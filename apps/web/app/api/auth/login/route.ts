@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { LoginInputSchema } from '@printflow/shared-types';
 import { prisma } from '@/lib/prisma';

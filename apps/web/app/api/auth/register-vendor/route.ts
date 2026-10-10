@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { RegisterVendorInputSchema, UserRole, PaperSize, PrintColor } from '@printflow/shared-types';
 import { prisma } from '@/lib/prisma';

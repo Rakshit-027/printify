@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 
 // In-memory or temporary buffer store for local development testing when Azure credentials are not provided

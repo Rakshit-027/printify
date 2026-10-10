@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAgentRequest } from '@/lib/agent-auth';
 import { generateDownloadSasUrl } from '@/lib/azure-storage';

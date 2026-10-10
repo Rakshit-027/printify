@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRoles } from '@/lib/auth';
 import { UserRole } from '@printflow/shared-types';
