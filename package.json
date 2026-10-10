@@ -14,7 +14,8 @@
     "db:generate": "npm --workspace=packages/database run generate",
     "db:push": "npm --workspace=packages/database run push",
     "db:seed": "npm --workspace=packages/database run seed",
-    "test": "npm --workspace=apps/web run test"
+    "test": "npm --workspace=apps/web run test",
+    "postinstall": "npm run db:generate"
   },
   "keywords": [
     "cloudprint",
