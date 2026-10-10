@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  transpilePackages: ["@printflow/shared-types", "@printflow/database"],
   turbopack: {
     root: path.join(__dirname, '../../'),
     rules: {
