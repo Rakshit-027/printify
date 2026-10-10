@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #FAF7F2;
+    --foreground: #0E1A3A;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  min-height: 100vh;
+  /* Next.js fonts */
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .ticket-card {
+    @apply bg-surface border border-hairline rounded-20 relative shadow-ink-soft overflow-hidden;
+  }
+  
+  /* Ticket semicircles on sides for confirmation screen */
+  .ticket-notch-left, .ticket-notch-right {
+    @apply absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-paper border border-hairline z-10;
+  }
+  .ticket-notch-left {
+    @apply -left-3 border-r-0 border-t-0 transform rotate-45;
+  }
+  .ticket-notch-right {
+    @apply -right-3 border-l-0 border-b-0 transform rotate-45;
+  }
+  
+  /* Perforated dashed line */
+  .ticket-divider {
+    @apply w-full border-t border-dashed border-hairline my-4;
+  }
+
+  /* Ruled paper background utility for empty states */
+  .ruled-paper {
+    background-image: repeating-linear-gradient(transparent, transparent 27px, #E7E1D6 28px);
+    background-size: 100% 28px;
+    background-attachment: local;
+  }
+}
+
+/* Base custom styles to maintain functionality */
+.glass-panel {
+  @apply bg-surface/90 backdrop-blur-md border border-hairline shadow-ink-soft;
+}
+.glass-card {
+  @apply bg-surface/80 backdrop-blur border border-hairline shadow-ink-soft rounded-20;
+}
+

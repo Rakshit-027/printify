@@ -1,0 +1,13 @@
+[Unit]
+Description=PrintFlow Document Retention and Stale Job Reaper Worker
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=printflow
+Group=printflow
+WorkingDirectory=/home/printflow/print-platform/background-worker
+EnvironmentFile=/home/printflow/print-platform/apps/web/.env
+ExecStart=/usr/bin/npm run run:retention
+StandardOutput=append:/var/log/printflow/retention.log
+StandardError=append:/var/log/printflow/retention.error.log

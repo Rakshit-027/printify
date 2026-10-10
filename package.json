@@ -1,0 +1,29 @@
+{
+  "name": "print-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production Online Printing & Vendor Management Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace=apps/web run dev",
+    "dev:agent": "npm --workspace=apps/desktop-agent run dev",
+    "build:web": "npm --workspace=apps/web run build",
+    "db:generate": "npm --workspace=packages/database run generate",
+    "db:push": "npm --workspace=packages/database run push",
+    "db:seed": "npm --workspace=packages/database run seed",
+    "test": "npm --workspace=apps/web run test"
+  },
+  "keywords": [
+    "cloudprint",
+    "vendor-management",
+    "nextjs",
+    "electron",
+    "razorpay",
+    "azure-blob-storage"
+  ],
+  "author": "PrintFlow Team",
+  "license": "UNLICENSED"
+}

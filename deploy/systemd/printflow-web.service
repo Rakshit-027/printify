@@ -1,0 +1,25 @@
+[Unit]
+Description=PrintFlow Next.js Production Web Application
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=printflow
+Group=printflow
+WorkingDirectory=/home/printflow/print-platform/apps/web
+EnvironmentFile=/home/printflow/print-platform/apps/web/.env
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5s
+StandardOutput=append:/var/log/printflow/web.log
+StandardError=append:/var/log/printflow/web.error.log
+
+# Memory & Process Protections for 4GB VPS
+MemoryMax=1800M
+TasksMax=1024
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

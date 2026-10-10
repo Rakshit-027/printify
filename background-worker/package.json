@@ -1,0 +1,19 @@
+{
+  "name": "@printflow/background-worker",
+  "version": "1.0.0",
+  "description": "Lightweight Document Retention & Job Reaper Worker for Linux VPS",
+  "main": "dist/retention-cleanup.js",
+  "scripts": {
+    "build": "tsc",
+    "run:retention": "tsx src/retention-cleanup.ts"
+  },
+  "dependencies": {
+    "@azure/storage-blob": "^12.17.0",
+    "@prisma/client": "^5.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "tsx": "^4.10.5",
+    "typescript": "^5.4.5"
+  }
+}

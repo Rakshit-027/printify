@@ -1,0 +1,25 @@
+{
+  "name": "@printflow/desktop-agent",
+  "version": "1.0.0",
+  "description": "Secure Windows Desktop Print Agent for PrintFlow Vendors",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "tsc && cp -r src/renderer dist/ && env GTK_IM_MODULE=xim electron . --disable-gpu",
+    "build": "tsc && cp -r src/renderer dist/",
+    "package:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.378.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.2",
+    "@types/react-dom": "^18.3.0",
+    "electron": "^30.0.9",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.5"
+  }
+}

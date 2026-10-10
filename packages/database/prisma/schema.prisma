@@ -1,0 +1,437 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------
+// ENUMS FOR STRICT STATE MACHINES
+// ---------------------------------------------------------
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  VENDOR_OWNER
+  VENDOR_STAFF
+}
+
+enum OrderStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  AWAITING_VENDOR_APPROVAL
+  CONFIRMED
+  PROCESSING
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  CASH_ON_COLLECTION
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  CASH_PENDING
+  CASH_COLLECTED
+}
+
+enum PrintJobStatus {
+  CREATED
+  QUEUED
+  CLAIMED_BY_DEVICE
+  DOWNLOADING
+  SUBMITTED_TO_SPOOLER
+  COMPLETED
+  FAILED
+  REQUIRES_MANUAL_REVIEW
+  CANCELLED
+}
+
+enum PaperSize {
+  A4
+  A3
+  LEGAL
+  LETTER
+}
+
+enum PrintColor {
+  BLACK_AND_WHITE
+  COLOR
+}
+
+enum DuplexMode {
+  SINGLE_SIDED
+  DOUBLE_SIDED_LONG_EDGE
+  DOUBLE_SIDED_SHORT_EDGE
+}
+
+// ---------------------------------------------------------
+// AUTHENTICATION & USERS
+// ---------------------------------------------------------
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phoneNumber  String?
+  role         UserRole @default(VENDOR_STAFF)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendorMemberships VendorMembership[]
+  auditLogs         AuditLog[]
+
+  @@index([email])
+}
+
+model Vendor {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  contactPhone    String
+  contactEmail    String
+  address         String
+  operatingHours  String?
+  isActive        Boolean  @default(true)
+  isApproved      Boolean  @default(false)
+  allowCashOnDesk Boolean  @default(true)
+  allowOnlinePayment Boolean @default(true)
+  requireApproval Boolean  @default(false)
+  retentionDays   Int      @default(30)
+  
+  // Vendor-Owned Payment Gateway (Direct to Vendor Bank)
+  razorpayKeyId         String?
+  razorpayKeySecret     String?
+  razorpayWebhookSecret String?
+  upiId                 String?
+
+  // Platform SaaS Subscription
+  subscriptionPlan      String    @default("TRIAL") // TRIAL, STARTER, PRO, ENTERPRISE
+  subscriptionExpiresAt DateTime?
+  isSubscriptionActive  Boolean   @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  memberships   VendorMembership[]
+  pricingConfig VendorPricing[]
+  devices       Device[]
+  printers      Printer[]
+  orders        Order[]
+  documents     Document[]
+  qrConfig      VendorQrConfig?
+
+  @@index([slug])
+}
+
+model VendorMembership {
+  id        String   @id @default(uuid())
+  userId    String
+  vendorId  String
+  role      UserRole @default(VENDOR_STAFF)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vendorId])
+}
+
+model VendorQrConfig {
+  id           String   @id @default(uuid())
+  vendorId     String   @unique
+  customColor  String?  @default("#000000")
+  logoBlobKey  String?
+  instructions String?
+  updatedAt    DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// PRICING MATRIX
+// ---------------------------------------------------------
+model VendorPricing {
+  id                String     @id @default(uuid())
+  vendorId          String
+  paperSize         PaperSize  @default(A4)
+  colorMode         PrintColor @default(BLACK_AND_WHITE)
+  isDuplex          Boolean    @default(false)
+  pricePerSideMinor Int
+  sheetChargeMinor  Int        @default(0)
+  minimumOrderMinor Int        @default(500)
+  isActive          Boolean    @default(true)
+  version           Int        @default(1)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, paperSize, colorMode, isDuplex, version])
+  @@index([vendorId, isActive])
+}
+
+// ---------------------------------------------------------
+// HARDWARE: DEVICES & PRINTERS
+// ---------------------------------------------------------
+model Device {
+  id             String    @id @default(uuid())
+  vendorId       String
+  deviceName     String
+  enrollmentCode String?   @unique
+  deviceKeyHash  String    @unique
+  osVersion      String?
+  agentVersion   String?
+  lastHeartbeat  DateTime?
+  isEnrolled     Boolean   @default(true)
+  isRevoked      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  printers  Printer[]
+  printJobs PrintJob[]
+
+  @@index([vendorId, isRevoked])
+}
+
+model Printer {
+  id             String      @id @default(uuid())
+  vendorId       String
+  deviceId       String
+  systemName     String
+  displayName    String
+  supportedSizes PaperSize[]
+  supportsColor  Boolean     @default(false)
+  supportsDuplex Boolean     @default(false)
+  isDefault      Boolean     @default(false)
+  isOnline       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  device    Device     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  printJobs PrintJob[]
+
+  @@unique([deviceId, systemName])
+}
+
+// ---------------------------------------------------------
+// DOCUMENT UPLOADS & AZURE METADATA
+// ---------------------------------------------------------
+model Document {
+  id             String   @id @default(uuid())
+  vendorId       String
+  originalName   String
+  sanitizedName  String
+  blobKey        String   @unique
+  mimeType       String
+  sizeBytes      BigInt
+  pageCount      Int
+  sha256Hash     String?
+  isVerified     Boolean  @default(false)
+  isPurged       Boolean  @default(false)
+  retentionUntil DateTime
+  createdAt      DateTime @default(now())
+
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([retentionUntil, isPurged])
+}
+
+model DocumentUploadSession {
+  id           String   @id @default(uuid())
+  vendorId     String
+  sessionToken String   @unique
+  expectedSize BigInt
+  mimeType     String
+  blobKey      String   @unique
+  expiresAt    DateTime
+  isCompleted  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([sessionToken])
+}
+
+// ---------------------------------------------------------
+// ORDERS & FINANCIAL RECORDS
+// ---------------------------------------------------------
+model Order {
+  id               String        @id @default(uuid())
+  vendorId         String
+  orderNumber      String
+  trackingToken    String        @unique
+  customerPhone    String?
+  customerName     String?
+  customerNotes    String?
+  status           OrderStatus   @default(DRAFT)
+  paymentMethod    PaymentMethod @default(RAZORPAY)
+  paymentStatus    PaymentStatus @default(PENDING)
+  subtotalMinor    Int
+  taxMinor         Int           @default(0)
+  totalAmountMinor Int
+  currency         String        @default("INR")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  vendor    Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  items     OrderItem[]
+  payments  Payment[]
+  printJobs PrintJob[]
+
+  @@unique([vendorId, orderNumber])
+  @@index([trackingToken])
+  @@index([vendorId, status])
+}
+
+model OrderItem {
+  id             String     @id @default(uuid())
+  orderId        String
+  documentId     String
+  paperSize      PaperSize  @default(A4)
+  colorMode      PrintColor @default(BLACK_AND_WHITE)
+  duplexMode     DuplexMode @default(SINGLE_SIDED)
+  copies         Int        @default(1)
+  pageRange      String?
+  totalSides     Int
+  totalSheets    Int
+  unitPriceMinor Int
+  itemTotalMinor Int
+
+  order    Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+}
+
+model Payment {
+  id                String        @id @default(uuid())
+  orderId           String
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  amountMinor       Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  failureReason     String?
+  rawPayload        Json?
+  verifiedAt        DateTime?
+  createdAt         DateTime      @default(now())
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds Refund[]
+
+  @@index([orderId])
+}
+
+model Refund {
+  id               String   @id @default(uuid())
+  paymentId        String
+  razorpayRefundId String?  @unique
+  amountMinor      Int
+  reason           String?
+  status           String   @default("PROCESSED")
+  createdAt        DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// PRINT EXECUTION LIFECYCLE
+// ---------------------------------------------------------
+model PrintJob {
+  id           String         @id @default(uuid())
+  orderId      String
+  vendorId     String
+  deviceId     String?
+  printerId    String?
+  status       PrintJobStatus @default(CREATED)
+  claimToken   String?
+  claimExpires DateTime?
+  attempts     Int            @default(0)
+  maxAttempts  Int            @default(3)
+  lastError    String?
+  spooledAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  device  Device?         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  printer Printer?        @relation(fields: [printerId], references: [id], onDelete: SetNull)
+  events  PrintJobEvent[]
+
+  @@index([vendorId, status])
+  @@index([deviceId, status])
+  @@index([claimExpires])
+}
+
+model PrintJobEvent {
+  id         String         @id @default(uuid())
+  printJobId String
+  status     PrintJobStatus
+  message    String?
+  metadata   Json?
+  createdAt  DateTime       @default(now())
+
+  printJob PrintJob @relation(fields: [printJobId], references: [id], onDelete: Cascade)
+
+  @@index([printJobId])
+}
+
+// ---------------------------------------------------------
+// SYSTEM RELIABILITY & AUDITING
+// ---------------------------------------------------------
+model WebhookEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  provider   String   @default("RAZORPAY")
+  eventType  String
+  payload    Json
+  processed  Boolean  @default(false)
+  error      String?
+  receivedAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([processed])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([resource, resourceId])
+  @@index([createdAt])
+}
+
+model RetentionTask {
+  id             String    @id @default(uuid())
+  taskType       String    @default("EXPIRED_BLOB_CLEANUP")
+  status         String    @default("PENDING")
+  blobsEvaluated Int       @default(0)
+  blobsPurged    Int       @default(0)
+  errors         String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+}

@@ -1,0 +1,2077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' http://localhost:* https://*.windows.net data:;">
+  <title>PrintFlow Workstation Desktop Agent</title>
+  <style>
+    :root {
+      --bg-base: #FAF7F2;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F8FAFC;
+      --border-subtle: #E2E8F0;
+      --border-hover: #CBD5E1;
+      --primary: #10B981;
+      --primary-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.15);
+      --cyan: #06b6d4;
+      --amber: #f59e0b;
+      --violet: #8b5cf6;
+      --rose: #ef4444;
+      --text-main: #0E1A3A;
+      --text-muted: #4A5568;
+      --text-dim: #64748b;
+}
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: rgba(14, 26, 58, 0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(14, 26, 58, 0.15); }
+
+    input, select, textarea {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      cursor: text !important;
+      pointer-events: auto !important;
+    }
+    button, .clickable {
+      cursor: pointer !important;
+      pointer-events: auto !important;
+    }
+    button, .clickable {
+      cursor: pointer !important;
+    }
+
+    #toast-banner {
+      display: none;
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      z-index: 10000;
+      background: linear-gradient(135deg, #065f46, #047857);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(16, 185, 129, 0.3);
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      align-items: center;
+      gap: 12px;
+    }
+
+    header {
+      background: var(--bg-card);
+      
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 16px 32px; box-shadow: 0 8px 30px rgba(14, 26, 58, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px var(--primary-glow);
+    }
+    .brand-logo svg {
+      width: 22px;
+      height: 22px;
+      color: #04121e;
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-chip {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .status-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rose);
+      box-shadow: 0 0 8px var(--rose);
+      transition: all 0.3s;
+    }
+    .status-pulse.online {
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary);
+      animation: pulseAnim 2s infinite;
+    }
+    @keyframes pulseAnim {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+    .btn svg { width: 14px; height: 14px; }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #FFFFFF;
+      border-color: rgba(52, 211, 153, 0.3);
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-color: rgba(14, 26, 58, 0.06);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+    }
+    .btn-outline {
+      background: transparent;
+      border-color: rgba(14, 26, 58, 0.06);
+      color: var(--text-muted);
+    }
+    .btn-outline:hover {
+      border-color: var(--border-hover);
+      color: var(--text-main);
+      background: rgba(14, 26, 58, 0.05);
+    }
+    .btn-amber {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
+    .btn-amber:hover {
+      background: rgba(245, 158, 11, 0.25);
+      color: var(--text-main);
+    }
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.22);
+      color: var(--text-main);
+    }
+
+    .kpi-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      padding: 24px 32px 0;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 24px 32px;
+      box-shadow: 0 8px 30px rgba(14, 26, 58, 0.08);
+      position: relative;
+      overflow: hidden;
+      
+      transition: border-color 0.2s;
+    }
+    .kpi-card:hover {
+      border-color: var(--border-hover);
+    }
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .kpi-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .kpi-icon svg { width: 15px; height: 15px; }
+    .kpi-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 6px;
+      letter-spacing: -0.5px;
+    }
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px 16px 32px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .tabs-group {
+      display: flex;
+      gap: 8px;
+      background: var(--bg-base);
+      padding: 6px;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+    }
+    .tab-item {
+      padding: 10px 18px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tab-item svg { width: 16px; height: 16px; }
+    .tab-item:hover { color: var(--text-main); }
+    .tab-item.active {
+      color: var(--text-main);
+      background: var(--bg-card);
+      box-shadow: 0 4px 12px rgba(14, 26, 58, 0.05);
+    }
+    .tab-counter {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 12px;
+      background: rgba(14, 26, 58, 0.08);
+      color: var(--text-muted);
+    }
+    .tab-item.active .tab-counter {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--primary);
+    }
+
+    .filters-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-input {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #fff;
+      outline: none;
+      width: 170px;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--primary);
+      width: 210px;
+    }
+    .filter-pill {
+      padding: 5px 11px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-pill:hover {
+      color: var(--text-main);
+      border-color: var(--border-hover);
+    }
+    .filter-pill.active {
+      background: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+      position: relative;
+    }
+    .view-pane {
+      display: none;
+    }
+    .view-pane.active {
+      display: block;
+    }
+
+    .orders-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .order-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 8px 30px rgba(14, 26, 58, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      
+      transition: all 0.2s;
+    }
+    .order-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-hover);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    .order-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .order-num-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .order-id {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.3px;
+    }
+    .status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-cyan { background: rgba(6, 182, 212, 0.15); color: #38bdf8; border: 1px solid rgba(6, 182, 212, 0.3); }
+    .badge-gray { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); }
+
+    .order-time {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .order-middle {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 24px;
+      align-items: center;
+      background: var(--bg-base);
+      border-radius: 12px;
+      padding: 24px 32px;
+      border: 1px solid rgba(14, 26, 58, 0.05);
+    }
+    .doc-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .doc-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan);
+      flex-shrink: 0;
+    }
+    .doc-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 280px;
+    }
+    .doc-specs {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      display: flex;
+      gap: 6px;
+    }
+    .spec-pill {
+      background: rgba(14, 26, 58, 0.05);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .customer-info {
+      font-size: 12px;
+    }
+    .customer-name {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .customer-phone {
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .price-block {
+      display: flex;
+      flex-direction: column;
+    }
+    .price-val {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+    .payment-tag {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .pay-success { color: #34d399; }
+    .pay-pending { color: #fbbf24; }
+
+    .order-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .printers-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 32px;
+      
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .form-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input, .form-select {
+      background: var(--bg-base);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+
+    .printer-row {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      transition: all 0.2s;
+    }
+    .printer-row:hover {
+      border-color: var(--border-hover);
+      background: rgba(6, 10, 18, 0.9);
+    }
+    .printer-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .printer-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .printer-badges {
+      display: flex;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .standee-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 0;
+    }
+    .standee-card {
+      background: var(--bg-card);
+      border: 2px solid rgba(16, 185, 129, 0.3);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.15);
+      border-radius: 24px;
+      padding: 48px;
+      width: 440px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+    .standee-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 20px var(--primary-glow);
+    }
+    .standee-logo svg { width: 28px; height: 28px; color: #FFFFFF; }
+    .standee-qr-frame {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      margin: 8px 0;
+    }
+
+    .terminal-box {
+      background: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      height: calc(100vh - 240px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #F8FAFC;
+    }
+    .term-header {
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .term-body {
+      flex: 1;
+      padding: 24px 32px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .log-entry {
+      display: flex;
+      gap: 12px;
+    }
+    .log-ts { color: var(--text-dim); }
+    .log-lvl-info { color: #38bdf8; font-weight: 700; }
+    .log-lvl-warn { color: #fbbf24; font-weight: 700; }
+    .log-lvl-error { color: #f87171; font-weight: 700; }
+    .log-lvl-success { color: #34d399; font-weight: 700; }
+
+    #auth-view {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 10, 18, 0.94);
+      
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      pointer-events: auto !important;
+    }
+    .auth-modal {
+      background: var(--bg-card);
+      border: 1px solid rgba(14, 26, 58, 0.1);
+      border-radius: 24px;
+      padding: 48px;
+      width: 480px;
+      max-width: 95vw;
+      box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.12);
+      position: relative;
+      pointer-events: auto !important;
+    }
+    .auth-modal-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .auth-tabs {
+      display: flex;
+      background: var(--border-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+    .auth-tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .auth-tab-btn.active {
+      background: rgba(30, 41, 59, 0.9);
+      color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    .auth-err-banner {
+      display: none;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      color: #fb7185;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notification -->
+  <div id="toast-banner">
+    <span id="toast-msg">Workstation initialized.</span>
+    <button onclick="hideToast()" style="background:transparent;border:none;color:var(--text-main);cursor:pointer;font-weight:bold;margin-left:8px;">✕</button>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 14H8v-4h8v4zm4-4h-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4z"/><circle cx="18" cy="11.5" r="1"/></svg>
+      </div>
+      <div class="brand-title-wrap">
+        <div class="brand-title">
+          <span>PrintFlow Workstation Agent</span>
+          <span class="badge-chip">Production v1.0</span>
+        </div>
+        <div class="brand-subtitle">
+          <div class="status-pulse" id="status-dot"></div>
+          <span id="store-title-text" style="font-weight:600;color: var(--text-main);">Connecting to Spooler...</span>
+          <span style="color:var(--text-dim);">•</span>
+          <span id="station-name-text">Counter Workstation 01</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-secondary" id="btn-toggle-polling" onclick="togglePolling()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        <span>Pause Polling</span>
+      </button>
+      <button class="btn btn-outline" onclick="openVirtualFolder()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+        <span>Spool Folder</span>
+      </button>
+      <button class="btn btn-outline" onclick="syncAllPrinters()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        <span>Sync</span>
+      </button>
+      <button class="btn btn-outline" onclick="openStandeeTab()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-3 2h2v3h-2zm3 3h3v3h-3zm-2 2h2v2h-2zm-3-4h3v2h-3z"/></svg>
+        <span>Store QR</span>
+      </button>
+      
+    </div>
+  </header>
+
+  <!-- KPI Analytics HUD -->
+  <div class="kpi-bar">
+    <div class="kpi-card" style="cursor:pointer;" onclick="setQueueFilter('PENDING')">
+      <div class="kpi-header">
+        <span class="kpi-label">Incoming &amp; Cash Orders</span>
+        <div class="kpi-icon" style="background:rgba(245,158,11,0.15);color:var(--amber);">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+        </div>
+      </div>
+      <div class="kpi-val" id="kpi-pending-count" style="color:var(--amber);">0</div>
+      <div class="kpi-sub" id="kpi-pending-sub">Awaiting print or cash approval • Click to filter</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">Total Store Volume</span>
+        <div class="kpi-icon" style="background:rgba(16,185,129,0.15);color:var(--primary);">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+        </div>
+      </div>
+      <div class="kpi-val" id="kpi-total-revenue" style="color:var(--primary);">₹0</div>
+      <div class="kpi-sub" id="kpi-total-orders-sub">0 total orders in cloud DB</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">B&amp;W Laser Spooler</span>
+        <div class="kpi-icon" style="background:rgba(6,182,212,0.15);color:var(--cyan);">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-5 11H8v-4h6v4z"/></svg>
+        </div>
+      </div>
+      <div class="kpi-val" id="kpi-bw-printer-name" style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Default Laser</div>
+      <div class="kpi-sub" id="kpi-bw-sub">Ready for high-speed print</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header">
+        <span class="kpi-label">Color Photo Spooler</span>
+        <div class="kpi-icon" style="background:rgba(139,92,246,0.15);color:var(--violet);">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19H12v2h7.65l-.62-1.39C20.26 18.07 21 16.12 21 14c0-4.97-4.03-9-9-9z"/></svg>
+        </div>
+      </div>
+      <div class="kpi-val" id="kpi-color-printer-name" style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Default Color</div>
+      <div class="kpi-sub" id="kpi-color-sub">Smart color separation active</div>
+    </div>
+  </div>
+
+  <!-- Navigation Bar -->
+  <div class="nav-bar">
+    <div class="tabs-group">
+      <button class="tab-item active" id="tab-orders" onclick="switchMainTab('orders')">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        <span>Live Print Queue</span>
+        <span class="tab-counter" id="badge-orders-count">0</span>
+      </button>
+
+      <button class="tab-item" id="tab-printers" onclick="switchMainTab('printers')">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 14H8v-4h8v4zm4-4h-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4z"/></svg>
+        <span>Hardware &amp; Routing</span>
+        <span class="tab-counter" id="badge-printers-count">0</span>
+      </button>
+
+      <button class="tab-item" id="tab-pricing" onclick="switchMainTab('pricing')">
+        <svg fill="currentColor" viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+        <span>Per-Page Rates &amp; Sizes</span>
+      </button>
+
+      <button class="tab-item" id="tab-standee" onclick="switchMainTab('standee')">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm13-2h3v2h-3zm-3 2h2v3h-2zm3 3h3v3h-3zm-2 2h2v2h-2zm-3-4h3v2h-3z"/></svg>
+        <span>Countertop QR Standee</span>
+      </button>
+
+      <button class="tab-item" id="tab-terminal" onclick="switchMainTab('terminal')">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-12-3l3.5-3.5L8 8l1.41-1.41L14.33 11.5l-4.92 4.91L8 15zm6 0h4v2h-4v-2z"/></svg>
+        <span>Spooler Terminal</span>
+        <span class="tab-counter" id="badge-logs-count">0</span>
+      </button>
+
+      <button class="tab-item" id="tab-settings" onclick="switchMainTab('settings')">
+        <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+        <span>Agent Settings</span>
+      </button>
+    </div>
+
+    <div class="filters-group" id="queue-filter-controls">
+      <input type="text" class="search-input" id="queue-search" placeholder="Search order / customer..." oninput="filterOrders()" />
+      <button class="filter-pill active" onclick="setQueueFilter('ALL')">ALL</button>
+      <button class="filter-pill" onclick="setQueueFilter('PENDING')">PENDING CASH</button>
+      <button class="filter-pill" onclick="setQueueFilter('CONFIRMED')">PRINTING</button>
+      <button class="filter-pill" onclick="setQueueFilter('READY')">READY</button>
+      <button class="filter-pill" onclick="setQueueFilter('COMPLETED')">COMPLETED</button>
+    </div>
+  </div>
+
+  <!-- Main Views -->
+  <div class="content-area">
+
+    <!-- 1. LIVE PRINT QUEUE VIEW -->
+    <div class="view-pane active" id="pane-orders">
+      <div class="orders-grid" id="orders-list-wrap">
+        <div style="text-align:center;padding:50px;color:var(--text-dim);">Connecting to local print spooler and cloud queue...</div>
+      </div>
+    </div>
+
+    <!-- 2. PRINTER HARDWARE & ROUTING VIEW -->
+    <div class="view-pane" id="pane-printers">
+      <div class="printers-layout">
+        
+        <div class="card-panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width:18px;height:18px;color:var(--primary);"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+              Smart Zero-Touch Hardware Routing
+            </span>
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:11px;" onclick="saveRoutingPrefs()">
+              Save Routing Rules
+            </button>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);line-height:1.6;">
+            PrintFlow inspects incoming PDFs page-by-page. B&amp;W jobs dispatch straight to your high-speed laser, while full-color photo jobs route seamlessly to your color inkjet or color laser.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Default B&amp;W Laser Printer</label>
+            <select class="form-select" id="select-bw-printer">
+              <option value="">(Loading system printers...)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Default Color Laser / Inkjet Printer</label>
+            <select class="form-select" id="select-color-printer">
+              <option value="">(Loading system printers...)</option>
+            </select>
+          </div>
+
+          <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:12px 14px;border-radius: 12px;font-size:12px;color:#34d399;">
+            💡 <strong>Zero-Hardware Safe Mode:</strong> Virtual printers write PDF output with full print job manifests directly into <code>~/PrintFlow-Virtual-Prints</code> for proofing.
+          </div>
+        </div>
+
+        <div class="card-panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width:18px;height:18px;color:var(--cyan);"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-5 11H8v-4h6v4z"/></svg>
+              Connected Hardware Spoolers (<span id="hw-count-text">0</span>)
+            </span>
+            <button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="syncAllPrinters()">
+              Rescan Hardware
+            </button>
+          </div>
+
+          <div id="printers-cards-list" style="display:flex;flex-direction:column;gap:10px;max-height:450px;overflow-y:auto;">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 3. PER-PAGE PRICING & SIZES VIEW -->
+    <div class="view-pane" id="pane-pricing">
+      <div style="max-width: 960px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 20px;">
+        <!-- Header Card -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 24px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px;">
+              <span>💵 Per-Page Pricing &amp; Paper Size Station</span>
+              <span class="badge-chip">Live Rates</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+              Configure custom per-page rates and active paper sizes for walk-up counter customers &amp; web uploads.
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 6px 12px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);">MIN ORDER:</span>
+              <span style="color: var(--primary); font-weight: 800; font-size: 13px;">₹</span>
+              <input type="number" id="inp-desktop-min-order" value="5" step="0.5" min="1" max="100" style="width: 50px; background: transparent; border: none; color: #fff; font-weight: 800; font-size: 13px; text-align: center; outline: none;" />
+            </div>
+            <button class="btn btn-primary" onclick="savePricingMatrix()">
+              💾 Save Rates &amp; Sizes
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Presets Strip -->
+        <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 14px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div style="font-size: 12px; font-weight: 700; color: #a5b4fc; display: flex; align-items: center; gap: 6px;">
+            <span>✨ Rate Presets:</span>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="applyDesktopPreset(2.0, 1.75, 10.0, 9.0, 5)">
+              Campus: ₹2 B&amp;W / ₹10 Color
+            </button>
+            <button class="btn btn-secondary" onclick="applyDesktopPreset(1.5, 1.25, 8.0, 7.5, 5)">
+              Discount: ₹1.50 B&amp;W / ₹8 Color
+            </button>
+            <button class="btn btn-secondary" onclick="applyDesktopPreset(3.0, 2.5, 15.0, 12.0, 10)">
+              Photo: ₹3 B&amp;W / ₹15 Color
+            </button>
+          </div>
+        </div>
+
+        <!-- Paper Sizes Grid -->
+        <div id="desktop-pricing-matrix" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. COUNTERTOP QR STANDEE VIEW -->
+    <div class="view-pane" id="pane-standee">
+      <div class="standee-container">
+        <div class="standee-card">
+          <div class="standee-logo">
+            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 14H8v-4h8v4zm4-4h-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4z"/></svg>
+          </div>
+          <div>
+            <h2 style="font-size:22px;font-weight:800;color: var(--text-main);" id="standee-store-name">SpeedyPrint Express</h2>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">Official Self-Service Print Kiosk Standee</p>
+          </div>
+
+          <div class="standee-qr-frame" id="standee-qr-container">
+            
+            <img id="qr-image" width="180" height="180" src="" style="border-radius: 12px; display: none;" />
+            <div id="qr-loading" style="width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; font-weight: 600;">
+              Loading QR...
+            </div>
+
+          </div>
+
+          <div>
+            <div style="font-size:14px;font-weight:700;color: var(--text-main);">Scan with Phone Camera</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Upload documents instantly from mobile &amp; pay via UPI</div>
+          </div>
+
+          <div style="display:flex;gap:10px;width:100%;">
+            <button class="btn btn-primary" style="flex:1;justify-content:center;" onclick="openStoreCustomerPage()">
+              Open Webpage
+            </button>
+            <button class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="printStandeeCard()">
+              🖨️ Print Standee
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. SPOOLER TERMINAL VIEW -->
+    <div class="view-pane" id="pane-terminal">
+      <div class="terminal-box">
+        <div class="term-header">
+          <span>REAL-TIME PRINT SPOOLER TELEMETRY STREAM</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline" style="padding:2px 8px;font-size:10px;" onclick="clearLogs()">Clear Console</button>
+          </div>
+        </div>
+        <div class="term-body" id="term-logs-body">
+          <div class="log-entry">
+            <span class="log-ts">[00:00:00]</span>
+            <span class="log-lvl-info">[SYSTEM]</span>
+            <span>PrintFlow Workstation Agent initialized. Ready for incoming print queues.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INLINE AUTH VIEW (Non-blocking, explicitly interactive) -->
+  <div id="auth-view">
+    <div class="auth-modal">
+      <div class="auth-modal-header">
+        <div class="brand-logo" style="margin:0 auto 14px;width:48px;height:48px;">
+          <svg fill="currentColor" viewBox="0 0 24 24"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 14H8v-4h8v4zm4-4h-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4z"/></svg>
+        </div>
+        <h2 style="font-size:20px;font-weight:800;color: var(--text-main);">Connect Print Workstation</h2>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:6px;">Link this PC to your vendor store to automatically receive and print orders.</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab-btn active" id="btn-tab-login" onclick="setAuthTab('login')">Vendor Account Login</button>
+        <button class="auth-tab-btn" id="btn-tab-code" onclick="setAuthTab('code')">Station Enrollment Code</button>
+      </div>
+
+      <div class="auth-err-banner" id="auth-error-box"></div>
+
+      <!-- Form 1: Vendor Email/Password Login -->
+      <form id="auth-form-login" onsubmit="handleVendorLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Vendor Email Address</label>
+          <input type="email" class="form-input" id="inp-email" required value="vendor@speedyprint.com" placeholder="vendor@printflow.in" autofocus tabindex="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="inp-password" required value="Vendor@123456" placeholder="••••••••" tabindex="2" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Workstation Counter Name</label>
+          <input type="text" class="form-input" id="inp-devicename" value="Counter-Workstation-01" tabindex="3" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Backend Server URL</label>
+          <input type="text" class="form-input" id="inp-backend-url" value="http://localhost:3000" tabindex="4" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-submit-login" style="width:100%;padding:12px;justify-content:center;margin-top:10px;" tabindex="5">
+          Sign In &amp; Connect Station
+        </button>
+      </form>
+
+      <!-- Form 2: Station Enrollment Code -->
+      <form id="auth-form-code" onsubmit="handleCodeEnroll(event)" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">One-Time Workstation Enrollment Code</label>
+          <input type="text" class="form-input" id="inp-code" required value="ENROLL-SPEE-A5A29A" placeholder="ENROLL-APEX-A8F2" tabindex="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Workstation Counter Name</label>
+          <input type="text" class="form-input" id="inp-devicename-code" value="Counter-Workstation-01" tabindex="2" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Backend Server URL</label>
+          <input type="text" class="form-input" id="inp-backend-url-code" value="http://localhost:3000" tabindex="3" />
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-submit-code" style="width:100%;padding:12px;justify-content:center;margin-top:10px;" tabindex="4">
+          Enroll Device Station
+        </button>
+      </form>
+
+      <!-- Quick 1-Click Demo Preview Mode -->
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(14, 26, 58, 0.08);text-align:center;">
+        <button type="button" class="btn btn-secondary" onclick="enterInstantDemoMode()" style="width:100%;justify-content:center;padding:10px;background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.3);color:#34d399;">
+          ⚡ Instant Demo Mode (Preview Full Dashboard)
+        </button>
+      </div>
+    </div>
+  
+    <!-- 6. SETTINGS VIEW -->
+    <div class="view-pane" id="pane-settings">
+      <div class="card-panel" style="max-width: 600px; margin: 0 auto; margin-top: 40px;">
+        <div class="panel-header" style="margin-bottom: 24px;">
+          <span class="panel-title" style="font-size:20px;">Agent Settings</span>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:24px;">
+          <label class="form-label">Station Name</label>
+          <div style="font-size:16px; font-weight:800; color:var(--text-main); margin-top:8px;" id="settings-station-name">Counter Workstation 01</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:24px;">
+          <label class="form-label">Vendor Store</label>
+          <div style="font-size:16px; font-weight:800; color:var(--text-main); margin-top:8px;" id="settings-store-name">Store Name</div>
+        </div>
+        
+        <div class="form-group" style="margin-bottom:32px;">
+          <label class="form-label">Backend URL</label>
+          <div style="font-size:14px; color:var(--text-muted); margin-top:8px;" id="settings-backend-url">http://localhost:3000</div>
+        </div>
+
+        <div style="display:flex; gap:16px; align-items:center; border-top: 1px solid var(--border-subtle); padding-top:24px;">
+          <button class="btn btn-danger" style="padding:14px 24px; font-size:14px; flex:1; justify-content:center;" onclick="promptLogout()">
+            <svg fill="currentColor" viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+            <span>Disconnect Workstation</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = window.printAgentApi;
+    let appStatus = null;
+    let printersList = [];
+    let ordersList = [];
+    let currentFilter = "ALL";
+    let isPolling = true;
+    let logCounter = 0;
+
+    function showToast(msg) {
+      const banner = document.getElementById("toast-banner");
+      document.getElementById("toast-msg").innerText = msg;
+      banner.style.display = "flex";
+      setTimeout(hideToast, 5000);
+    }
+    function hideToast() {
+      document.getElementById("toast-banner").style.display = "none";
+    }
+
+    function switchMainTab(tabName) {
+      document.querySelectorAll(".tab-item").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-pane").forEach(p => p.classList.remove("active"));
+      
+      const tabBtn = document.getElementById("tab-" + tabName);
+      const pane = document.getElementById("pane-" + tabName);
+      if (tabBtn) tabBtn.classList.add("active");
+      if (pane) pane.classList.add("active");
+
+      const filterControls = document.getElementById("queue-filter-controls");
+      if (filterControls) {
+        filterControls.style.display = tabName === "orders" ? "flex" : "none";
+      }
+
+      if (tabName === "pricing") {
+        loadPricingData();
+      }
+    }
+
+    function openStandeeTab() {
+      switchMainTab("standee");
+    }
+
+    function setQueueFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll(".filter-pill").forEach(p => {
+        p.classList.toggle("active", p.innerText === filter || (filter === "PENDING" && p.innerText.includes("PENDING")));
+      });
+      renderOrders();
+    }
+
+    function filterOrders() {
+      renderOrders();
+    }
+
+    function setAuthTab(tab) {
+      document.getElementById("btn-tab-login").classList.toggle("active", tab === "login");
+      document.getElementById("btn-tab-code").classList.toggle("active", tab === "code");
+      document.getElementById("auth-form-login").style.display = tab === "login" ? "block" : "none";
+      document.getElementById("auth-form-code").style.display = tab === "code" ? "block" : "none";
+      document.getElementById("auth-error-box").style.display = "none";
+      
+      if (tab === "login") {
+        document.getElementById("inp-email").focus();
+      } else {
+        document.getElementById("inp-code").focus();
+      }
+    }
+
+    function showAuthView() {
+      document.getElementById("auth-view").style.display = "flex";
+      setTimeout(() => {
+        const inp = document.getElementById("inp-email");
+        if (inp) inp.focus();
+      }, 100);
+    }
+    function hideAuthView() {
+      document.getElementById("auth-view").style.display = "none";
+    }
+
+    function showAuthError(msg) {
+      const box = document.getElementById("auth-error-box");
+      box.innerText = msg;
+      box.style.display = "block";
+    }
+
+    async function refreshAll() {
+      if (!api) return;
+      try {
+        appStatus = await api.getStatus();
+        printersList = appStatus.printers || [];
+
+        if (!appStatus.isEnrolled) {
+          showAuthView();
+          document.getElementById("status-dot").className = "status-pulse";
+          document.getElementById("store-title-text").innerText = "Not Connected";
+          document.getElementById("station-name-text").innerText = "Unregistered Workstation";
+          return;
+        }
+
+        hideAuthView();
+        document.getElementById("status-dot").className = "status-pulse online";
+        const vName = appStatus.config?.vendorName || "Active Store";
+        const stationName = appStatus.config?.deviceName || "Counter Workstation 01";
+        document.getElementById("store-title-text").innerText = vName;
+        document.getElementById("station-name-text").innerText = stationName;
+        
+        document.getElementById("standee-store-name").innerText = vName;
+        
+        // Generate Dynamic QR Code
+        if (appStatus.config && appStatus.config.backendUrl && appStatus.config.vendorSlug) {
+          const storeUrl = appStatus.config.backendUrl + "/v/" + appStatus.config.vendorSlug;
+          const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(storeUrl);
+          const img = document.getElementById("qr-image");
+          img.onload = () => {
+            img.style.display = "block";
+            document.getElementById("qr-loading").style.display = "none";
+          };
+          img.src = qrUrl;
+        }
+
+
+        isPolling = Boolean(appStatus.config?.isPollingActive);
+        updatePollingButton();
+
+        renderPrinters();
+        await fetchOrders();
+        await loadPricingData();
+      } catch (err) {
+        console.error("Refresh error:", err);
+      }
+    }
+
+    async function togglePolling() {
+      if (!api) return;
+      isPolling = !isPolling;
+      await api.togglePolling(isPolling);
+      updatePollingButton();
+      showToast(isPolling ? "Auto-print queue polling active (10s interval)" : "Auto-print paused by operator");
+    }
+
+    function updatePollingButton() {
+      const btn = document.getElementById("btn-toggle-polling");
+      if (isPolling) {
+        btn.innerHTML = `<svg fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg><span>Pause Polling</span>`;
+        btn.className = "btn btn-secondary";
+      } else {
+        btn.innerHTML = `<svg fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Resume Auto-Print</span>`;
+        btn.className = "btn btn-primary";
+      }
+    }
+
+    async function openVirtualFolder() {
+      if (!api) return;
+      const res = await api.openPrintsFolder();
+      if (res.success) {
+        showToast("Opened virtual spooler folder: " + res.folder);
+      }
+    }
+
+    function renderPrinters() {
+      document.getElementById("badge-printers-count").innerText = printersList.length;
+      document.getElementById("hw-count-text").innerText = printersList.length;
+
+      const bwSelect = document.getElementById("select-bw-printer");
+      const colorSelect = document.getElementById("select-color-printer");
+      const listWrap = document.getElementById("printers-cards-list");
+
+      const savedBw = appStatus?.config?.defaultBwPrinter || "";
+      const savedColor = appStatus?.config?.defaultColorPrinter || "";
+
+      let optionsHtml = `<option value="">System Default Printer</option>`;
+      printersList.forEach(p => {
+        optionsHtml += `<option value="${p.systemName}">${p.displayName || p.systemName}</option>`;
+      });
+      bwSelect.innerHTML = optionsHtml;
+      colorSelect.innerHTML = optionsHtml;
+
+      if (savedBw) bwSelect.value = savedBw;
+      if (savedColor) colorSelect.value = savedColor;
+
+      const currentBwPrinter = printersList.find(p => p.systemName === savedBw) || printersList.find(p => p.isDefault) || printersList[0];
+      const currentColorPrinter = printersList.find(p => p.systemName === savedColor) || printersList.find(p => p.supportsColor) || printersList[0];
+
+      if (currentBwPrinter) {
+        document.getElementById("kpi-bw-printer-name").innerText = currentBwPrinter.displayName || currentBwPrinter.systemName;
+      }
+      if (currentColorPrinter) {
+        document.getElementById("kpi-color-printer-name").innerText = currentColorPrinter.displayName || currentColorPrinter.systemName;
+      }
+
+      listWrap.innerHTML = "";
+      printersList.forEach(p => {
+        const row = document.createElement("div");
+        row.className = "printer-row";
+        const isBwDefault = p.systemName === savedBw || (!savedBw && p.isDefault);
+        const isColorDefault = p.systemName === savedColor;
+
+        row.innerHTML = `
+          <div class="printer-info">
+            <div class="printer-name">
+              <span>${p.displayName || p.systemName}</span>
+              ${p.isDefault ? '<span class="badge-chip">OS Default</span>' : ''}
+              ${isBwDefault ? '<span class="badge-chip" style="color:var(--cyan);border-color:rgba(6,182,212,0.3);background:rgba(6,182,212,0.15);">Active B&W</span>' : ''}
+              ${isColorDefault ? '<span class="badge-chip" style="color:var(--violet);border-color:rgba(139,92,246,0.3);background:rgba(139,92,246,0.15);">Active Color</span>' : ''}
+            </div>
+            <div class="printer-badges">
+              <span>${p.supportsColor ? "🎨 Full Color" : "⬛ Monochrome"}</span>
+              <span>•</span>
+              <span>${p.supportsDuplex ? "Two-Sided (Duplex)" : "Single Sided"}</span>
+              <span>•</span>
+              <span>${p.isVirtual ? "Virtual Emulated Spooler" : "Hardware Driver"}</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="padding:6px 12px;font-size:11px;" onclick="testPrintPrinter('${p.systemName}')">
+            🖨️ Test Print
+          </button>
+        `;
+        listWrap.appendChild(row);
+      });
+    }
+
+    async function syncAllPrinters() {
+      if (!api) return;
+      showToast("Scanning operating system spoolers...");
+      const res = await api.syncPrinters();
+      if (res.success) {
+        printersList = res.printers || [];
+        renderPrinters();
+        showToast("Synchronized " + printersList.length + " printers!");
+      }
+    }
+
+    async function saveRoutingPrefs() {
+      if (!api) return;
+      const defaultBwPrinter = document.getElementById("select-bw-printer").value;
+      const defaultColorPrinter = document.getElementById("select-color-printer").value;
+      await api.setPrinterPreference({ defaultBwPrinter, defaultColorPrinter });
+      showToast("Smart routing preferences updated!");
+      refreshAll();
+    }
+
+    async function testPrintPrinter(name) {
+      if (!api) return;
+      showToast("Sending test document to " + name + "...");
+      const res = await api.testPrint(name);
+      if (res.success) {
+        showToast("Test page successfully spooled to " + name + "!");
+      } else {
+        showToast("Test print alert: " + (res.message || "Failed"));
+      }
+    }
+
+    async function fetchOrders() {
+      if (!api || !appStatus?.isEnrolled) return;
+      try {
+        const res = await api.getOrders(currentFilter);
+        if (res.success) {
+          ordersList = res.orders || [];
+          renderOrders();
+        }
+      } catch (err) {
+        console.error("Order fetch err:", err);
+      }
+    }
+
+    function renderOrders() {
+      const wrap = document.getElementById("orders-list-wrap");
+      const searchVal = document.getElementById("queue-search").value.toLowerCase().trim();
+
+      let filtered = ordersList;
+      if (currentFilter !== "ALL") {
+        if (currentFilter === "PENDING") {
+          filtered = filtered.filter(o => 
+            o.status === "AWAITING_VENDOR_APPROVAL" || 
+            o.paymentStatus === "CASH_PENDING" || 
+            (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+          );
+        } else if (currentFilter === "CONFIRMED") {
+          filtered = filtered.filter(o => o.status === "CONFIRMED" || o.status === "PRINTING");
+        } else if (currentFilter === "READY") {
+          filtered = filtered.filter(o => o.status === "READY_FOR_PICKUP");
+        } else if (currentFilter === "COMPLETED") {
+          filtered = filtered.filter(o => o.status === "COMPLETED");
+        }
+      }
+
+      if (searchVal) {
+        filtered = filtered.filter(o => 
+          (o.orderNumber && o.orderNumber.toLowerCase().includes(searchVal)) ||
+          (o.customerName && o.customerName.toLowerCase().includes(searchVal)) ||
+          (o.items && o.items.some(i => i.document && i.document.originalName && i.document.originalName.toLowerCase().includes(searchVal)))
+        );
+      }
+
+      const cashPendingOrders = ordersList.filter(o => 
+        o.paymentStatus === "CASH_PENDING" || 
+        (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+      );
+      const pendingCount = ordersList.filter(o => 
+        o.status === "AWAITING_VENDOR_APPROVAL" || 
+        o.paymentStatus === "CASH_PENDING" ||
+        (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+      ).length;
+
+      document.getElementById("kpi-pending-count").innerText = pendingCount;
+      const kpiSub = document.getElementById("kpi-pending-sub");
+      if (kpiSub) {
+        kpiSub.innerText = cashPendingOrders.length + " cash to collect • " + ordersList.filter(o => o.status === "AWAITING_VENDOR_APPROVAL").length + " awaiting approval";
+      }
+      document.getElementById("badge-orders-count").innerText = ordersList.length;
+
+      const totalRevenueMinor = ordersList
+        .filter(o => o.paymentStatus === "SUCCESS" || o.paymentStatus === "CASH_COLLECTED")
+        .reduce((sum, o) => sum + (o.totalAmountMinor || 0), 0);
+      document.getElementById("kpi-total-revenue").innerText = "₹" + (totalRevenueMinor / 100).toFixed(2);
+      document.getElementById("kpi-total-orders-sub").innerText = ordersList.length + " orders synced in cloud DB";
+
+      if (filtered.length === 0) {
+        wrap.innerHTML = `
+          <div style="text-align:center;padding:60px 20px;color:var(--text-dim);">
+            <div style="font-size:32px;margin-bottom:12px;">📭</div>
+            <div style="font-size:15px;font-weight:700;color:var(--text-muted);">No orders matching this filter</div>
+            <div style="font-size:12px;margin-top:4px;">Incoming customer walk-up orders will arrive here automatically in real time.</div>
+          </div>
+        `;
+        return;
+      }
+
+      wrap.innerHTML = "";
+      filtered.forEach(o => {
+        const card = document.createElement("div");
+        card.className = "order-card";
+
+        const isCashPending = o.paymentStatus === "CASH_PENDING" || 
+          (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS");
+        const isPaid = o.paymentStatus === "SUCCESS" || o.paymentStatus === "CASH_COLLECTED";
+
+        let badgeHtml = "";
+        if (o.status === "AWAITING_VENDOR_APPROVAL") {
+          badgeHtml = `<span class="status-badge badge-amber">⚠️ Awaiting Approval</span>`;
+        } else if (o.status === "CONFIRMED") {
+          badgeHtml = `<span class="status-badge badge-cyan">🖨️ Queued for Spooler</span>`;
+        } else if (o.status === "READY_FOR_PICKUP") {
+          badgeHtml = `<span class="status-badge badge-emerald">✅ Ready for Pickup</span>`;
+        } else if (o.status === "COMPLETED") {
+          badgeHtml = `<span class="status-badge badge-gray">📦 Completed</span>`;
+        } else {
+          badgeHtml = `<span class="status-badge badge-gray">${o.status}</span>`;
+        }
+
+        if (isCashPending) {
+          badgeHtml += ` <span class="status-badge badge-amber" style="background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.5);color:#fbbf24;font-weight:700;">💵 Cash Pending</span>`;
+        } else if (o.paymentStatus === "CASH_COLLECTED") {
+          badgeHtml += ` <span class="status-badge badge-emerald" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:#34d399;font-weight:700;">✅ Cash Collected</span>`;
+        }
+
+        const firstItem = (o.items && o.items[0]) || {};
+        const docName = (firstItem.document && firstItem.document.originalName) || "Document.pdf";
+        const pageCount = (firstItem.document && firstItem.document.pageCount) || firstItem.totalSheets || 1;
+        const colorMode = firstItem.colorMode === "COLOR" ? "Color" : "B&W";
+        const duplex = (firstItem.duplexMode && firstItem.duplexMode.includes("DOUBLE")) ? "Double-Sided" : "Single-Sided";
+        const copies = firstItem.copies || 1;
+
+        const timeStr = o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now";
+        const priceStr = "₹" + ((o.totalAmountMinor || 0) / 100).toFixed(2);
+
+        let actionsHtml = "";
+
+        // 1. PROMINENT CASH APPROVAL BUTTON
+        // If cash is pending, ALWAYS show option to approve cash regardless of order status!
+        if (isCashPending) {
+          actionsHtml += `
+            <button class="btn btn-amber" style="background:linear-gradient(135deg, #f59e0b, #d97706);color: #FFFFFF;font-weight:800;border:1px solid #fbbf24;box-shadow:0 0 14px rgba(245,158,11,0.4);" onclick="handleCollectCash('${o.id}', '${o.orderNumber || o.id}', ${o.totalAmountMinor || 0})">
+              💵 Approve Cash (${priceStr})
+            </button>
+          `;
+        }
+
+        // 2. LIFECYCLE ACTIONS
+        if (o.status === "AWAITING_VENDOR_APPROVAL") {
+          actionsHtml += `
+            <button class="btn btn-primary" onclick="handleStatusAction('${o.id}', 'APPROVE')">
+              ✅ Approve Order
+            </button>
+            <button class="btn btn-secondary" onclick="handleStatusAction('${o.id}', 'REJECT')">
+              ❌ Reject
+            </button>
+          `;
+        } else if (o.status === "CONFIRMED") {
+          actionsHtml += `
+            <button class="btn btn-primary" onclick="handleDirectPrint('${o.id}', '${o.orderNumber || o.id}')">
+              🖨️ Spool Document Now
+            </button>
+            <button class="btn btn-secondary" onclick="handleStatusAction('${o.id}', 'MARK_READY')">
+              ✅ Mark Ready
+            </button>
+          `;
+        } else if (o.status === "READY_FOR_PICKUP") {
+          actionsHtml += `
+            <button class="btn btn-primary" onclick="handleStatusAction('${o.id}', 'MARK_COMPLETED')">
+              📦 Handed Over / Complete
+            </button>
+          `;
+        }
+
+        const colorModeStyle = colorMode === "Color" ? "color:var(--violet)" : "color:var(--cyan)";
+        const paymentLabel = o.paymentStatus === "SUCCESS" 
+          ? "● Razorpay Paid" 
+          : (o.paymentStatus === "CASH_COLLECTED" ? "● Cash Collected (Paid)" : "● Cash Pending (Desk)");
+        const paymentTagClass = isPaid ? "pay-success" : "pay-pending";
+
+        card.innerHTML = `
+          <div class="order-top">
+            <div class="order-num-block">
+              <span class="order-id">${o.orderNumber || o.id}</span>
+              ${badgeHtml}
+            </div>
+            <div class="order-time">
+              <svg fill="currentColor" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+              <span>${timeStr}</span>
+            </div>
+          </div>
+
+          <div class="order-middle">
+            <div class="doc-preview">
+              <div class="doc-icon">
+                <svg fill="currentColor" viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              </div>
+              <div style="min-width:0;">
+                <div class="doc-name">${docName}</div>
+                <div class="doc-specs">
+                  <span class="spec-pill">${pageCount} pages</span>
+                  <span class="spec-pill">${copies} cop${copies > 1 ? "ies" : "y"}</span>
+                  <span class="spec-pill" style="${colorModeStyle};">${colorMode}</span>
+                  <span class="spec-pill">${duplex}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="customer-info">
+              <div class="customer-name">${o.customerName || "Walk-up Customer"}</div>
+              <div class="customer-phone">${o.customerPhone || "Mobile upload"}</div>
+            </div>
+
+            <div class="price-block">
+              <div class="price-val">${priceStr}</div>
+              <div class="payment-tag ${paymentTagClass}">
+                ${paymentLabel}
+              </div>
+            </div>
+
+            <div class="order-actions">
+              ${actionsHtml}
+            </div>
+          </div>
+        `;
+
+        wrap.appendChild(card);
+      });
+    }
+
+    async function handleCollectCash(orderId, orderNum, amountMinor) {
+      if (!api) return;
+      const priceDisplay = amountMinor ? "₹" + (amountMinor / 100).toFixed(2) : "";
+      showToast("Approving & collecting cash " + priceDisplay + " for " + orderNum + "...");
+
+      // Immediate optimistic update
+      const ord = ordersList.find(o => o.id === orderId);
+      if (ord) {
+        ord.paymentStatus = "CASH_COLLECTED";
+        if (ord.status === "AWAITING_VENDOR_APPROVAL") {
+          ord.status = "CONFIRMED";
+        }
+        renderOrders();
+      }
+
+      try {
+        const res = await api.updateOrderStatus({ orderId, action: "MARK_CASH_COLLECTED" });
+        if (res && res.success !== false) {
+          showToast("✅ Cash payment approved & collected for " + orderNum + "!");
+          if (ord && ord.status === "CONFIRMED") {
+            await handleDirectPrint(orderId, orderNum);
+          }
+          await fetchOrders();
+        } else {
+          showToast("Update alert: " + (res?.error || "Recorded"));
+          await fetchOrders();
+        }
+      } catch (err) {
+        console.error("handleCollectCash error:", err);
+        showToast("Error updating cash status");
+        await fetchOrders();
+      }
+    }
+
+    async function handleStatusAction(orderId, action) {
+      if (!api) return;
+      const ord = ordersList.find(o => o.id === orderId);
+      if (ord) {
+        if (action === "APPROVE") ord.status = "CONFIRMED";
+        else if (action === "REJECT") ord.status = "REJECTED";
+        else if (action === "MARK_READY") ord.status = "READY_FOR_PICKUP";
+        else if (action === "MARK_COMPLETED") ord.status = "COMPLETED";
+        else if (action === "MARK_CASH_COLLECTED") ord.paymentStatus = "CASH_COLLECTED";
+        renderOrders();
+      }
+      showToast("Updating order status...");
+      const res = await api.updateOrderStatus({ orderId, action });
+      if (res && res.success !== false) {
+        showToast("Order status updated.");
+        fetchOrders();
+      } else {
+        showToast("Status: " + (res?.error || "Recorded"));
+        fetchOrders();
+      }
+    }
+
+    async function handleDirectPrint(orderId, orderNum) {
+      if (!api) return;
+      showToast("Spooling " + orderNum + " to designated printer...");
+      const res = await api.printOrderDirect({ orderId, orderNumber: orderNum, copies: 1 });
+      if (res && res.success) {
+        showToast("Order " + orderNum + " spooled successfully!");
+      } else {
+        showToast("Spool result: " + (res?.message || "Completed"));
+      }
+    }
+
+    function openStoreCustomerPage() {
+      const slug = appStatus?.config?.vendorSlug || "speedy-express";
+      const url = (appStatus?.config?.backendUrl || "http://localhost:3000") + "/v/" + slug;
+      if (api && api.openExternalUrl) {
+        api.openExternalUrl(url);
+      } else {
+        window.open(url, "_blank");
+      }
+    }
+
+    async function printStandeeCard() {
+      if (!api) return;
+      showToast("Sending countertop QR Standee to Default Color Printer...");
+      const targetPrinter = appStatus?.config?.defaultColorPrinter || (printersList[0] && printersList[0].systemName) || "Default";
+      await api.printOrderDirect({ orderId: "STANDEE-CARD", orderNumber: "STORE-QR-STANDEE", printerName: targetPrinter, copies: 1 });
+      showToast("Countertop Standee sent to spooler!");
+    }
+
+    async function handleVendorLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("inp-email").value.trim();
+      const password = document.getElementById("inp-password").value;
+      const deviceName = document.getElementById("inp-devicename").value.trim();
+      const backendUrl = document.getElementById("inp-backend-url").value.trim();
+
+      const btn = document.getElementById("btn-submit-login");
+      btn.innerText = "Authenticating & Enrolling...";
+      btn.disabled = true;
+
+      try {
+        const res = await api.login({ backendUrl, email, password, deviceName });
+        if (res.success) {
+          showToast("Workstation connected to " + (res.vendor?.name || "Store") + "!");
+          refreshAll();
+        } else {
+          showAuthError(res.error || "Login failed. Check server URL and credentials.");
+        }
+      } catch (err) {
+        showAuthError(err.message || "Connection failed");
+      } finally {
+        btn.innerText = "Sign In & Connect Station";
+        btn.disabled = false;
+      }
+    }
+
+    async function handleCodeEnroll(e) {
+      e.preventDefault();
+      const enrollmentCode = document.getElementById("inp-code").value.trim();
+      const deviceName = document.getElementById("inp-devicename-code").value.trim();
+      const backendUrl = document.getElementById("inp-backend-url-code").value.trim();
+
+      const btn = document.getElementById("btn-submit-code");
+      btn.innerText = "Validating Code...";
+      btn.disabled = true;
+
+      try {
+        const res = await api.enrollDevice({ backendUrl, enrollmentCode, deviceName });
+        if (res.success) {
+          showToast("Workstation successfully enrolled!");
+          refreshAll();
+        } else {
+          showAuthError(res.error || "Invalid or expired enrollment code.");
+        }
+      } catch (err) {
+        showAuthError(err.message || "Enrollment failed");
+      } finally {
+        btn.innerText = "Enroll Device Station";
+        btn.disabled = false;
+      }
+    }
+
+    async function enterInstantDemoMode() {
+      if (!api) return;
+      showToast("Activating Workstation Instant Demo Mode...");
+      await api.quickDemoMode();
+      refreshAll();
+    }
+
+    async function promptLogout() {
+      if (!api) return;
+      showToast("Disconnecting workstation...");
+      try {
+        await api.logout();
+        appStatus = null;
+        ordersList = [];
+        showToast("Workstation disconnected. Please sign in to reconnect.");
+        const inpEmail = document.getElementById("inp-email");
+        if (inpEmail) inpEmail.value = "";
+        const inpPwd = document.getElementById("inp-password");
+        if (inpPwd) inpPwd.value = "";
+        const inpCode = document.getElementById("inp-code");
+        if (inpCode) inpCode.value = "";
+        await refreshAll();
+      } catch (err) {
+        showToast("Disconnect error: " + (err.message || "Failed"));
+      }
+    }
+
+    function addTerminalLog(time, level, msg) {
+      logCounter++;
+      document.getElementById("badge-logs-count").innerText = logCounter;
+      const body = document.getElementById("term-logs-body");
+      const row = document.createElement("div");
+      row.className = "log-entry";
+      const lvlClass = "log-lvl-" + (level || "info").toLowerCase();
+      row.innerHTML = `<span class="log-ts">[${time}]</span> <span class="${lvlClass}">[${(level || "INFO").toUpperCase()}]</span> <span>${msg}</span>`;
+      body.appendChild(row);
+      body.scrollTop = body.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById("term-logs-body").innerHTML = "";
+      logCounter = 0;
+      document.getElementById("badge-logs-count").innerText = 0;
+    }
+
+    if (api && api.onLog) {
+      api.onLog(log => {
+        addTerminalLog(
+          log.timestamp || new Date().toLocaleTimeString(),
+          log.level || "info",
+          log.message || ""
+        );
+      });
+    }
+
+    setInterval(fetchOrders, 8000);
+    refreshAll();
+  
+    // ==========================================
+    // VENDOR PRICING & PAPER SIZE MANAGEMENT
+    // ==========================================
+    let desktopPricingData = [
+      { paperSize: "A4", colorMode: "BLACK_AND_WHITE", isDuplex: false, pricePerSideMinor: 200, isActive: true },
+      { paperSize: "A4", colorMode: "BLACK_AND_WHITE", isDuplex: true, pricePerSideMinor: 175, isActive: true },
+      { paperSize: "A4", colorMode: "COLOR", isDuplex: false, pricePerSideMinor: 1000, isActive: true },
+      { paperSize: "A4", colorMode: "COLOR", isDuplex: true, pricePerSideMinor: 900, isActive: true },
+      { paperSize: "A3", colorMode: "BLACK_AND_WHITE", isDuplex: false, pricePerSideMinor: 500, isActive: false },
+      { paperSize: "A3", colorMode: "BLACK_AND_WHITE", isDuplex: true, pricePerSideMinor: 450, isActive: false },
+      { paperSize: "A3", colorMode: "COLOR", isDuplex: false, pricePerSideMinor: 2000, isActive: false },
+      { paperSize: "A3", colorMode: "COLOR", isDuplex: true, pricePerSideMinor: 1800, isActive: false },
+      { paperSize: "LEGAL", colorMode: "BLACK_AND_WHITE", isDuplex: false, pricePerSideMinor: 300, isActive: false },
+      { paperSize: "LEGAL", colorMode: "BLACK_AND_WHITE", isDuplex: true, pricePerSideMinor: 250, isActive: false },
+      { paperSize: "LEGAL", colorMode: "COLOR", isDuplex: false, pricePerSideMinor: 1200, isActive: false },
+      { paperSize: "LEGAL", colorMode: "COLOR", isDuplex: true, pricePerSideMinor: 1100, isActive: false },
+      { paperSize: "LETTER", colorMode: "BLACK_AND_WHITE", isDuplex: false, pricePerSideMinor: 200, isActive: false },
+      { paperSize: "LETTER", colorMode: "BLACK_AND_WHITE", isDuplex: true, pricePerSideMinor: 175, isActive: false },
+      { paperSize: "LETTER", colorMode: "COLOR", isDuplex: false, pricePerSideMinor: 1000, isActive: false },
+      { paperSize: "LETTER", colorMode: "COLOR", isDuplex: true, pricePerSideMinor: 900, isActive: false },
+    ];
+    let desktopMinOrder = 5;
+
+    async function loadPricingData() {
+      if (api && api.getPricing) {
+        try {
+          const res = await api.getPricing();
+          if (res && res.success && res.pricing) {
+            desktopPricingData = res.pricing;
+            if (res.minimumOrderMinor !== undefined) {
+              desktopMinOrder = res.minimumOrderMinor / 100;
+            }
+          }
+        } catch (err) {
+          console.error("loadPricingData err:", err);
+        }
+      }
+      renderDesktopPricingMatrix();
+    }
+
+    function renderDesktopPricingMatrix() {
+      const container = document.getElementById("desktop-pricing-matrix");
+      if (!container) return;
+      const minInput = document.getElementById("inp-desktop-min-order");
+      if (minInput) minInput.value = desktopMinOrder;
+
+      const sizes = [
+        { key: "A4", name: "A4 (Standard 210 × 297 mm)", desc: "Standard college & office prints" },
+        { key: "A3", name: "A3 (Large Format 297 × 420 mm)", desc: "Drawings, posters, large spreadsheets" },
+        { key: "LEGAL", name: "Legal (8.5 × 14 in)", desc: "Stamp papers, affidavits, court contracts" },
+        { key: "LETTER", name: "Letter (8.5 × 11 in)", desc: "Corporate documents & invoices" },
+      ];
+
+      container.innerHTML = "";
+      sizes.forEach(s => {
+        const sizeItems = desktopPricingData.filter(p => p.paperSize === s.key);
+        const isActive = sizeItems.some(p => p.isActive !== false);
+
+        const bw1 = (sizeItems.find(p => p.colorMode === "BLACK_AND_WHITE" && !p.isDuplex)?.pricePerSideMinor || 200) / 100;
+        const bw2 = (sizeItems.find(p => p.colorMode === "BLACK_AND_WHITE" && p.isDuplex)?.pricePerSideMinor || 175) / 100;
+        const col1 = (sizeItems.find(p => p.colorMode === "COLOR" && !p.isDuplex)?.pricePerSideMinor || 1000) / 100;
+        const col2 = (sizeItems.find(p => p.colorMode === "COLOR" && p.isDuplex)?.pricePerSideMinor || 900) / 100;
+
+        const card = document.createElement("div");
+        card.style.cssText = `
+          background: var(--bg-card);
+          border: 1px solid ${isActive ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-subtle)'};
+          border-radius: 16px;
+          padding: 18px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          opacity: ${isActive ? '1' : '0.65'};
+          transition: all 0.2s;
+        `;
+
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:12px;">
+            <div>
+              <div style="font-size:15px; font-weight:800; color:var(--text-main);">${s.name}</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${s.desc}</div>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <span style="font-size:11px; font-weight:800; color:${isActive ? 'var(--primary)' : 'var(--text-dim)'}; letter-spacing:0.5px;">
+                ${isActive ? '● OFFERED AT COUNTER' : '○ DISABLED'}
+              </span>
+              <input type="checkbox" id="chk-${s.key}-active" ${isActive ? 'checked' : ''} onchange="toggleDesktopSize('${s.key}', this.checked)" style="width:18px; height:18px; accent-color:var(--primary); cursor:pointer;" />
+            </label>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:var(--bg-base); border:1px solid var(--border-subtle); border-radius:12px; padding:10px 12px;">
+              <div style="font-size:10px; font-weight:800; color:var(--text-muted); margin-bottom:6px; letter-spacing:0.4px;">B&amp;W 1-SIDED (₹/SIDE)</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; color:var(--text-dim); font-weight:800;">₹</span>
+                <input type="number" id="inp-${s.key}-bw-single" step="0.25" min="0.5" value="${bw1}" oninput="updateDesktopPriceField('${s.key}', 'BLACK_AND_WHITE', false, this.value)" style="width:100%; background:transparent; border:none; color:var(--text-main); font-size:15px; font-weight:800; outline:none;" />
+              </div>
+            </div>
+
+            <div style="background:var(--bg-base); border:1px solid var(--border-subtle); border-radius:12px; padding:10px 12px;">
+              <div style="font-size:10px; font-weight:800; color:var(--text-muted); margin-bottom:6px; letter-spacing:0.4px;">B&amp;W DUPLEX (₹/SIDE)</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; color:var(--text-dim); font-weight:800;">₹</span>
+                <input type="number" id="inp-${s.key}-bw-duplex" step="0.25" min="0.5" value="${bw2}" oninput="updateDesktopPriceField('${s.key}', 'BLACK_AND_WHITE', true, this.value)" style="width:100%; background:transparent; border:none; color:var(--text-main); font-size:15px; font-weight:800; outline:none;" />
+              </div>
+            </div>
+
+            <div style="background:rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.3); border-radius:12px; padding:10px 12px;">
+              <div style="font-size:10px; font-weight:800; color:#c4b5fd; margin-bottom:6px; letter-spacing:0.4px;">COLOR 1-SIDED (₹/SIDE)</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; color:#c4b5fd; font-weight:800;">₹</span>
+                <input type="number" id="inp-${s.key}-col-single" step="0.5" min="1" value="${col1}" oninput="updateDesktopPriceField('${s.key}', 'COLOR', false, this.value)" style="width:100%; background:transparent; border:none; color:var(--text-main); font-size:15px; font-weight:800; outline:none;" />
+              </div>
+            </div>
+
+            <div style="background:rgba(139, 92, 246, 0.1); border:1px solid rgba(139, 92, 246, 0.3); border-radius:12px; padding:10px 12px;">
+              <div style="font-size:10px; font-weight:800; color:#c4b5fd; margin-bottom:6px; letter-spacing:0.4px;">COLOR DUPLEX (₹/SIDE)</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:13px; color:#c4b5fd; font-weight:800;">₹</span>
+                <input type="number" id="inp-${s.key}-col-duplex" step="0.5" min="1" value="${col2}" oninput="updateDesktopPriceField('${s.key}', 'COLOR', true, this.value)" style="width:100%; background:transparent; border:none; color:var(--text-main); font-size:15px; font-weight:800; outline:none;" />
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function toggleDesktopSize(paperSize, active) {
+      desktopPricingData = desktopPricingData.map(p => {
+        if (p.paperSize === paperSize) return { ...p, isActive: active };
+        return p;
+      });
+      renderDesktopPricingMatrix();
+    }
+
+    function updateDesktopPriceField(paperSize, colorMode, isDuplex, value) {
+      const minor = Math.max(10, Math.round((parseFloat(value) || 1) * 100));
+      let found = false;
+      desktopPricingData = desktopPricingData.map(p => {
+        if (p.paperSize === paperSize && p.colorMode === colorMode && p.isDuplex === isDuplex) {
+          found = true;
+          return { ...p, pricePerSideMinor: minor };
+        }
+        return p;
+      });
+      if (!found) {
+        desktopPricingData.push({
+          paperSize,
+          colorMode,
+          isDuplex,
+          pricePerSideMinor: minor,
+          isActive: true
+        });
+      }
+    }
+
+    function applyDesktopPreset(bw1, bw2, c1, c2, minOrder) {
+      desktopMinOrder = minOrder;
+      desktopPricingData = desktopPricingData.map(p => {
+        let price = p.pricePerSideMinor;
+        if (p.paperSize === "A4" || p.paperSize === "LETTER") {
+          if (p.colorMode === "BLACK_AND_WHITE") price = (p.isDuplex ? bw2 : bw1) * 100;
+          else price = (p.isDuplex ? c2 : c1) * 100;
+        } else if (p.paperSize === "A3") {
+          if (p.colorMode === "BLACK_AND_WHITE") price = (p.isDuplex ? bw2 * 2.5 : bw1 * 2.5) * 100;
+          else price = (p.isDuplex ? c2 * 2 : c1 * 2) * 100;
+        } else if (p.paperSize === "LEGAL") {
+          if (p.colorMode === "BLACK_AND_WHITE") price = (p.isDuplex ? bw2 + 0.5 : bw1 + 0.5) * 100;
+          else price = (p.isDuplex ? c2 + 2 : c1 + 2) * 100;
+        }
+        return { ...p, pricePerSideMinor: Math.round(price) };
+      });
+      showToast("Applied preset rates! Click 'Save Rates & Sizes' to publish.");
+      renderDesktopPricingMatrix();
+    }
+
+    async function savePricingMatrix() {
+      if (!api) return;
+      const minInput = document.getElementById("inp-desktop-min-order");
+      const minOrderMinor = Math.round((parseFloat(minInput?.value) || 5) * 100);
+
+      // Re-read every value directly from the DOM inputs to guarantee fresh data
+      const sizes = ["A4", "A3", "LEGAL", "LETTER"];
+      sizes.forEach(size => {
+        const chk = document.getElementById(`chk-${size}-active`);
+        const isActive = chk ? chk.checked : true;
+
+        const bw1El = document.getElementById(`inp-${size}-bw-single`);
+        const bw2El = document.getElementById(`inp-${size}-bw-duplex`);
+        const c1El = document.getElementById(`inp-${size}-col-single`);
+        const c2El = document.getElementById(`inp-${size}-col-duplex`);
+
+        if (bw1El) updateDesktopPriceField(size, "BLACK_AND_WHITE", false, bw1El.value);
+        if (bw2El) updateDesktopPriceField(size, "BLACK_AND_WHITE", true, bw2El.value);
+        if (c1El) updateDesktopPriceField(size, "COLOR", false, c1El.value);
+        if (c2El) updateDesktopPriceField(size, "COLOR", true, c2El.value);
+
+        desktopPricingData = desktopPricingData.map(p => {
+          if (p.paperSize === size) return { ...p, isActive };
+          return p;
+        });
+      });
+
+      showToast("Publishing custom rates to cloud...");
+      try {
+        const res = await api.updatePricing({
+          pricing: desktopPricingData,
+          minimumOrderMinor: minOrderMinor
+        });
+        if (res && res.success !== false) {
+          showToast("✅ Rates & Paper Sizes saved & published successfully!");
+        } else {
+          showToast("Update error: " + (res?.error || "Failed"));
+        }
+      } catch (err) {
+        console.error("savePricingMatrix err:", err);
+        showToast("Error updating pricing");
+      }
+    }
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendorProfile Vendor?
+  orders        Order[]
+}
+
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+model Vendor {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  vendorCode  String   @unique
+  shopName    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  devices     VendorDevice[]
+  printers    Printer[]
+  pricing     VendorPricing[]
+  orders      Order[]
+  printJobs   PrintJob[]
+}
+
+model VendorDevice {
+  id          String   @id @default(uuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  deviceName  String
+  tokenHash   String
+  isRevoked   Boolean  @default(false)
+  lastSeen    DateTime?
+  createdAt   DateTime @default(now())
+
+  printJobs   PrintJob[]
+}
+
+model Printer {
+  id              String   @id @default(uuid())
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  name            String
+  isColor         Boolean  @default(false)
+  isDuplex        Boolean  @default(false)
+  supportedSizes  String[]
+  status          String   @default("ONLINE")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  printJobs       PrintJob[]
+}
+
+model VendorPricing {
+  id              String   @id @default(uuid())
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  paperSize       String
+  isColor         Boolean
+  isDuplex        Boolean
+  pricePerSheet   Int      // Stored in minor units (e.g., paise)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Document {
+  id              String   @id @default(uuid())
+  storageKey      String
+  fileName        String
+  fileSize        Int
+  pageCount       Int?
+  uploadedAt      DateTime @default(now())
+
+  orderItems      OrderItem[]
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  publicNumber    String   @unique
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  customerId      String?
+  customer        User?    @relation(fields: [customerId], references: [id])
+  
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  approvalStatus  ApprovalStatus @default(NOT_REQUIRED)
+  orderStatus     OrderStatus @default(CREATED)
+  
+  currency        String   @default("INR")
+  subtotal        Int
+  taxAmount       Int      @default(0)
+  discountAmount  Int      @default(0)
+  totalAmount     Int
+  pricingSnapshot Json
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           OrderItem[]
+  payments        Payment[]
+  printJobs       PrintJob[]
+}
+
+enum PaymentMethod {
+  CASH
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum ApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  CREATED
+  AWAITING_PAYMENT_APPROVAL
+  READY
+  QUEUED
+  PRINTING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  documentId      String
+  document        Document @relation(fields: [documentId], references: [id])
+  
+  paperSize       String
+  isColor         Boolean
+  isDuplex        Boolean
+  copies          Int
+  pageSelection   String?  // e.g., "1-5, 8"
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  gatewayRef      String?
+  amount          Int
+  status          PaymentStatus
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PrintJob {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  deviceId        String?
+  device          VendorDevice? @relation(fields: [deviceId], references: [id])
+  printerId       String?
+  printer         Printer? @relation(fields: [printerId], references: [id])
+  
+  status          PrintStatus @default(NOT_QUEUED)
+  attemptCount    Int      @default(0)
+  requestedSettings Json
+  
+  submittedAt     DateTime?
+  completedAt     DateTime?
+  lastError       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  events          JobEvent[]
+}
+
+enum PrintStatus {
+  NOT_QUEUED
+  QUEUED
+  DOWNLOADING
+  PRINTING
+  SUBMITTED
+  COMPLETED
+  FAILED
+  NEEDS_REVIEW
+}
+
+model JobEvent {
+  id              String   @id @default(uuid())
+  jobId           String
+  job             PrintJob @relation(fields: [jobId], references: [id])
+  status          PrintStatus
+  message         String?
+  createdAt       DateTime @default(now())
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  action          String
+  actorId         String
+  details         Json
+  createdAt       DateTime @default(now())
+}
