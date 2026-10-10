@@ -106,30 +106,26 @@ export async function POST(request: NextRequest) {
         {
           vendorId: vendor.id,
           paperSize: PaperSize.A4,
-          printColor: PrintColor.BLACK_AND_WHITE,
-          ratePerPageMinor: 200, // ₹2.00
-          duplexDiscountMinor: 50, // ₹0.50 discount
+          colorMode: PrintColor.BLACK_AND_WHITE,
+          pricePerSideMinor: 200, // ₹2.00
         },
         {
           vendorId: vendor.id,
           paperSize: PaperSize.A4,
-          printColor: PrintColor.COLOR,
-          ratePerPageMinor: 1000, // ₹10.00
-          duplexDiscountMinor: 100, // ₹1.00 discount
+          colorMode: PrintColor.COLOR,
+          pricePerSideMinor: 1000, // ₹10.00
         },
         {
           vendorId: vendor.id,
           paperSize: PaperSize.A3,
-          printColor: PrintColor.BLACK_AND_WHITE,
-          ratePerPageMinor: 500, // ₹5.00
-          duplexDiscountMinor: 100,
+          colorMode: PrintColor.BLACK_AND_WHITE,
+          pricePerSideMinor: 500, // ₹5.00
         },
         {
           vendorId: vendor.id,
           paperSize: PaperSize.A3,
-          printColor: PrintColor.COLOR,
-          ratePerPageMinor: 2000, // ₹20.00
-          duplexDiscountMinor: 200,
+          colorMode: PrintColor.COLOR,
+          pricePerSideMinor: 2000, // ₹20.00
         },
       ],
     });
