@@ -27,12 +27,17 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [isTerminalState, setIsTerminalState] = useState(false);
+
   const fetchOrder = async () => {
     try {
       const res = await fetch(`/api/orders/${token}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch order');
       setOrder(data.order);
+      if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(data.order.status)) {
+        setIsTerminalState(true);
+      }
     } catch (err: any) {
       setError(err.message || 'Error tracking order');
     } finally {
@@ -43,10 +48,15 @@ export default function OrderTrackingPage() {
   useEffect(() => {
     if (token) {
       fetchOrder();
-      const interval = setInterval(fetchOrder, 12000);
+      if (isTerminalState) return;
+      const interval = setInterval(() => {
+        if (!isTerminalState) {
+          fetchOrder();
+        }
+      }, 12000);
       return () => clearInterval(interval);
     }
-  }, [token]);
+  }, [token, isTerminalState]);
 
   if (loading) {
     return (

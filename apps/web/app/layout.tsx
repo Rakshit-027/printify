@@ -6,10 +6,10 @@ import { GlobalFooter } from '@/components/GlobalFooter';
 import { BrandLogo } from '@/components/BrandLogo';
 import { JsonLd } from '@/components/JsonLd';
 
-const sora = Sora({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-sora' });
-const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' });
-const notoSansDevanagari = Noto_Sans_Devanagari({ subsets: ['devanagari'], weight: ['400', '500', '600'], variable: '--font-noto-sans-devanagari' });
+const sora = Sora({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-sora', display: 'swap' });
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-inter', display: 'swap' });
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono', display: 'swap' });
+const notoSansDevanagari = Noto_Sans_Devanagari({ subsets: ['devanagari'], weight: ['400', '500', '600'], variable: '--font-noto-sans-devanagari', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://print2me.in'),
@@ -131,6 +131,8 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="google-site-verification" content="FA-hLtD6B6nuYiWlzNMmMXzzypbrLWra15q3CGSD-Bk" />
+        <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+        <link rel="dns-prefetch" href="https://api.razorpay.com" />
         <JsonLd data={[organizationSchema, websiteSchema, webAppSchema]} />
       </head>
       <body className={`min-h-screen flex flex-col justify-between selection:bg-saffron selection:text-white ${sora.variable} ${inter.variable} ${jetbrainsMono.variable} ${notoSansDevanagari.variable} font-inter text-ink`}>

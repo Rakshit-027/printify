@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { prisma } from '@/lib/prisma';
 
+// In-memory cache for generated QR codes to prevent redundant CPU cycles
+const qrCache = new Map<string, { svg?: string; dataUrl?: string; timestamp: number }>();
+const QR_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { vendorSlug: string } }
@@ -46,22 +50,31 @@ export async function GET(
     const format = searchParams.get('format') || 'svg';
     const shouldDownload = searchParams.get('download') === '1';
     const fgColor = searchParams.get('color') || vendor.qrConfig?.customColor || '#020617';
+    const cacheKey = `${targetUrl}:${fgColor}`;
+
+    const now = Date.now();
+    const cached = qrCache.get(cacheKey);
+    const isCacheValid = cached && (now - cached.timestamp < QR_CACHE_TTL);
 
     if (format === 'svg') {
-      const svgString = await QRCode.toString(targetUrl, {
-        type: 'svg',
-        color: {
-          dark: fgColor,
-          light: '#ffffff',
-        },
-        margin: 2,
-        width: 600,
-        errorCorrectionLevel: 'H', // High error correction so logos can be placed in center
-      });
+      let svgString = isCacheValid ? cached.svg : undefined;
+      if (!svgString) {
+        svgString = await QRCode.toString(targetUrl, {
+          type: 'svg',
+          color: {
+            dark: fgColor,
+            light: '#ffffff',
+          },
+          margin: 2,
+          width: 600,
+          errorCorrectionLevel: 'H',
+        });
+        qrCache.set(cacheKey, { ...(cached || {}), svg: svgString, timestamp: now });
+      }
 
       const headers: Record<string, string> = {
         'Content-Type': 'image/svg+xml',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+        'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400',
       };
 
       if (shouldDownload) {
@@ -71,31 +84,49 @@ export async function GET(
       return new NextResponse(svgString, { status: 200, headers });
     }
 
-    // Default to JSON response with data URL for in-app UI rendering
-    const dataUrl = await QRCode.toDataURL(targetUrl, {
-      color: {
-        dark: fgColor,
-        light: '#ffffff',
-      },
-      margin: 2,
-      width: 400,
-      errorCorrectionLevel: 'H',
-    });
+    // JSON response for vendor order page and standee modal
+    // Only generate dataUrl if requested or already cached to avoid blocking event loop
+    const includeDataUrl = searchParams.get('dataUrl') === '1' || searchParams.get('format') === 'json_with_qr';
+    let dataUrl: string | undefined = undefined;
 
-    return NextResponse.json({
-      success: true,
-      vendor: {
-        id: vendor.id,
-        name: vendor.name,
-        slug: vendor.slug,
-        address: vendor.address || 'Campus Counter',
-        contactPhone: vendor.contactPhone || null,
-        operatingHours: vendor.operatingHours || null,
-        targetUrl,
-        pricingConfig: vendor.pricingConfig || [],
+    if (includeDataUrl) {
+      dataUrl = isCacheValid ? cached.dataUrl : undefined;
+      if (!dataUrl) {
+        dataUrl = await QRCode.toDataURL(targetUrl, {
+          color: {
+            dark: fgColor,
+            light: '#ffffff',
+          },
+          margin: 2,
+          width: 400,
+          errorCorrectionLevel: 'H',
+        });
+        qrCache.set(cacheKey, { ...(cached || {}), dataUrl, timestamp: now });
+      }
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        vendor: {
+          id: vendor.id,
+          name: vendor.name,
+          slug: vendor.slug,
+          address: vendor.address || 'Campus Counter',
+          contactPhone: vendor.contactPhone || null,
+          operatingHours: vendor.operatingHours || null,
+          targetUrl,
+          pricingConfig: vendor.pricingConfig || [],
+          allowCashOnDesk: vendor.allowCashOnDesk ?? true,
+        },
+        ...(dataUrl ? { dataUrl } : {}),
       },
-      dataUrl,
-    });
+      {
+        headers: {
+          'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('QR generation error:', error);
     return NextResponse.json({ error: 'Failed to generate vendor QR code' }, { status: 500 });

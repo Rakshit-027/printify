@@ -70,16 +70,32 @@ export default function VendorDashboardPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json();
 
+      // If user is already loaded, only fetch orders for the active tab (instant tab switching)
+      if (sessionUser) {
+        const ordersRes = await fetch(`/api/vendor/orders?status=${activeTab}`);
+        const ordersData = await ordersRes.json();
+        if (ordersRes.ok) {
+          setOrders(ordersData.orders || []);
+        } else if (ordersRes.status === 401) {
+          router.push('/login');
+        }
+        return;
+      }
+
+      // Initial load: Fetch authentication and orders in parallel
+      const [meRes, ordersRes] = await Promise.all([
+        fetch('/api/auth/me'),
+        fetch(`/api/vendor/orders?status=${activeTab}`),
+      ]);
+
+      const meData = await meRes.json();
       if (!meRes.ok || !meData.authenticated) {
         router.push('/login');
         return;
       }
       setSessionUser(meData.user);
 
-      const ordersRes = await fetch(`/api/vendor/orders?status=${activeTab}`);
       const ordersData = await ordersRes.json();
       if (ordersRes.ok) {
         setOrders(ordersData.orders || []);

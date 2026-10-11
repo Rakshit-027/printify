@@ -34,18 +34,27 @@ function isAzureConfigured(): boolean {
   );
 }
 
+let cachedSharedKeyCredential: StorageSharedKeyCredential | null = null;
+let cachedBlobServiceClient: BlobServiceClient | null = null;
+
 function getSharedKeyCredential(): StorageSharedKeyCredential | null {
   if (!isAzureConfigured()) return null;
-  return new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY);
+  if (!cachedSharedKeyCredential) {
+    cachedSharedKeyCredential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY);
+  }
+  return cachedSharedKeyCredential;
 }
 
 function getBlobServiceClient(): BlobServiceClient | null {
   const credential = getSharedKeyCredential();
   if (!credential) return null;
-  return new BlobServiceClient(
-    `https://${ACCOUNT_NAME}.blob.core.windows.net`,
-    credential
-  );
+  if (!cachedBlobServiceClient) {
+    cachedBlobServiceClient = new BlobServiceClient(
+      `https://${ACCOUNT_NAME}.blob.core.windows.net`,
+      credential
+    );
+  }
+  return cachedBlobServiceClient;
 }
 
 /**

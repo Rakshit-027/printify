@@ -38,8 +38,17 @@ export default function AdminDashboardPage() {
   const [retentionRunning, setRetentionRunning] = useState(false);
 
   // Load Administrative Data
-  const loadData = async () => {
+  const loadData = async (filterOnly = false) => {
     try {
+      if (filterOnly) {
+        const vendorsRes = await fetch(`/api/admin/vendors?filter=${vendorFilter}`);
+        if (vendorsRes.ok) {
+          const vendorsData = await vendorsRes.json();
+          setVendors(vendorsData.vendors || []);
+        }
+        return;
+      }
+
       setLoading(true);
 
       const [metricsRes, vendorsRes, logsRes, webhooksRes] = await Promise.all([
@@ -71,7 +80,11 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    loadData();
+    if (!metrics) {
+      loadData(false);
+    } else {
+      loadData(true);
+    }
   }, [vendorFilter]);
 
   const handleVendorAction = async (vendorId: string, action: string) => {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PDFDocument } from 'pdf-lib';
+import dynamic from 'next/dynamic';
 import {
   UploadCloud,
   FileText,
@@ -33,9 +33,13 @@ import {
   Check,
   X
 } from 'lucide-react';
-import { QrStandeeModal } from '@/components/QrStandeeModal';
 import { BrandLogo } from '@/components/BrandLogo';
 import Link from 'next/link';
+
+const QrStandeeModal = dynamic(
+  () => import('@/components/QrStandeeModal').then((m) => m.QrStandeeModal),
+  { ssr: false }
+);
 
 interface VendorData {
   id: string;
@@ -166,6 +170,7 @@ export default function VendorPublicOrderPage() {
       if (file.type === 'application/pdf') {
         try {
           const buffer = await file.arrayBuffer();
+          const { PDFDocument } = await import('pdf-lib');
           const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
           pageCount = pdfDoc.getPageCount();
         } catch {
