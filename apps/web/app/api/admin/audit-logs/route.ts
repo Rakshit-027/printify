@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           resourceId: 'admin-1',
           ipAddress: '127.0.0.1',
           createdAt: new Date(),
-          user: { email: 'admin@printflow.io', fullName: 'Platform Administrator', role: 'SUPER_ADMIN' },
+          user: { email: 'admin@print2me.in', fullName: 'Platform Administrator', role: 'SUPER_ADMIN' },
         },
         {
           id: 'log-2',

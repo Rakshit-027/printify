@@ -461,7 +461,7 @@ export default function AdminDashboardPage() {
             <div className="p-6 rounded-[24px] bg-paper border border-hairline space-y-3 shadow-sm">
               <div className="font-sora font-extrabold text-ink text-lg">Document Expiration Policy Constraints</div>
               <p className="text-ink-soft leading-relaxed font-medium">
-                By default, all customer documents uploaded to PrintFlow expire 30 days after creation.
+                By default, all customer documents uploaded to Print2Me expire 30 days after creation.
                 Documents are safely purged from private Azure Blob containers when their associated orders are
                 completed, cancelled, or rejected. No documents are retained on the Linux VPS filesystem.
               </p>

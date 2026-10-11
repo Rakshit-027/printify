@@ -455,7 +455,7 @@ export function VendorSettingsModal({ isOpen, onClose, onUpdated }: VendorSettin
                 <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs flex items-start gap-2.5">
                   <ShieldCheck className="w-5 h-5 shrink-0 text-indigo-400 mt-0.5" />
                   <p className="leading-relaxed">
-                    <strong>100% Direct Payouts</strong>: Customer payments go directly to your personal bank account via your own Razorpay keys or Cash. PrintFlow never holds your print funds.
+                    <strong>100% Direct Payouts</strong>: Customer payments go directly to your personal bank account via your own Razorpay keys or Cash. Print2Me never holds your print funds.
                   </p>
                 </div>
 

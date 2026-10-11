@@ -485,7 +485,7 @@ export default function VendorDashboardPage() {
               </div>
               <div>
                 <h3 className="font-sora text-xl font-bold text-ink">Desktop Print Agent</h3>
-                <p className="text-sm text-ink-soft">Pair your PC printer with PrintFlow</p>
+                <p className="text-sm text-ink-soft">Pair your PC printer with Print2Me</p>
               </div>
             </div>
 

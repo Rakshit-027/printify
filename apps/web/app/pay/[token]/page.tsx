@@ -81,7 +81,7 @@ export default function PaymentCheckoutPage() {
       key: paymentData.razorpayKeyId,
       amount: paymentData.amountMinor,
       currency: paymentData.currency || 'INR',
-      name: paymentData.vendorName || 'PrintFlow Station',
+      name: paymentData.vendorName || 'Print2Me Station',
       description: `Payment for Print Order ${paymentData.orderNumber}`,
       order_id: paymentData.razorpayOrderId,
       handler: async function (response: any) {

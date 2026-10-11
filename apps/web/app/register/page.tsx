@@ -100,7 +100,7 @@ export default function RegisterPage() {
             </div>
             {formData.storeName && (
               <p className="text-[11px] text-slate-500 pl-1">
-                Customer QR URL: <span className="text-emerald-400 font-mono">localhost:3000/v/{generatedSlug}</span>
+                Customer QR URL: <span className="text-emerald-400 font-mono">print2me.in/v/{generatedSlug}</span>
               </p>
             )}
           </div>

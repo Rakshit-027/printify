@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogIn, Lock, Mail, ShieldAlert, ArrowRight, Store, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/primitives';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -55,12 +56,12 @@ export default function LoginPage() {
     <div className="max-w-md mx-auto px-6 py-12 md:py-24 min-h-screen">
       <div className="bg-surface p-8 md:p-10 rounded-[32px] border border-hairline shadow-ink-soft space-y-8">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-[20px] bg-paper flex items-center justify-center mx-auto text-ink border border-hairline shadow-sm">
-            <LogIn className="w-8 h-8" />
+          <div className="flex justify-center mb-1">
+            <BrandLogo variant="horizontal" height={42} withLink href="/" />
           </div>
           <div>
-            <h1 className="text-3xl font-sora font-extrabold text-ink tracking-tight mb-2">Welcome back</h1>
-            <p className="text-sm text-ink-soft font-medium">Access your Vendor Store or Administrative Command Portal</p>
+            <h1 className="text-2xl font-sora font-extrabold text-ink tracking-tight mb-1">Welcome back</h1>
+            <p className="text-xs text-ink-soft font-medium">Access your Vendor Store or Administrative Command Portal</p>
           </div>
         </div>
 
@@ -81,7 +82,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@business.com"
+                placeholder="you@yourdomain.com"
                 className="w-full bg-paper border border-hairline rounded-[16px] pl-12 pr-5 py-4 font-medium text-ink focus:outline-none focus:border-saffron focus:ring-4 focus:ring-saffron/10 transition-all placeholder:text-ink-soft/50"
               />
             </div>
@@ -119,11 +120,19 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="text-center text-sm font-medium text-ink-soft pt-2">
-          Want to register your print shop?{' '}
-          <Link href="/register-vendor" className="text-saffron font-bold hover:underline">
-            Register Business
-          </Link>
+        <div className="text-center text-xs font-medium text-ink-soft pt-2 space-y-2">
+          <div>
+            Want to register your print shop?{' '}
+            <Link href="/register-vendor" className="text-saffron font-bold hover:underline">
+              Register Business
+            </Link>
+          </div>
+          <div className="text-[11px] text-ink-soft/70">
+            Need assistance? Reach us at{' '}
+            <a href="mailto:support@print2me.in" className="hover:text-ink text-ink font-semibold underline">
+              support@print2me.in
+            </a>
+          </div>
         </div>
       </div>
     </div>
