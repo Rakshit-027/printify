@@ -465,7 +465,7 @@ export default function VendorDashboardPage() {
         onClose={() => setShowQrModal(false)}
         vendorName={vendor.name}
         vendorSlug={vendor.slug}
-        address="Shop 4, Campus Arcade, Sector 14, Gurugram"
+        address={vendor.address}
       />
 
       {/* Desktop Agent Enrollment Modal */}

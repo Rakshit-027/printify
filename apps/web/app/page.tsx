@@ -19,12 +19,63 @@ import {
   Send
 } from 'lucide-react';
 import { Button, Accordion } from '@/components/primitives';
+import { JsonLd } from '@/components/JsonLd';
 
 export default function HomePage() {
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
+
+  const homeFaqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'Do I need to download an app to print with Print2Me?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'No. Print2Me runs entirely in your mobile browser at print2me.in. Just scan the shop’s QR code and you are ready to upload and print in seconds.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Is there a limit on file size?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'You can upload PDFs, JPGs, and PNGs up to 50MB each. The system auto-detects pages, colors, and paper sizes with instant price calculation.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How do I know my documents are private?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Files are directly streamed to our private encrypted storage via secure short-lived SAS tokens. After printing, files are automatically purged. Print2Me never stores or views customer documents.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'What if the shop printer is broken after I pay?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'If a job fails to print or the vendor rejects it due to hardware issues, your transaction is safely reversed. You can also opt for Pay Cash on Desk to pay only when you have paper in hand.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'How can I contact Print2Me support or partner my shop?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'You can reach our dedicated support desk anytime at support@print2me.in or support@print2me.com. Print vendors can also register their store directly at print2me.in/register-vendor.',
+        },
+      },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-paper pb-20">
+      <JsonLd data={homeFaqSchema} />
+
       {/* HERO SECTION WITH VISUAL MOCKUP */}
       <section className="relative overflow-hidden px-6 pt-20 pb-24 md:pt-28 md:pb-32 max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
@@ -44,9 +95,14 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <Link href="/vendor" className="w-full sm:w-auto">
+              <Link href="/v/speedy-express" className="w-full sm:w-auto">
                 <Button variant="primary" className="w-full h-14 px-8 text-base">
-                  Partner your shop
+                  Try Demo Print Kiosk
+                </Button>
+              </Link>
+              <Link href="/how-it-works" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full h-14 px-8 text-base">
+                  How It Works
                 </Button>
               </Link>
             </div>
@@ -167,6 +223,13 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        <div className="mt-10 text-center">
+          <Link href="/how-it-works" className="inline-flex items-center gap-2 text-sm font-bold text-saffron hover:underline">
+            <span>Read full step-by-step walkthrough</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </section>
 
       {/* LIVE SHOP LOCATOR */}
@@ -178,6 +241,12 @@ export default function HomePage() {
             </div>
             <h2 className="font-sora text-3xl font-extrabold text-ink">Find a Print2Me shop</h2>
             <p className="text-ink-soft text-lg">We are expanding rapidly across colleges and commercial hubs. Search for a partnered print kiosk on print2me.in.</p>
+            <div className="pt-1">
+              <Link href="/locations" className="inline-flex items-center gap-1.5 text-xs font-bold text-ink hover:text-saffron transition-colors">
+                <span>Browse all verified college &amp; market print kiosks</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
           <div className="flex-1 w-full relative">
             <input 
@@ -185,9 +254,9 @@ export default function HomePage() {
               placeholder="Enter your college or city..." 
               className="w-full h-16 rounded-[20px] px-6 pr-16 font-medium text-ink bg-surface border border-hairline shadow-sm focus:outline-none focus:border-saffron focus:ring-4 focus:ring-saffron/10 transition-all" 
             />
-            <button className="absolute right-2 top-2 bottom-2 w-12 bg-ink rounded-14 flex items-center justify-center text-white hover:bg-ink/90 transition-colors shadow-sm">
+            <Link href="/locations" className="absolute right-2 top-2 bottom-2 w-12 bg-ink rounded-14 flex items-center justify-center text-white hover:bg-ink/90 transition-colors shadow-sm" aria-label="Search locations">
               <ArrowRight className="w-5 h-5" />
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -205,6 +274,12 @@ export default function HomePage() {
           { question: "What if the shop printer is broken after I pay?", answer: "If a job fails to print or the vendor rejects it due to hardware issues, your transaction is safely reversed. You can also opt for 'Pay Cash on Desk' to pay only when you have paper in hand." },
           { question: "How can I contact Print2Me support or partner my shop?", answer: "You can reach our dedicated support desk anytime at support@print2me.in or support@print2me.com. Print vendors can also register their store directly at print2me.in/register-vendor." },
         ]} />
+        <div className="mt-8 text-center">
+          <Link href="/faq" className="inline-flex items-center gap-2 text-sm font-bold text-saffron hover:underline">
+            <span>Explore all questions on pricing, privacy, and support</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </section>
 
       {/* VENDOR PRICING */}

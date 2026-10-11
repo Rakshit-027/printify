@@ -86,7 +86,7 @@ export function GlobalNavbar() {
             {/* Quick Track Search Button */}
             <button
               onClick={() => setIsTrackModalOpen(true)}
-              className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-pill bg-paper border border-hairline text-ink-soft hover:text-ink hover:border-saffron/40 hover:bg-surface transition-all text-xs font-medium shadow-sm group"
+              className="hidden xl:flex items-center gap-2.5 px-3.5 py-1.5 rounded-pill bg-paper border border-hairline text-ink-soft hover:text-ink hover:border-saffron/40 hover:bg-surface transition-all text-xs font-medium shadow-sm group"
             >
               <Search className="w-3.5 h-3.5 text-saffron group-hover:scale-110 transition-transform" />
               <span>Track Print Order...</span>
@@ -97,12 +97,41 @@ export function GlobalNavbar() {
           </div>
 
           {/* Navigation Items */}
-          <nav className="flex items-center gap-2 sm:gap-3 text-sm font-medium">
+          <nav className="flex items-center gap-1.5 sm:gap-2.5 text-sm font-medium">
             
+            {/* Public SEO Nav Links */}
+            <Link
+              href="/how-it-works"
+              className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+            >
+              How It Works
+            </Link>
+
+            <Link
+              href="/document-printing"
+              className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+            >
+              Document Printing
+            </Link>
+
+            <Link
+              href="/campus-printing"
+              className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+            >
+              Campus
+            </Link>
+
+            <Link
+              href="/partner"
+              className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+            >
+              Partner
+            </Link>
+
             {/* Mobile Track button */}
             <button
               onClick={() => setIsTrackModalOpen(true)}
-              className="md:hidden flex items-center justify-center w-9 h-9 rounded-full bg-paper border border-hairline text-ink-soft hover:text-ink transition-colors"
+              className="xl:hidden flex items-center justify-center w-9 h-9 rounded-full bg-paper border border-hairline text-ink-soft hover:text-ink transition-colors"
               aria-label="Track Order"
             >
               <Search className="w-4 h-4" />
@@ -111,10 +140,10 @@ export function GlobalNavbar() {
             {/* Demo Link */}
             <Link
               href="/v/speedy-express"
-              className="hidden lg:flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors px-3 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+              className="hidden 2xl:flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
             >
               <QrCode className="w-3.5 h-3.5 text-ink-soft" />
-              <span>Demo QR Kiosk</span>
+              <span>Demo Kiosk</span>
             </Link>
 
             {/* If Logged in */}
