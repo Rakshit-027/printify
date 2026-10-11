@@ -34,6 +34,8 @@ import {
   X
 } from 'lucide-react';
 import { QrStandeeModal } from '@/components/QrStandeeModal';
+import { BrandLogo } from '@/components/BrandLogo';
+import Link from 'next/link';
 
 interface VendorData {
   id: string;
@@ -360,43 +362,59 @@ export default function VendorPublicOrderPage() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] pb-40 text-ink selection:bg-saffron selection:text-white">
-      {/* 1. ULTRA-SLEEK MOBILE APP HEADER */}
-      <header className="sticky top-0 z-30 bg-surface/90 backdrop-blur-xl border-b border-hairline/60 px-4 py-3 shadow-[0_2px_12px_rgba(14,26,58,0.04)]">
-        <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative">
-              <div className="w-11 h-11 rounded-20 bg-gradient-to-tr from-saffron to-amber-500 text-white font-sora font-extrabold text-lg flex items-center justify-center shadow-md shadow-saffron/20 shrink-0">
-                {vendor.name.charAt(0)}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="font-sora font-extrabold text-ink text-base tracking-tight truncate">
-                  {vendor.name}
-                </h1>
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live
-                </span>
-              </div>
-              <p className="text-xs text-ink-soft truncate flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-saffron shrink-0" />
-                <span className="truncate">{vendor.address}</span>
-              </p>
+      {/* 1. ULTRA-SLEEK MOBILE APP HEADER WITH PRINT2ME LOGO & SHOP INFO */}
+      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-hairline/60 shadow-[0_2px_12px_rgba(14,26,58,0.04)]">
+        {/* Brand Bar */}
+        <div className="border-b border-hairline/40 px-4 py-2 bg-paper/60">
+          <div className="max-w-xl mx-auto flex items-center justify-between">
+            <Link href="/" className="inline-flex items-center hover:opacity-90 transition-opacity">
+              <BrandLogo variant="horizontal" height={28} />
+            </Link>
+            <div className="flex items-center gap-1.5 text-[11px] text-ink-soft bg-surface px-2.5 py-1 rounded-pill border border-hairline font-semibold shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Instant Kiosk</span>
             </div>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowQrModal(true)}
-              className="w-9 h-9 rounded-14 bg-paper border border-hairline hover:border-saffron/40 flex items-center justify-center text-ink-soft hover:text-ink transition-all active:scale-95 shadow-sm"
-              title="View Counter Standee QR"
-              aria-label="View QR"
-            >
-              <QrCode className="w-4 h-4" />
-            </button>
+        {/* Vendor Shop Information */}
+        <div className="px-4 py-2.5">
+          <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-20 bg-gradient-to-tr from-saffron to-amber-500 text-white font-sora font-extrabold text-base flex items-center justify-center shadow-md shadow-saffron/20 shrink-0">
+                  {vendor.name.charAt(0)}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="font-sora font-extrabold text-ink text-sm sm:text-base tracking-tight truncate">
+                    {vendor.name}
+                  </h1>
+                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Counter Ready
+                  </span>
+                </div>
+                <p className="text-xs text-ink-soft truncate flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-saffron shrink-0" />
+                  <span className="truncate">{vendor.address}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="w-8 h-8 rounded-12 bg-paper border border-hairline hover:border-saffron/40 flex items-center justify-center text-ink-soft hover:text-ink transition-all active:scale-95 shadow-sm"
+                title="View Counter Standee QR"
+                aria-label="View QR"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>

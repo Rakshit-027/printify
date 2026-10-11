@@ -71,7 +71,7 @@ export function GlobalNavbar() {
     }
   };
 
-  // On walk-in upload kiosk pages (/v/[vendorSlug]), hide the global header so walk-in users don't see Sign In or Register Shop
+  // On walk-in upload kiosk pages (/v/[vendorSlug]), the page renders its own dedicated kiosk header with the Print2Me BrandLogo & shop info.
   if (isKioskUploadPage) {
     return (
       <OrderTrackModal
