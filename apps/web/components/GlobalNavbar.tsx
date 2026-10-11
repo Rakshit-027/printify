@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Printer,
   Search,
@@ -33,6 +33,8 @@ interface UserSession {
 
 export function GlobalNavbar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isKioskUploadPage = pathname?.startsWith('/v/');
   const [session, setSession] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
@@ -69,6 +71,16 @@ export function GlobalNavbar() {
     }
   };
 
+  // On walk-in upload kiosk pages (/v/[vendorSlug]), hide the global header so walk-in users don't see Sign In or Register Shop
+  if (isKioskUploadPage) {
+    return (
+      <OrderTrackModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+      />
+    );
+  }
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-hairline px-4 sm:px-6 py-3 shadow-sm transition-all">
@@ -99,34 +111,38 @@ export function GlobalNavbar() {
           {/* Navigation Items */}
           <nav className="flex items-center gap-1.5 sm:gap-2.5 text-sm font-medium">
             
-            {/* Public SEO Nav Links */}
-            <Link
-              href="/how-it-works"
-              className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
-            >
-              How It Works
-            </Link>
+            {/* Public SEO Nav Links (Hidden on walk-in upload kiosk pages) */}
+            {!isKioskUploadPage && (
+              <>
+                <Link
+                  href="/how-it-works"
+                  className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+                >
+                  How It Works
+                </Link>
 
-            <Link
-              href="/document-printing"
-              className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
-            >
-              Document Printing
-            </Link>
+                <Link
+                  href="/document-printing"
+                  className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+                >
+                  Document Printing
+                </Link>
 
-            <Link
-              href="/campus-printing"
-              className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
-            >
-              Campus
-            </Link>
+                <Link
+                  href="/campus-printing"
+                  className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+                >
+                  Campus
+                </Link>
 
-            <Link
-              href="/partner"
-              className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
-            >
-              Partner
-            </Link>
+                <Link
+                  href="/partner"
+                  className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold"
+                >
+                  Partner
+                </Link>
+              </>
+            )}
 
             {/* Mobile Track button */}
             <button
@@ -208,8 +224,14 @@ export function GlobalNavbar() {
                   </div>
                 )}
               </div>
+            ) : isKioskUploadPage ? (
+              /* Dedicated walk-in customer kiosk view: Keep header minimal & focused on printing */
+              <div className="flex items-center gap-1.5 text-xs text-ink-soft bg-paper px-2.5 py-1 rounded-pill border border-hairline font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Express Kiosk</span>
+              </div>
             ) : (
-              /* If Logged Out */
+              /* If Logged Out on regular public pages */
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
