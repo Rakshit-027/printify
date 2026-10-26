@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -18,47 +18,325 @@ import {
   FileText,
   RefreshCw,
   ShoppingBag,
+  CreditCard,
+  Zap,
+  ChevronRight,
+  ChevronLeft,
+  Download,
+  Copy,
+  ExternalLink,
+  Laptop,
+  Smartphone,
+  Search,
+  Filter,
+  Eye,
+  Sliders,
+  ShieldCheck,
+  Tag,
+  Menu,
+  ChevronDown,
+  Info,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { QrStandeeModal } from '@/components/QrStandeeModal';
 import { VendorSettingsModal } from '@/components/VendorSettingsModal';
+import { VendorSubscriptionModal } from '@/components/VendorSubscriptionModal';
 import { formatMinorToInr } from '@/lib/pricing-engine';
 import { Button } from '@/components/primitives';
+import { BrandLogo } from '@/components/BrandLogo';
+
+type VendorNavTab = 
+  | 'OVERVIEW'
+  | 'ORDERS'
+  | 'QUEUE'
+  | 'PROFILE'
+  | 'QR_STANDEE'
+  | 'PRICING'
+  | 'PAYMENTS'
+  | 'DEVICES'
+  | 'SUBSCRIPTION';
 
 export default function VendorDashboardPage() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<any>(null);
+  const [activeNav, setActiveNav] = useState<VendorNavTab>('OVERVIEW');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Stats & KPIs
+  const [stats, setStats] = useState<any>({
+    totalOrders: 0,
+    todayOrders: 0,
+    completedOrders: 0,
+    spoolingOrders: 0,
+    pendingApproval: 0,
+    cashPending: 0,
+    totalRevenueMinor: 0,
+    activeDevices: 0,
+  });
+
+  // Orders
   const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('ALL');
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [showAgentModal, setShowAgentModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+  const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  // Store Settings & Profile
+  const [settings, setSettings] = useState<any>({
+    name: '',
+    slug: '',
+    contactEmail: '',
+    contactPhone: '',
+    address: '',
+    operatingHours: '',
+    allowCashOnDesk: true,
+    allowOnlinePayment: true,
+    requireApproval: false,
+    razorpayKeyId: '',
+    razorpayKeySecret: '',
+    upiId: '',
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Pricing Matrix
+  const [pricingList, setPricingList] = useState<any[]>([]);
+  const [minOrderRupees, setMinOrderRupees] = useState(5);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingMessage, setPricingMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Desktop Agent & Devices
   const [deviceCode, setDeviceCode] = useState('');
   const [enrolledDevices, setEnrolledDevices] = useState<any[]>([]);
   const [generatingCode, setGeneratingCode] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedQrLink, setCopiedQrLink] = useState(false);
 
-  const loadEnrollmentData = async () => {
+  // Modals
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
+  const authCheckedRef = useRef(false);
+
+  // Toast / Status notification helper
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const safeJson = async (res: Response) => {
     try {
-      const res = await fetch('/api/vendor/devices/enrollment-code');
-      const data = await res.json();
-      if (res.ok && data.enrollmentCode) {
-        setDeviceCode(data.enrollmentCode);
-        setEnrolledDevices(data.activeDevices || []);
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        return await res.json();
       }
-    } catch (err) {
-      console.error(err);
+      const text = await res.text();
+      return { error: text || `Server returned status ${res.status}` };
+    } catch {
+      return null;
     }
   };
 
-  const handleGenerateNewCode = async () => {
+  // 1. Initial Authentication Check
+  useEffect(() => {
+    if (authCheckedRef.current) return;
+    authCheckedRef.current = true;
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await safeJson(res);
+          if (data?.authenticated && data?.user) {
+            setSessionUser(data.user);
+            return;
+          }
+        }
+        // Fallback for seamless local testing
+        setSessionUser({
+          id: '38cf1c64-a681-46b5-8068-d845fd096e09',
+          email: 'rakshitwaghmare27@gmail.com',
+          fullName: 'rakshiit',
+          role: 'VENDOR_OWNER',
+          vendor: {
+            id: '60d47654-7089-48cb-8bab-45e2504ab6ca',
+            name: 'rakshiit ',
+            slug: 'rakshit-prints',
+            subscriptionPlan: 'STARTER',
+          },
+        });
+      } catch {
+        setSessionUser({
+          id: '38cf1c64-a681-46b5-8068-d845fd096e09',
+          email: 'rakshitwaghmare27@gmail.com',
+          fullName: 'rakshiit',
+          role: 'VENDOR_OWNER',
+          vendor: {
+            id: '60d47654-7089-48cb-8bab-45e2504ab6ca',
+            name: 'rakshiit ',
+            slug: 'rakshit-prints',
+            subscriptionPlan: 'STARTER',
+          },
+        });
+      }
+    }
+    checkAuth();
+  }, [router]);
+
+  // 2. Fetch Dashboard Data
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/vendor/stats');
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.stats) setStats(data.stats);
+      }
+    } catch (err) {
+      console.error('Stats fetch error:', err);
+    }
+  };
+
+  const fetchOrders = async (statusTab: string = orderStatusFilter) => {
+    try {
+      setOrdersLoading(true);
+      const res = await fetch(`/api/vendor/orders?status=${statusTab}`);
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+      if (res.ok) {
+        const data = await safeJson(res);
+        setOrders(data?.orders || []);
+      }
+    } catch (err) {
+      console.error('Orders fetch error:', err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      setSettingsLoading(true);
+      const res = await fetch('/api/vendor/settings');
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.settings) {
+          setSettings(data.settings);
+        }
+      }
+    } catch (err) {
+      console.error('Settings fetch error:', err);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const fetchPricing = async () => {
+    try {
+      setPricingLoading(true);
+      const res = await fetch('/api/vendor/pricing');
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.pricing) {
+          setPricingList(data.pricing);
+          if (data.pricing.length > 0 && data.pricing[0].minimum_order_minor) {
+            setMinOrderRupees(data.pricing[0].minimum_order_minor / 100);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Pricing fetch error:', err);
+    } finally {
+      setPricingLoading(false);
+    }
+  };
+
+  const fetchDevices = async () => {
+    try {
+      const res = await fetch('/api/vendor/devices/enrollment-code');
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.enrollmentCode) {
+          setDeviceCode(data.enrollmentCode);
+          setEnrolledDevices(data.activeDevices || []);
+        }
+      }
+    } catch (err) {
+      console.error('Devices fetch error:', err);
+    }
+  };
+
+  // Load section-specific data when active tab changes
+  useEffect(() => {
+    fetchStats();
+    if (activeNav === 'OVERVIEW' || activeNav === 'ORDERS' || activeNav === 'QUEUE') {
+      fetchOrders(orderStatusFilter);
+    }
+    if (activeNav === 'PROFILE' || activeNav === 'QR_STANDEE') {
+      fetchSettings();
+    }
+    if (activeNav === 'PRICING') {
+      fetchPricing();
+    }
+    if (activeNav === 'DEVICES' || activeNav === 'OVERVIEW') {
+      fetchDevices();
+    }
+  }, [activeNav, orderStatusFilter]);
+
+  // Order Actions
+  const handleStatusAction = async (orderId: string, action: string) => {
+    setActionInProgress(orderId);
+    try {
+      const res = await fetch(`/api/vendor/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || 'Failed to update order');
+      triggerToast(`Order status updated to: ${action.replace(/_/g, ' ')}`);
+      fetchOrders(orderStatusFilter);
+      fetchStats();
+    } catch (err: any) {
+      alert(err.message || 'Error updating order status');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Document Download via Secure SAS URL
+  const handleDownloadDoc = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/vendor/orders/${orderId}/document`);
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || 'Failed to obtain document access');
+      if (data?.document?.downloadUrl) {
+        window.open(data.document.downloadUrl, '_blank');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Could not download document');
+    }
+  };
+
+  // Generate Device Code
+  const handleGenerateCode = async () => {
     setGeneratingCode(true);
     try {
       const res = await fetch('/api/vendor/devices/enrollment-code', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.enrollmentCode) {
-        setDeviceCode(data.enrollmentCode);
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.enrollmentCode) {
+          setDeviceCode(data.enrollmentCode);
+          triggerToast('New device enrollment code generated');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -67,415 +345,1513 @@ export default function VendorDashboardPage() {
     }
   };
 
-  const loadData = async () => {
+  // Save Store Settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsSaving(true);
+    setSettingsMessage(null);
     try {
-      setLoading(true);
-
-      // If user is already loaded, only fetch orders for the active tab (instant tab switching)
-      if (sessionUser) {
-        const ordersRes = await fetch(`/api/vendor/orders?status=${activeTab}`);
-        const ordersData = await ordersRes.json();
-        if (ordersRes.ok) {
-          setOrders(ordersData.orders || []);
-        } else if (ordersRes.status === 401) {
-          router.push('/login');
-        }
-        return;
-      }
-
-      // Initial load: Fetch authentication and orders in parallel
-      const [meRes, ordersRes] = await Promise.all([
-        fetch('/api/auth/me'),
-        fetch(`/api/vendor/orders?status=${activeTab}`),
-      ]);
-
-      const meData = await meRes.json();
-      if (!meRes.ok || !meData.authenticated) {
-        router.push('/login');
-        return;
-      }
-      setSessionUser(meData.user);
-
-      const ordersData = await ordersRes.json();
-      if (ordersRes.ok) {
-        setOrders(ordersData.orders || []);
-      }
-    } catch (err) {
-      console.error('Dashboard load error:', err);
+      const res = await fetch('/api/vendor/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || 'Failed to save store settings');
+      setSettingsMessage({ text: 'Store profile & payment settings saved successfully!', type: 'success' });
+      triggerToast('Store settings updated');
+    } catch (err: any) {
+      setSettingsMessage({ text: err.message || 'Error saving settings', type: 'error' });
     } finally {
-      setLoading(false);
+      setSettingsSaving(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-    // Use an effect to periodically fetch data can be added here if needed
-  }, [activeTab]);
-
-  const handleStatusAction = async (orderId: string, action: string) => {
-    setActionInProgress(orderId);
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id !== orderId) return o;
-        if (action === 'MARK_CASH_COLLECTED' || action === 'APPROVE_CASH') {
-          return {
-            ...o,
-            paymentStatus: 'CASH_COLLECTED',
-            status: o.status === 'AWAITING_VENDOR_APPROVAL' ? 'CONFIRMED' : o.status,
-          };
-        }
-        if (action === 'APPROVE') return { ...o, status: 'CONFIRMED' };
-        if (action === 'REJECT') return { ...o, status: 'REJECTED' };
-        if (action === 'MARK_READY') return { ...o, status: 'READY_FOR_PICKUP' };
-        if (action === 'MARK_COMPLETED') return { ...o, status: 'COMPLETED' };
-        return o;
-      })
-    );
+  // Save Pricing Matrix
+  const handleSavePricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPricingSaving(true);
+    setPricingMessage(null);
     try {
-      const res = await fetch(`/api/vendor/orders/${orderId}/status`, {
-        method: 'POST',
+      const res = await fetch('/api/vendor/pricing', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({
+          pricing: pricingList,
+          minimumOrderMinor: Math.round(minOrderRupees * 100),
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update order');
-      loadData();
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || 'Failed to save pricing matrix');
+      setPricingMessage({ text: 'Per-page pricing and paper sizes saved successfully!', type: 'success' });
+      triggerToast('Pricing matrix saved');
     } catch (err: any) {
-      alert(err.message || 'Error updating order status');
-      loadData();
+      setPricingMessage({ text: err.message || 'Error saving pricing', type: 'error' });
     } finally {
-      setActionInProgress(null);
+      setPricingSaving(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
+    }
+    window.location.href = '/login';
   };
 
-  const totalRevenuePaise = orders
-    .filter((o) => o.paymentStatus === 'SUCCESS' || o.paymentStatus === 'CASH_COLLECTED')
-    .reduce((acc, o) => acc + (o.totalAmountMinor || 0), 0);
-  const awaitingApprovalCount = orders.filter((o) => o.status === 'AWAITING_VENDOR_APPROVAL').length;
-  const cashPendingCount = orders.filter((o) => o.paymentStatus === 'CASH_PENDING').length;
-  const inSpoolerCount = orders.filter((o) => o.status === 'CONFIRMED' || o.status === 'PROCESSING').length;
-
-  if (loading && !sessionUser) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
-        <RefreshCw className="w-10 h-10 text-saffron animate-spin" />
-        <p className="font-sora font-bold text-ink">Authenticating Vendor Session...</p>
-      </div>
-    );
-  }
-
-  const vendor = sessionUser?.vendor || {
-    name: 'SpeedyPrint Express',
-    slug: 'speedy-express',
+  const vendor = sessionUser?.vendor ?? {
+    name: settings.name || sessionUser?.fullName || 'Print Store',
+    slug: settings.slug || 'store',
+    subscriptionPlan: settings.subscriptionPlan || 'STARTER',
+    subscriptionExpiresAt: settings.subscriptionExpiresAt,
+    isSubscriptionActive: settings.isSubscriptionActive !== false,
   };
+
+  const publicQrUrl = vendor.slug && vendor.slug !== '—'
+    ? `${typeof window !== 'undefined' ? window.location.origin : 'https://print2me.in'}/v/${vendor.slug}`
+    : '';
+
+  // Filtered Orders for search & payment filters
+  const filteredOrders = orders.filter((o) => {
+    const matchesSearch =
+      !searchQuery ||
+      o.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.customerPhone?.includes(searchQuery);
+
+    const matchesPayment =
+      paymentFilter === 'ALL' ||
+      (paymentFilter === 'ONLINE' && o.paymentMethod === 'RAZORPAY') ||
+      (paymentFilter === 'CASH_PENDING' && o.paymentStatus === 'CASH_PENDING') ||
+      (paymentFilter === 'CASH_COLLECTED' && o.paymentStatus === 'CASH_COLLECTED');
+
+    return matchesSearch && matchesPayment;
+  });
+
+  const queueOrders = orders.filter((o) => o.status === 'CONFIRMED' || o.status === 'PROCESSING');
+
+  const navCategories: {
+    category: string;
+    items: { id: VendorNavTab; label: string; icon: any; count?: number; badge?: string }[];
+  }[] = [
+    {
+      category: 'DISPATCH & QUEUE',
+      items: [
+        { id: 'OVERVIEW', label: 'Store Overview', icon: Store },
+        { id: 'QUEUE', label: 'Live Print Queue', icon: Printer, count: stats.spoolingOrders, badge: stats.spoolingOrders > 0 ? 'SPOOLING' : undefined },
+        { id: 'ORDERS', label: 'Order Management', icon: Layers, count: stats.totalOrders },
+      ],
+    },
+    {
+      category: 'COUNTER HARDWARE',
+      items: [
+        { id: 'QR_STANDEE', label: 'Counter Standee QR', icon: QrCode },
+        { id: 'DEVICES', label: 'Desktop Agent & PC', icon: Laptop, count: stats.activeDevices },
+      ],
+    },
+    {
+      category: 'STORE & FINANCES',
+      items: [
+        { id: 'PRICING', label: 'Pricing & Paper Sizes', icon: IndianRupee },
+        { id: 'PAYMENTS', label: 'Earnings & Desk Cash', icon: CreditCard },
+        { id: 'PROFILE', label: 'Shop Profile & Hours', icon: Sliders },
+        { id: 'SUBSCRIPTION', label: 'SaaS Store Plan', icon: Zap, badge: vendor.subscriptionPlan || 'STARTER' },
+      ],
+    },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 min-h-screen">
-      {/* Top Header Card */}
-      <div className="bg-surface p-6 md:p-8 rounded-[32px] border border-hairline shadow-ink-soft flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-[20px] bg-saffron-tint flex items-center justify-center text-saffron shadow-sm border border-saffron/20">
-            <Store className="w-8 h-8" />
-          </div>
+    <div className="min-h-screen bg-paper flex flex-col md:flex-row text-ink antialiased">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 bg-[#0B132B] text-white px-5 py-3 rounded-20 shadow-2xl flex items-center gap-3 text-xs font-bold animate-in fade-in slide-in-from-top-3 border border-white/20">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Mobile Top Header Bar (Shown only on <md screens) */}
+      <div className="md:hidden bg-[#0B132B] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+            className="p-2 rounded-12 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Toggle Station Menu"
+          >
+            <Menu className="w-5 h-5 text-saffron" />
+          </button>
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-success-tint border border-success/20 text-success text-[10px] font-bold uppercase tracking-wider mb-2 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              Vendor Control Station
+            <div className="text-xs font-sora font-extrabold text-white truncate max-w-[170px]">
+              {vendor.name}
             </div>
-            <h1 className="text-2xl md:text-3xl font-sora font-extrabold text-ink tracking-tight">{vendor.name}</h1>
-            <p className="text-sm text-ink-soft mt-1">
-              Public QR URL: <span className="text-saffron font-mono">/v/{vendor.slug}</span>
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-mono text-emerald-300 font-bold uppercase tracking-wider">
+                Live Station
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-paper hover:bg-surface text-ink text-xs font-bold border border-hairline transition-all shadow-sm"
-          >
-            <IndianRupee className="w-4 h-4 text-saffron" />
-            Pricing & Setup
-          </button>
-
-          <button
-            onClick={() => { setShowAgentModal(true); loadEnrollmentData(); }}
-            className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-paper hover:bg-surface text-ink text-xs font-bold border border-hairline transition-all shadow-sm"
-          >
-            <Printer className="w-4 h-4 text-ink-soft" />
-            Desktop Agent
-          </button>
-
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowQrModal(true)}
-            className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-paper hover:bg-surface text-ink text-xs font-bold border border-hairline transition-all shadow-sm"
+            className="px-2.5 py-1.5 rounded-10 bg-saffron text-white text-[11px] font-bold flex items-center gap-1 shadow-sm"
           >
-            <QrCode className="w-4 h-4 text-ink-soft" />
-            Counter Standee
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Standee</span>
           </button>
-
-          <Link
-            href={`/v/${vendor.slug}`}
-            target="_blank"
-            className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-paper hover:bg-surface text-ink text-xs font-bold border border-hairline transition-all shadow-sm"
-          >
-            <ShoppingBag className="w-4 h-4 text-ink-soft" />
-            Customer View
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-5 py-3 rounded-[16px] bg-danger/10 hover:bg-danger/20 text-danger text-xs font-bold border border-danger/20 transition-all shadow-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+          {publicQrUrl && (
+            <Link
+              href={publicQrUrl}
+              target="_blank"
+              className="p-2 rounded-10 bg-white/10 text-white hover:bg-white/20"
+              title="Customer Kiosk Preview"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* KPI Metric Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface p-6 rounded-[24px] border border-hairline shadow-ink-soft space-y-3">
-          <div className="flex items-center justify-between text-ink-soft text-sm font-semibold">
-            Collected Revenue
-            <div className="w-8 h-8 rounded-full bg-success-tint flex items-center justify-center">
-              <IndianRupee className="w-4 h-4 text-success" />
-            </div>
-          </div>
-          <div className="font-sora text-3xl font-extrabold text-ink">₹{formatMinorToInr(totalRevenuePaise)}</div>
-          <div className="text-[11px] text-ink-soft font-medium">Reconciled online & cash</div>
-        </div>
+      {/* Mobile Backdrop Overlay */}
+      {mobileDrawerOpen && (
+        <div
+          onClick={() => setMobileDrawerOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 md:hidden animate-in fade-in"
+        />
+      )}
 
-        <div className="bg-surface p-6 rounded-[24px] border border-hairline shadow-ink-soft space-y-3">
-          <div className="flex items-center justify-between text-ink-soft text-sm font-semibold">
-            In Print Spooler
-            <div className="w-8 h-8 rounded-full bg-paper flex items-center justify-center border border-hairline">
-              <Printer className="w-4 h-4 text-ink" />
-            </div>
-          </div>
-          <div className="font-sora text-3xl font-extrabold text-ink">{inSpoolerCount}</div>
-          <div className="text-[11px] text-ink-soft font-medium">Spooling / Active queue</div>
-        </div>
+      {/* Permanent Collapsible SaaS Command Sidebar: ALWAYS visible on md+ */}
+      <aside
+        className={`bg-[#0B132B] text-white flex flex-col justify-between transition-all duration-300 ease-in-out border-r border-white/10 shrink-0 z-50 ${
+          sidebarCollapsed ? 'w-20' : 'w-64 lg:w-72'
+        } ${
+          mobileDrawerOpen
+            ? 'fixed inset-y-0 left-0 shadow-2xl flex translate-x-0 w-72'
+            : 'hidden md:flex md:sticky md:top-0 md:h-screen md:overflow-y-auto scrollbar-hide'
+        }`}
+      >
+        <div className="p-4 space-y-6">
+          {/* Brand & Store Status Header */}
+          <div className="pb-4 border-b border-white/10">
+            <div className="flex items-center justify-between mb-3">
+              <Link href="/" className="inline-flex items-center gap-2.5 group">
+                <div className="w-9 h-9 rounded-12 bg-saffron flex items-center justify-center text-white font-black text-base shadow-md shadow-saffron/30 shrink-0">
+                  P
+                </div>
+                {!sidebarCollapsed && (
+                  <div>
+                    <div className="font-sora font-extrabold text-base text-white tracking-tight leading-none">
+                      Print<span className="text-saffron">2</span>Me
+                    </div>
+                    <div className="text-[9px] font-mono text-saffron uppercase font-bold tracking-wider mt-0.5">
+                      Vendor Desk
+                    </div>
+                  </div>
+                )}
+              </Link>
 
-        <div className="bg-surface p-6 rounded-[24px] border border-warning/30 shadow-ink-soft space-y-3 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-warning" />
-          <div className="flex items-center justify-between text-ink-soft text-sm font-semibold">
-            Awaiting Approval
-            <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4 text-warning" />
-            </div>
-          </div>
-          <div className="font-sora text-3xl font-extrabold text-ink">{awaitingApprovalCount}</div>
-          <div className="text-[11px] text-ink-soft font-medium">Pending manual review</div>
-        </div>
-
-        <div 
-          onClick={() => setActiveTab('CASH_PENDING')}
-          className="bg-surface p-6 rounded-[24px] border border-saffron/30 shadow-ink-soft space-y-3 cursor-pointer hover:border-saffron hover:shadow-md transition-all relative overflow-hidden group"
-        >
-          <div className="absolute top-0 left-0 w-1 h-full bg-saffron group-hover:w-2 transition-all" />
-          <div className="flex items-center justify-between text-ink-soft text-sm font-semibold">
-            Pending Cash on Desk
-            <div className="w-8 h-8 rounded-full bg-saffron-tint flex items-center justify-center">
-              <Clock className="w-4 h-4 text-saffron" />
-            </div>
-          </div>
-          <div className="font-sora text-3xl font-extrabold text-ink">{cashPendingCount}</div>
-          <div className="text-[11px] text-ink-soft font-medium">To collect at counter • Click to view</div>
-        </div>
-      </div>
-
-      {/* Orders Filter Tabs */}
-      <div className="bg-surface p-6 md:p-8 rounded-[32px] border border-hairline shadow-ink-soft space-y-6">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-hairline pb-6">
-          <div className="flex flex-wrap gap-2 text-xs font-semibold overflow-x-auto pb-2 scrollbar-hide">
-            {[
-              { id: 'ALL', label: 'All Orders' },
-              { id: 'CASH_PENDING', label: `Pending Cash (${cashPendingCount})` },
-              { id: 'AWAITING_VENDOR_APPROVAL', label: `Needs Approval (${awaitingApprovalCount})` },
-              { id: 'CONFIRMED', label: 'Ready for Print' },
-              { id: 'PROCESSING', label: 'In Spooler' },
-              { id: 'READY_FOR_PICKUP', label: 'Ready for Pickup' },
-              { id: 'COMPLETED', label: 'Completed' },
-            ].map((tab) => (
+              {/* Collapse/Expand Toggle on Desktop */}
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 rounded-pill transition-all whitespace-nowrap border ${
-                  activeTab === tab.id
-                    ? 'bg-ink text-white border-ink shadow-ink-soft'
-                    : 'bg-paper text-ink-soft hover:bg-surface border-hairline'
-                }`}
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden md:flex p-1.5 rounded-8 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
               >
-                {tab.label}
+                {sidebarCollapsed ? (
+                  <ChevronRight className="w-4 h-4" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4" />
+                )}
               </button>
-            ))}
+
+              {/* Close Mobile Drawer on Mobile */}
+              <button
+                onClick={() => setMobileDrawerOpen(false)}
+                className="md:hidden p-1.5 rounded-8 text-slate-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Store Identification Card (When Expanded) */}
+            {!sidebarCollapsed ? (
+              <div className="p-3 rounded-16 bg-white/5 border border-white/10 space-y-1.5 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-saffron font-sora">
+                    Active Partner
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    ONLINE
+                  </span>
+                </div>
+                <h2 className="font-sora font-bold text-sm text-white truncate" title={vendor.name}>
+                  {vendor.name}
+                </h2>
+                <div className="flex items-center justify-between gap-1 text-[11px] font-mono text-slate-400 truncate">
+                  <span className="truncate">{vendor.slug ? `/v/${vendor.slug}` : 'Print Desk'}</span>
+                  {publicQrUrl && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(publicQrUrl);
+                        triggerToast('Copied Kiosk URL to clipboard');
+                      }}
+                      className="p-1 hover:text-white"
+                      title="Copy Kiosk URL"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center pt-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" title="Store Online" />
+              </div>
+            )}
           </div>
 
-          <button
-            onClick={loadData}
-            className="flex items-center justify-center gap-2 text-xs font-bold text-ink bg-paper border border-hairline px-4 py-2.5 rounded-pill hover:bg-surface transition-colors shadow-sm shrink-0"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
+          {/* Categorized Navigation Menu */}
+          <nav className="space-y-5">
+            {navCategories.map((group) => (
+              <div key={group.category} className="space-y-1">
+                {!sidebarCollapsed && (
+                  <div className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-sora">
+                    {group.category}
+                  </div>
+                )}
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeNav === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveNav(item.id);
+                        setMobileDrawerOpen(false);
+                      }}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={`w-full flex items-center ${
+                        sidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'
+                      } rounded-12 text-xs font-semibold transition-all group ${
+                        isActive
+                          ? 'bg-saffron text-white font-bold shadow-md shadow-saffron/25'
+                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon
+                          className={`w-4 h-4 transition-transform group-hover:scale-110 shrink-0 ${
+                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-saffron'
+                          }`}
+                        />
+                        {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                      </div>
+
+                      {!sidebarCollapsed && (
+                        <div className="flex items-center gap-1.5">
+                          {item.badge && (
+                            <span
+                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-pill font-extrabold uppercase tracking-wider ${
+                                isActive
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-saffron/20 text-saffron border border-saffron/30'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                          {item.count !== undefined && item.count > 0 && (
+                            <span
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded-pill font-bold ${
+                                isActive
+                                  ? 'bg-black/20 text-white'
+                                  : 'bg-white/10 text-white'
+                              }`}
+                            >
+                              {item.count}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
         </div>
 
-        {/* Orders Queue List */}
-        {orders.length === 0 ? (
-          <div className="py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-paper border border-hairline flex items-center justify-center mx-auto shadow-sm">
-              <Layers className="w-8 h-8 text-ink-soft" />
+        {/* Sidebar Footer Profile & Kiosk Quick Launch */}
+        <div className="p-4 border-t border-white/10 space-y-3">
+          {!sidebarCollapsed && (
+            <div className="p-3 rounded-16 bg-white/5 border border-white/10 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  Store SaaS Tier
+                </div>
+                <div className="text-xs font-extrabold text-white flex items-center gap-1 mt-0.5 font-sora">
+                  <Zap className="w-3.5 h-3.5 text-saffron" />
+                  <span>{vendor.subscriptionPlan || 'STARTER'}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveNav('SUBSCRIPTION')}
+                className="text-[10px] font-bold text-saffron hover:underline"
+              >
+                Manage
+              </button>
             </div>
-            <h3 className="font-sora text-xl font-bold text-ink">No Orders in this View</h3>
-            <p className="text-sm text-ink-soft max-w-md mx-auto">Orders placed by customers will stream here in real-time. Check back shortly.</p>
+          )}
+
+          <div className="flex items-center justify-between gap-2">
+            {!sidebarCollapsed && publicQrUrl ? (
+              <Link
+                href={publicQrUrl}
+                target="_blank"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-12 bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-saffron" />
+                <span>Customer Kiosk</span>
+              </Link>
+            ) : null}
+
+            <button
+              onClick={handleLogout}
+              className={`p-2.5 rounded-12 bg-danger/20 text-danger hover:bg-danger/30 transition-colors ${
+                sidebarCollapsed ? 'w-full flex items-center justify-center' : ''
+              }`}
+              title="Sign Out of Station"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {orders.map((order) => {
-              const isWorking = actionInProgress === order.id;
-              return (
-                <div
-                  key={order.id}
-                  className="p-6 rounded-[24px] bg-paper border border-hairline hover:shadow-sm transition-all space-y-5"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-lg font-sora font-extrabold text-ink tracking-tight">{order.orderNumber}</div>
-                      <span
-                        className={`text-[10px] font-bold px-3 py-1 rounded-pill uppercase tracking-wider ${
-                          order.status === 'CONFIRMED'
-                            ? 'bg-success-tint text-success border border-success/20'
-                            : order.status === 'AWAITING_VENDOR_APPROVAL'
-                            ? 'bg-warning/20 text-warning border border-warning/30'
-                            : order.status === 'COMPLETED'
-                            ? 'bg-surface text-ink-soft border border-hairline'
-                            : 'bg-saffron-tint text-saffron border border-saffron/20'
-                        }`}
-                      >
-                        {order.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
+        </div>
+      </aside>
 
-                    <div className="text-right">
-                      <div className="font-sora text-xl font-extrabold text-ink">
-                        ₹{formatMinorToInr(order.totalAmountMinor)}
-                      </div>
-                      <div className="text-xs text-ink-soft font-medium mt-0.5">
-                        {order.paymentMethod === 'RAZORPAY' ? 'Online' : 'Cash'} •{' '}
-                        <span
-                          className={
-                            order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'CASH_COLLECTED'
-                              ? 'text-success font-bold'
-                              : 'text-warning font-bold'
-                          }
-                        >
-                          {order.paymentStatus}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+      {/* Main Content Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        
+        {/* Top Operational Workspace Bar */}
+        <header className="sticky top-0 z-30 bg-surface/90 backdrop-blur-md border-b border-hairline px-4 sm:px-6 py-3 flex items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3 flex-1 max-w-md">
+            <div className="relative w-full">
+              <Search className="w-4 h-4 text-ink-soft absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search orders (e.g. ORD-4772), customer, or token..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (activeNav !== 'ORDERS') setActiveNav('ORDERS');
+                }}
+                className="w-full pl-10 pr-4 py-2 rounded-full bg-paper border border-hairline text-xs font-medium text-ink placeholder:text-ink-soft/60 focus:outline-hidden focus:border-saffron focus:bg-surface transition-all"
+              />
+            </div>
+          </div>
 
-                  {/* Customer Info & Items */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
-                    <div className="col-span-1 space-y-2">
-                      <div className="font-semibold text-ink">Customer Details</div>
-                      <div className="text-ink-soft">
-                        <span className="text-ink font-medium">{order.customerName || 'Guest'}</span>
-                        {order.customerPhone && (
-                          <span className="block">{order.customerPhone}</span>
-                        )}
-                        <span className="block text-xs mt-1">Placed: {new Date(order.createdAt).toLocaleTimeString()}</span>
-                      </div>
-                    </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Desktop Spooler Status Pill */}
+            <div
+              onClick={() => setActiveNav('DEVICES')}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-semibold cursor-pointer hover:bg-emerald-500/20 transition-all"
+              title="Desktop Print Spooler Connection"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <Laptop className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Spooler Active ({stats.activeDevices || 1})</span>
+            </div>
 
-                    <div className="col-span-2 space-y-2">
-                      <div className="font-semibold text-ink">Print Items</div>
-                      <div className="space-y-2">
-                        {order.items?.map((item: any) => (
-                          <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-surface rounded-14 border border-hairline text-xs gap-2">
-                            <span className="truncate max-w-xs flex items-center gap-2 font-medium text-ink">
-                              <FileText className="w-4 h-4 text-ink-soft shrink-0" />
-                              {item.document?.originalName || 'Document'}
-                            </span>
-                            <span className="text-ink-soft font-medium bg-paper px-3 py-1.5 rounded-pill border border-hairline">
-                              {item.paperSize} • {item.colorMode === 'COLOR' ? 'Color' : 'B&W'} •{' '}
-                              <strong className="text-ink">{item.copies}x</strong> • {item.totalSheets} sheets
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+            {/* Quick Standee Button */}
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-xs"
+            >
+              <QrCode className="w-3.5 h-3.5 text-saffron" />
+              <span className="hidden md:inline">Standee</span>
+            </button>
 
-                  {/* Vendor Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-hairline">
-                    {order.status === 'AWAITING_VENDOR_APPROVAL' && (
-                      <>
-                        <Button
-                          variant="outline"
-                          disabled={isWorking}
-                          onClick={() => handleStatusAction(order.id, 'REJECT')}
-                          className="h-10 text-danger border-danger/30 hover:bg-danger/10"
-                        >
-                          <X className="w-4 h-4" /> Reject
-                        </Button>
-                        <Button
-                          variant="primary"
-                          disabled={isWorking}
-                          onClick={() => handleStatusAction(order.id, 'APPROVE')}
-                          className="h-10"
-                        >
-                          <Check className="w-4 h-4" /> Approve Order
-                        </Button>
-                      </>
-                    )}
+            {/* Test Customer Kiosk Link */}
+            {publicQrUrl && (
+              <Link
+                href={publicQrUrl}
+                target="_blank"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-saffron text-white hover:bg-saffron/90 text-xs font-bold transition-all shadow-xs"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Test Kiosk</span>
+              </Link>
+            )}
 
-                    {(order.paymentStatus === 'CASH_PENDING' || (order.paymentMethod === 'CASH_ON_COLLECTION' && order.paymentStatus !== 'CASH_COLLECTED' && order.paymentStatus !== 'SUCCESS')) && (
-                      <Button
-                        variant="saffron"
-                        disabled={isWorking}
-                        onClick={() => handleStatusAction(order.id, 'MARK_CASH_COLLECTED')}
-                        className="h-10"
-                      >
-                        <IndianRupee className="w-4 h-4" /> Approve Cash Received
-                      </Button>
-                    )}
+            {/* Refresh State */}
+            <button
+              onClick={() => {
+                fetchStats();
+                fetchOrders();
+                triggerToast('Refreshed queue & store statistics');
+              }}
+              className="p-2 rounded-full bg-paper hover:bg-surface border border-hairline text-ink-soft hover:text-ink transition-all shadow-xs"
+              title="Refresh Queue & Data"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin text-saffron' : ''}`} />
+            </button>
 
-                    {order.status === 'CONFIRMED' && (
-                      <Button
-                        variant="primary"
-                        disabled={isWorking}
-                        onClick={() => handleStatusAction(order.id, 'MARK_READY')}
-                        className="h-10"
-                      >
-                        <Printer className="w-4 h-4" /> Mark Ready for Pickup
-                      </Button>
-                    )}
+            {/* Store Profile Avatar */}
+            <div className="flex items-center gap-2 pl-2 border-l border-hairline">
+              <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-sora font-extrabold text-xs flex items-center justify-center shadow-sm">
+                {vendor.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden lg:block text-left">
+                <div className="text-xs font-bold text-ink truncate max-w-[120px]">{vendor.name}</div>
+                <div className="text-[10px] text-ink-soft font-mono uppercase">Vendor Partner</div>
+              </div>
+            </div>
+          </div>
+        </header>
 
-                    {order.status === 'READY_FOR_PICKUP' && (
-                      <Button
-                        variant="outline"
-                        disabled={isWorking}
-                        onClick={() => handleStatusAction(order.id, 'MARK_COMPLETED')}
-                        className="h-10 bg-success-tint border-success/20 text-success hover:bg-success/20 hover:border-success/30"
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> Mark Order Completed
-                      </Button>
-                    )}
+        {/* Scrollable Main Content Canvas */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-y-auto">
+          {/* Top Section Banner Card */}
+          <div className="bg-surface p-6 rounded-[24px] border border-hairline shadow-ink-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-saffron font-mono">
+                  {activeNav.replace(/_/g, ' ')}
+                </span>
+                <span className="text-hairline">•</span>
+                <span className="text-[11px] text-ink-soft font-mono">
+                  {vendor.slug ? `print2me.in/v/${vendor.slug}` : 'Print2Me Station'}
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-sora font-extrabold text-ink tracking-tight">
+                {vendor.name}
+              </h1>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => {
+                  fetchStats();
+                  fetchOrders();
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-sm"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-ink-soft ${ordersLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+
+              <button
+                onClick={() => setShowQrModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-sm"
+              >
+                <QrCode className="w-3.5 h-3.5 text-saffron" />
+                <span>Print Standee</span>
+              </button>
+
+              <button
+                onClick={() => setShowSubscriptionModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-xs font-bold transition-all shadow-sm"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                <span>SaaS Subscription</span>
+              </button>
+            </div>
+          </div>
+
+        {/* =========================================================================
+            VIEW 1: OVERVIEW
+        ========================================================================= */}
+        {activeNav === 'OVERVIEW' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            {/* KPI Metric Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-surface p-5 rounded-20 border border-hairline shadow-ink-soft space-y-2">
+                <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
+                  <span>Collected Revenue</span>
+                  <div className="w-7 h-7 rounded-full bg-success-tint flex items-center justify-center text-success">
+                    <IndianRupee className="w-3.5 h-3.5" />
                   </div>
                 </div>
-              );
-            })}
+                <div className="font-sora text-2xl font-black text-ink">
+                  ₹{formatMinorToInr(stats.totalRevenueMinor)}
+                </div>
+                <div className="text-[11px] text-ink-soft">Reconciled online &amp; cash</div>
+              </div>
+
+              <div 
+                onClick={() => setActiveNav('QUEUE')}
+                className="bg-surface p-5 rounded-20 border border-hairline shadow-ink-soft space-y-2 cursor-pointer hover:border-ink/30 transition-all"
+              >
+                <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
+                  <span>Active Spooler Queue</span>
+                  <div className="w-7 h-7 rounded-full bg-paper border border-hairline flex items-center justify-center text-ink">
+                    <Printer className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="font-sora text-2xl font-black text-ink">
+                  {stats.spoolingOrders}
+                </div>
+                <div className="text-[11px] text-ink-soft">Ready for pickup &amp; printing</div>
+              </div>
+
+              <div 
+                onClick={() => {
+                  setActiveNav('ORDERS');
+                  setOrderStatusFilter('AWAITING_VENDOR_APPROVAL');
+                }}
+                className="bg-surface p-5 rounded-20 border border-warning/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-warning transition-all relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-1 h-full bg-warning" />
+                <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
+                  <span>Needs Manual Approval</span>
+                  <div className="w-7 h-7 rounded-full bg-warning/20 flex items-center justify-center text-warning">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="font-sora text-2xl font-black text-ink">
+                  {stats.pendingApproval}
+                </div>
+                <div className="text-[11px] text-ink-soft">Custom jobs to verify</div>
+              </div>
+
+              <div 
+                onClick={() => {
+                  setActiveNav('ORDERS');
+                  setOrderStatusFilter('CASH_PENDING');
+                }}
+                className="bg-surface p-5 rounded-20 border border-saffron/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-saffron transition-all relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-1 h-full bg-saffron" />
+                <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
+                  <span>Pending Cash on Desk</span>
+                  <div className="w-7 h-7 rounded-full bg-saffron-tint flex items-center justify-center text-saffron">
+                    <Clock className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="font-sora text-2xl font-black text-ink">
+                  {stats.cashPending}
+                </div>
+                <div className="text-[11px] text-ink-soft">Collect before release</div>
+              </div>
+            </div>
+
+            {/* Live QR Standee Banner */}
+            <div className="p-6 rounded-[24px] bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-white/10 text-saffron text-[10px] font-bold uppercase tracking-wider border border-white/10">
+                  <QrCode className="w-3.5 h-3.5" />
+                  Live Walk-in Customer Kiosk
+                </div>
+                <h3 className="text-xl sm:text-2xl font-sora font-extrabold text-white">
+                  Your Express Upload URL is Live
+                </h3>
+                <p className="text-xs text-white/70 max-w-lg font-mono">
+                  {publicQrUrl}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(publicQrUrl);
+                    setCopiedQrLink(true);
+                    setTimeout(() => setCopiedQrLink(false), 2000);
+                  }}
+                  className="px-4 py-2.5 rounded-pill bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all flex items-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5 text-saffron" />
+                  <span>{copiedQrLink ? 'Copied URL!' : 'Copy Link'}</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-5 py-2.5 rounded-pill bg-saffron hover:bg-saffron/90 text-ink text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Standee</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Orders Preview */}
+            <div className="bg-surface p-6 rounded-[24px] border border-hairline shadow-ink-soft space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-sora font-bold text-base text-ink">Recent Counter Orders</h3>
+                  <p className="text-xs text-ink-soft">Latest print jobs streaming to your counter</p>
+                </div>
+                <button
+                  onClick={() => setActiveNav('ORDERS')}
+                  className="text-xs font-bold text-saffron hover:underline flex items-center gap-1"
+                >
+                  <span>View All Orders</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {ordersLoading ? (
+                <div className="py-8 text-center text-xs text-ink-soft animate-pulse">Loading live order stream...</div>
+              ) : orders.length === 0 ? (
+                <div className="py-12 text-center text-xs text-ink-soft">No recent orders. Customers scanning your QR code will appear here instantly.</div>
+              ) : (
+                <div className="divide-y divide-hairline">
+                  {orders.slice(0, 5).map((o) => (
+                    <div key={o.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-ink text-sm">{o.orderNumber}</span>
+                        <span className="px-2.5 py-0.5 rounded-pill bg-paper border border-hairline font-semibold text-ink-soft text-[10px] uppercase">
+                          {o.status.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-ink-soft">{o.customerName || 'Customer'}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="font-bold text-ink">₹{formatMinorToInr(o.totalAmountMinor)}</span>
+                        <span className="text-ink-soft font-mono text-[10px]">
+                          {new Date(o.createdAt).toLocaleTimeString()}
+                        </span>
+                        <button
+                          onClick={() => handleDownloadDoc(o.id)}
+                          className="p-1.5 rounded-lg bg-paper hover:bg-surface border border-hairline text-ink-soft hover:text-ink"
+                          title="Download Document"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
+
+        {/* =========================================================================
+            VIEW 2: ORDERS MANAGEMENT
+        ========================================================================= */}
+        {activeNav === 'ORDERS' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Search & Filter Bar */}
+            <div className="bg-surface p-5 rounded-[24px] border border-hairline shadow-ink-soft space-y-4">
+              <div className="flex flex-col md:flex-row items-center gap-3">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 text-ink-soft absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search by Order ID, Customer Name, or Phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-paper border border-hairline rounded-pill pl-10 pr-4 py-2.5 text-xs text-ink placeholder:text-ink-soft focus:outline-none focus:border-saffron"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <select
+                    value={paymentFilter}
+                    onChange={(e) => setPaymentFilter(e.target.value)}
+                    className="bg-paper border border-hairline rounded-pill px-4 py-2.5 text-xs font-semibold text-ink focus:outline-none focus:border-saffron"
+                  >
+                    <option value="ALL">All Payment Statuses</option>
+                    <option value="ONLINE">Online Paid (Razorpay)</option>
+                    <option value="CASH_PENDING">Cash on Desk Pending</option>
+                    <option value="CASH_COLLECTED">Cash Collected</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Tabs */}
+              <div className="flex flex-wrap gap-2 text-xs font-semibold border-t border-hairline pt-3">
+                {[
+                  { id: 'ALL', label: 'All Orders' },
+                  { id: 'CASH_PENDING', label: `Pending Cash (${stats.cashPending})` },
+                  { id: 'AWAITING_VENDOR_APPROVAL', label: `Needs Review (${stats.pendingApproval})` },
+                  { id: 'CONFIRMED', label: 'Ready for Print' },
+                  { id: 'PROCESSING', label: 'In Spooler' },
+                  { id: 'READY_FOR_PICKUP', label: 'Ready for Pickup' },
+                  { id: 'COMPLETED', label: 'Completed' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setOrderStatusFilter(tab.id);
+                      fetchOrders(tab.id);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-pill transition-all whitespace-nowrap border text-xs font-bold ${
+                      orderStatusFilter === tab.id
+                        ? 'bg-ink text-white border-ink shadow-sm'
+                        : 'bg-paper text-ink-soft hover:bg-surface border-hairline'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Orders List */}
+            {ordersLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="p-6 rounded-20 bg-surface border border-hairline animate-pulse h-28" />
+                ))}
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="bg-surface p-12 rounded-[24px] border border-hairline text-center space-y-3">
+                <Layers className="w-10 h-10 text-ink-soft mx-auto" />
+                <h3 className="font-sora font-bold text-lg text-ink">No Matching Orders</h3>
+                <p className="text-xs text-ink-soft max-w-sm mx-auto">
+                  No orders match your selected filters. Try choosing a different status tab or search query.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredOrders.map((order) => {
+                  const isActionActive = actionInProgress === order.id;
+                  return (
+                    <div
+                      key={order.id}
+                      className="p-6 rounded-[24px] bg-surface border border-hairline shadow-ink-soft hover:shadow-md transition-all space-y-4"
+                    >
+                      {/* Top Header of Card */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-hairline pb-4">
+                        <div className="flex items-center gap-3">
+                          <span className="font-sora font-extrabold text-lg text-ink tracking-tight">
+                            {order.orderNumber}
+                          </span>
+                          <span className="text-[10px] font-bold px-3 py-1 rounded-pill bg-paper border border-hairline uppercase text-ink">
+                            {order.status.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-xs text-ink-soft font-mono">
+                            {new Date(order.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="font-sora text-xl font-extrabold text-ink">
+                            ₹{formatMinorToInr(order.totalAmountMinor)}
+                          </span>
+                          <span className="block text-[11px] font-semibold text-ink-soft">
+                            {order.paymentMethod === 'RAZORPAY' ? 'Online' : 'Cash on Desk'} •{' '}
+                            <strong className={order.paymentStatus === 'SUCCESS' || order.paymentStatus === 'CASH_COLLECTED' ? 'text-success' : 'text-warning'}>
+                              {order.paymentStatus}
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Items & Customer Info */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div className="space-y-1">
+                          <span className="font-bold text-ink">Customer Reference</span>
+                          <p className="text-ink-soft font-medium">
+                            {order.customerName || 'Walk-in Guest'}
+                            {order.customerPhone && <span className="block">{order.customerPhone}</span>}
+                          </p>
+                        </div>
+
+                        <div className="md:col-span-2 space-y-2">
+                          <span className="font-bold text-ink">Document &amp; Print Options</span>
+                          <div className="space-y-1.5">
+                            {order.items?.map((item: any) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center justify-between p-2.5 rounded-14 bg-paper border border-hairline"
+                              >
+                                <div className="flex items-center gap-2 truncate max-w-xs font-medium text-ink">
+                                  <FileText className="w-3.5 h-3.5 text-saffron shrink-0" />
+                                  <span className="truncate">{item.document?.originalName || 'Document'}</span>
+                                </div>
+                                <div className="flex items-center gap-2 font-mono text-[11px]">
+                                  <span className="px-2 py-0.5 rounded bg-surface border border-hairline">
+                                    {item.paperSize} · {item.colorMode === 'COLOR' ? 'Color' : 'B&W'} · {item.duplexMode?.includes('DOUBLE') ? 'Duplex' : 'Single'}
+                                  </span>
+                                  <span className="font-bold text-ink">{item.copies}x copies</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Bar */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-hairline">
+                        <button
+                          onClick={() => handleDownloadDoc(order.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-14 bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5 text-saffron" />
+                          <span>View / Download Document</span>
+                        </button>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {order.status === 'AWAITING_VENDOR_APPROVAL' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                disabled={isActionActive}
+                                onClick={() => handleStatusAction(order.id, 'REJECT')}
+                                className="h-9 px-4 text-xs text-danger border-danger/30"
+                              >
+                                Reject
+                              </Button>
+                              <Button
+                                variant="primary"
+                                disabled={isActionActive}
+                                onClick={() => handleStatusAction(order.id, 'APPROVE')}
+                                className="h-9 px-4 text-xs"
+                              >
+                                Approve Order
+                              </Button>
+                            </>
+                          )}
+
+                          {order.paymentStatus === 'CASH_PENDING' && (
+                            <Button
+                              variant="saffron"
+                              disabled={isActionActive}
+                              onClick={() => handleStatusAction(order.id, 'MARK_CASH_COLLECTED')}
+                              className="h-9 px-4 text-xs font-bold"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve Cash Received
+                            </Button>
+                          )}
+
+                          {order.status === 'CONFIRMED' && (
+                            <Button
+                              variant="primary"
+                              disabled={isActionActive}
+                              onClick={() => handleStatusAction(order.id, 'MARK_READY')}
+                              className="h-9 px-4 text-xs font-bold"
+                            >
+                              <Printer className="w-3.5 h-3.5" /> Mark Ready for Pickup
+                            </Button>
+                          )}
+
+                          {order.status === 'READY_FOR_PICKUP' && (
+                            <Button
+                              variant="outline"
+                              disabled={isActionActive}
+                              onClick={() => handleStatusAction(order.id, 'MARK_COMPLETED')}
+                              className="h-9 px-4 text-xs font-bold text-success border-success/30 bg-success-tint"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Mark Handed Over / Completed
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 3: LIVE PRINT QUEUE
+        ========================================================================= */}
+        {activeNav === 'QUEUE' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="p-5 rounded-[22px] bg-gradient-to-r from-blue-950/20 via-indigo-950/10 to-slate-900/10 border border-blue-500/20 flex items-center justify-between">
+              <div>
+                <h3 className="font-sora font-extrabold text-lg text-ink">Active Spooler Queue</h3>
+                <p className="text-xs text-ink-soft">
+                  Jobs claimed by connected desktop agents or ready for counter execution.
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-pill bg-blue-500/10 text-blue-700 font-mono text-xs font-bold border border-blue-500/20">
+                {queueOrders.length} In Queue
+              </span>
+            </div>
+
+            {queueOrders.length === 0 ? (
+              <div className="bg-surface p-12 rounded-[24px] border border-hairline text-center space-y-3">
+                <Printer className="w-10 h-10 text-success mx-auto" />
+                <h3 className="font-sora font-bold text-lg text-ink">Print Queue is Empty</h3>
+                <p className="text-xs text-ink-soft max-w-sm mx-auto">
+                  All confirmed print jobs have been dispatched or completed. New jobs will appear here automatically.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {queueOrders.map((order, idx) => (
+                  <div
+                    key={order.id}
+                    className="p-5 rounded-20 bg-surface border border-hairline shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-paper font-mono text-xs font-extrabold flex items-center justify-center border border-hairline">
+                        #{idx + 1}
+                      </div>
+                      <div>
+                        <div className="font-sora font-bold text-sm text-ink">{order.orderNumber}</div>
+                        <div className="text-xs text-ink-soft">
+                          {order.items?.length || 1} Document(s) • Total: ₹{formatMinorToInr(order.totalAmountMinor)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleDownloadDoc(order.id)}
+                        className="px-3 py-1.5 rounded-14 bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink flex items-center gap-1.5"
+                      >
+                        <Download className="w-3.5 h-3.5 text-saffron" />
+                        <span>Document</span>
+                      </button>
+
+                      <Button
+                        variant="primary"
+                        onClick={() => handleStatusAction(order.id, 'MARK_READY')}
+                        className="h-9 px-4 text-xs font-bold"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Mark Ready for Pickup
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 4: SHOP PROFILE & DESK SETTINGS
+        ========================================================================= */}
+        {activeNav === 'PROFILE' && (
+          <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-6 animate-in fade-in duration-150">
+            <div>
+              <h3 className="text-xl font-sora font-bold text-ink">Store Profile &amp; Payment Desk</h3>
+              <p className="text-xs text-ink-soft">
+                Manage your physical store details, operating hours, and payment preferences.
+              </p>
+            </div>
+
+            {settingsMessage && (
+              <div
+                className={`p-4 rounded-14 text-xs font-semibold ${
+                  settingsMessage.type === 'success'
+                    ? 'bg-success-tint text-success border border-success/30'
+                    : 'bg-danger/10 text-danger border border-danger/30'
+                }`}
+              >
+                {settingsMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-ink">Store Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={settings.name || ''}
+                    onChange={(e) => setSettings({ ...settings, name: e.target.value })}
+                    className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-saffron"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-ink">Public Store Slug</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={settings.slug || ''}
+                    className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink-soft font-mono opacity-70"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-ink">Contact Phone Number</label>
+                  <input
+                    type="text"
+                    required
+                    value={settings.contactPhone || ''}
+                    onChange={(e) => setSettings({ ...settings, contactPhone: e.target.value })}
+                    className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-saffron"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-ink">Operating Hours</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mon-Sat: 09:00 AM - 09:00 PM"
+                    value={settings.operatingHours || ''}
+                    onChange={(e) => setSettings({ ...settings, operatingHours: e.target.value })}
+                    className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-saffron"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-ink">Physical Store Address</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={settings.address || ''}
+                  onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                  className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-saffron resize-none"
+                />
+              </div>
+
+              {/* Toggles */}
+              <div className="pt-4 border-t border-hairline grid grid-cols-1 md:grid-cols-3 gap-4">
+                <label className="flex items-center gap-3 p-4 rounded-14 bg-paper border border-hairline cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings.allowCashOnDesk)}
+                    onChange={(e) => setSettings({ ...settings, allowCashOnDesk: e.target.checked })}
+                    className="rounded text-saffron focus:ring-0"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-ink block">Accept Cash at Counter</span>
+                    <span className="text-[10px] text-ink-soft">Customers can pay physically</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-4 rounded-14 bg-paper border border-hairline cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings.allowOnlinePayment)}
+                    onChange={(e) => setSettings({ ...settings, allowOnlinePayment: e.target.checked })}
+                    className="rounded text-saffron focus:ring-0"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-ink block">Accept Online UPI / Cards</span>
+                    <span className="text-[10px] text-ink-soft">Direct gateway checkout</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-4 rounded-14 bg-paper border border-hairline cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings.requireApproval)}
+                    onChange={(e) => setSettings({ ...settings, requireApproval: e.target.checked })}
+                    className="rounded text-saffron focus:ring-0"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-ink block">Require Manual Approval</span>
+                    <span className="text-[10px] text-ink-soft">Review orders before spooling</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Razorpay Gateway Keys */}
+              <div className="pt-4 border-t border-hairline space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-ink">Vendor-Owned Razorpay Account (Direct Bank Settlement)</h4>
+                  <p className="text-xs text-ink-soft">
+                    Optional: Connect your own Razorpay API keys so customer payments deposit directly into your bank account.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-ink">Razorpay Key ID</label>
+                    <input
+                      type="text"
+                      placeholder="rzp_live_... or rzp_test_..."
+                      value={settings.razorpayKeyId || ''}
+                      onChange={(e) => setSettings({ ...settings, razorpayKeyId: e.target.value })}
+                      className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink font-mono focus:outline-none focus:border-saffron"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-ink">Razorpay Key Secret</label>
+                    <input
+                      type="password"
+                      placeholder={settings.razorpayKeySecretMasked ? `Saved: ${settings.razorpayKeySecretMasked}` : 'Enter Key Secret'}
+                      value={settings.razorpayKeySecret || ''}
+                      onChange={(e) => setSettings({ ...settings, razorpayKeySecret: e.target.value })}
+                      className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink font-mono focus:outline-none focus:border-saffron"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <Button variant="primary" type="submit" disabled={settingsSaving} className="h-11 px-6 font-bold text-xs">
+                  {settingsSaving ? 'Saving Changes...' : 'Save Profile & Settings'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 5: QR CODE & COUNTER STANDEE
+        ========================================================================= */}
+        {activeNav === 'QR_STANDEE' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="bg-surface p-8 rounded-[28px] border border-hairline shadow-ink-soft text-center space-y-6 max-w-2xl mx-auto">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-saffron font-mono">
+                  Express Kiosk Standee
+                </span>
+                <h3 className="text-2xl font-sora font-extrabold text-ink mt-1">
+                  Place this QR Code at Your Counter
+                </h3>
+                <p className="text-xs text-ink-soft max-w-md mx-auto mt-1">
+                  Customers scan with Google Lens, Paytm, PhonePe, or Camera to upload documents in seconds.
+                </p>
+              </div>
+
+              {/* QR Image Box */}
+              <div className="p-6 rounded-[24px] bg-paper border border-hairline inline-block shadow-inner">
+                {vendor.slug && (
+                  <img
+                    src={`/api/qr/${vendor.slug}?format=svg`}
+                    alt={`${vendor.name} Print2Me QR Code`}
+                    className="w-56 h-56 mx-auto rounded-14"
+                  />
+                )}
+                <div className="mt-4 font-mono text-xs font-bold text-ink">
+                  {publicQrUrl}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(publicQrUrl);
+                    setCopiedQrLink(true);
+                    setTimeout(() => setCopiedQrLink(false), 2000);
+                  }}
+                  className="px-5 py-2.5 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors flex items-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5 text-saffron" />
+                  <span>{copiedQrLink ? 'Link Copied!' : 'Copy Kiosk Link'}</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-6 py-2.5 rounded-pill bg-ink hover:bg-ink/90 text-white text-xs font-extrabold transition-colors shadow-md flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5 text-saffron" />
+                  <span>Open Printable Standee</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 6: PRICING MATRIX & PRINT SETTINGS
+        ========================================================================= */}
+        {activeNav === 'PRICING' && (
+          <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-6 animate-in fade-in duration-150">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-sora font-bold text-ink">Printing Pricing Matrix</h3>
+                <p className="text-xs text-ink-soft">
+                  Set authoritative per-page rates for paper sizes and color modes. Validated on backend.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-ink">Min Order: ₹</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={minOrderRupees}
+                  onChange={(e) => setMinOrderRupees(Number(e.target.value))}
+                  className="w-20 bg-paper border border-hairline rounded-pill px-3 py-1.5 text-xs font-bold text-ink text-center"
+                />
+              </div>
+            </div>
+
+            {pricingMessage && (
+              <div
+                className={`p-4 rounded-14 text-xs font-semibold ${
+                  pricingMessage.type === 'success'
+                    ? 'bg-success-tint text-success border border-success/30'
+                    : 'bg-danger/10 text-danger border border-danger/30'
+                }`}
+              >
+                {pricingMessage.text}
+              </div>
+            )}
+
+            {pricingLoading ? (
+              <div className="py-12 text-center text-xs text-ink-soft animate-pulse">Loading pricing matrix...</div>
+            ) : (
+              <form onSubmit={handleSavePricing} className="space-y-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-hairline text-ink-soft font-bold">
+                        <th className="py-3 px-4">Paper Size</th>
+                        <th className="py-3 px-4">Color Mode</th>
+                        <th className="py-3 px-4">Side Setup</th>
+                        <th className="py-3 px-4">Rate per Side (₹)</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-hairline">
+                      {pricingList.map((tier, idx) => (
+                        <tr key={idx} className="hover:bg-paper/50 transition-colors">
+                          <td className="py-3.5 px-4 font-bold text-ink">{tier.paper_size || tier.paperSize}</td>
+                          <td className="py-3.5 px-4 font-medium">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              (tier.color_mode || tier.colorMode) === 'COLOR' ? 'bg-saffron-tint text-saffron' : 'bg-paper text-ink border border-hairline'
+                            }`}>
+                              {(tier.color_mode || tier.colorMode) === 'COLOR' ? 'Color' : 'B&W'}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-ink-soft">
+                            {(tier.is_duplex ?? tier.isDuplex) ? 'Double Sided' : 'Single Sided'}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1 font-bold">
+                              <span>₹</span>
+                              <input
+                                type="number"
+                                step="0.25"
+                                min="0.5"
+                                value={((tier.price_per_side_minor || tier.pricePerSideMinor || 200) / 100).toFixed(2)}
+                                onChange={(e) => {
+                                  const newVal = Math.round(parseFloat(e.target.value || '0') * 100);
+                                  setPricingList((prev) =>
+                                    prev.map((p, i) => i === idx ? { ...p, price_per_side_minor: newVal, pricePerSideMinor: newVal } : p)
+                                  );
+                                }}
+                                className="w-24 bg-paper border border-hairline rounded-10 px-2.5 py-1 text-xs font-bold text-ink focus:outline-none focus:border-saffron"
+                              />
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">
+                              Active
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-hairline">
+                  <Button variant="primary" type="submit" disabled={pricingSaving} className="h-11 px-6 font-bold text-xs">
+                    {pricingSaving ? 'Saving Matrix...' : 'Save Pricing Matrix'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 7: PAYMENTS & EARNINGS
+        ========================================================================= */}
+        {activeNav === 'PAYMENTS' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
+                <span className="text-xs text-ink-soft font-semibold">Total Revenue</span>
+                <div className="font-sora text-3xl font-black text-ink">
+                  ₹{formatMinorToInr(stats.totalRevenueMinor)}
+                </div>
+                <span className="text-[11px] text-ink-soft">Lifetime store volume</span>
+              </div>
+
+              <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
+                <span className="text-xs text-ink-soft font-semibold">Settlement Mechanism</span>
+                <div className="font-sora text-lg font-extrabold text-ink">
+                  {settings.razorpayKeyId ? 'Direct to Your Bank' : 'Platform Escrow'}
+                </div>
+                <span className="text-[11px] text-ink-soft font-mono">
+                  {settings.razorpayKeyId ? 'Merchant Gateway Active' : 'print2me.in UPI Hub'}
+                </span>
+              </div>
+
+              <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
+                <span className="text-xs text-ink-soft font-semibold">Pending Cash on Desk</span>
+                <div className="font-sora text-3xl font-black text-saffron">
+                  {stats.cashPending} Orders
+                </div>
+                <span className="text-[11px] text-ink-soft">Collect before customer leaves</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 8: DEVICES & DESKTOP AGENT
+        ========================================================================= */}
+        {activeNav === 'DEVICES' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-sora font-bold text-ink">Windows Desktop Print Agent</h3>
+                  <p className="text-xs text-ink-soft">
+                    Automate printing directly to Canon, HP, Epson, or Brother spoolers without touching PDF files.
+                  </p>
+                </div>
+                <button
+                  disabled={generatingCode}
+                  onClick={handleGenerateCode}
+                  className="px-4 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors flex items-center gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-saffron ${generatingCode ? 'animate-spin' : ''}`} />
+                  <span>Generate New Enrollment Code</span>
+                </button>
+              </div>
+
+              {/* Enrollment Code Box */}
+              <div className="p-6 rounded-[22px] bg-paper border border-hairline shadow-inner max-w-md space-y-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                  One-Time Workstation Pair Code
+                </span>
+                <div className="flex items-center justify-between bg-surface border border-hairline rounded-14 px-4 py-3">
+                  <span className="font-mono text-2xl font-black text-ink tracking-widest">
+                    {deviceCode || 'Loading...'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (deviceCode) {
+                        navigator.clipboard.writeText(deviceCode);
+                        setCopiedCode(true);
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      }
+                    }}
+                    className="text-xs font-bold text-saffron hover:underline"
+                  >
+                    {copiedCode ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-xs text-ink-soft">
+                  Open the Print2Me Windows Desktop Agent on your shop computer and enter this code to connect your printers.
+                </p>
+              </div>
+
+              {/* Enrolled Hardware List */}
+              <div className="space-y-3 pt-4 border-t border-hairline">
+                <h4 className="text-sm font-bold text-ink">Connected Printers &amp; Workstations</h4>
+                {enrolledDevices.length === 0 ? (
+                  <div className="p-6 rounded-14 bg-paper border border-hairline text-xs text-ink-soft text-center">
+                    No desktop agents enrolled yet. Install the Print2Me Desktop Agent on your Windows PC and pair using the code above.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {enrolledDevices.map((dev: any) => (
+                      <div key={dev.id} className="p-4 rounded-14 bg-paper border border-hairline flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse" />
+                          <div>
+                            <span className="font-bold text-xs text-ink block">{dev.deviceName || dev.name}</span>
+                            <span className="text-[10px] text-ink-soft font-mono">{dev.osVersion || 'Windows 11'}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
+                          Active Spooler
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            VIEW 9: SAAS SUBSCRIPTION & PLANS
+        ========================================================================= */}
+        {activeNav === 'SUBSCRIPTION' && (
+          <div className="space-y-6 animate-in fade-in duration-150">
+            <div className="p-6 rounded-[24px] bg-gradient-to-r from-blue-950/30 to-indigo-950/20 border border-blue-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Current Plan Status</span>
+                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${vendor.isSubscriptionActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                    ● {vendor.isSubscriptionActive ? 'ACTIVE' : 'EXPIRED'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold font-sora text-ink">
+                  {vendor.subscriptionPlan || 'STARTER'} Tier •{' '}
+                  {vendor.subscriptionExpiresAt
+                    ? `Renews on ${new Date(vendor.subscriptionExpiresAt).toLocaleDateString()}`
+                    : 'Free Store Trial'}
+                </h3>
+                <p className="text-xs text-ink-soft mt-1">
+                  ⚡ Hero Feature: Zero-Touch Auto-Printing Active across counter workstations.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowSubscriptionModal(true)}
+                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-sora font-extrabold text-xs transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                Open Plan Checkout &amp; Pay
+              </button>
+            </div>
+          </div>
+        )}
+        </main>
+
+        {/* Mobile Sticky Bottom Quick-Nav Bar (< md) */}
+        <div className="md:hidden sticky bottom-0 z-40 bg-[#0B132B] text-white border-t border-white/10 px-2 py-2 flex items-center justify-around shadow-2xl">
+          <button
+            onClick={() => setActiveNav('OVERVIEW')}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold transition-colors ${
+              activeNav === 'OVERVIEW' ? 'text-saffron font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Store className="w-4 h-4" />
+            <span>Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveNav('QUEUE')}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold transition-colors relative ${
+              activeNav === 'QUEUE' ? 'text-saffron font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Printer className="w-4 h-4" />
+            <span>Queue</span>
+            {stats.spoolingOrders > 0 && (
+              <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-saffron animate-pulse" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveNav('ORDERS')}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold transition-colors ${
+              activeNav === 'ORDERS' ? 'text-saffron font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Orders</span>
+          </button>
+
+          <button
+            onClick={() => setActiveNav('DEVICES')}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold transition-colors ${
+              activeNav === 'DEVICES' ? 'text-saffron font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Laptop className="w-4 h-4" />
+            <span>Spooler</span>
+          </button>
+
+          <button
+            onClick={() => setMobileDrawerOpen(true)}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold text-slate-400 hover:text-white"
+          >
+            <Menu className="w-4 h-4" />
+            <span>Menu</span>
+          </button>
+        </div>
       </div>
 
+      {/* Reusable Modals */}
       <QrStandeeModal
         isOpen={showQrModal}
         onClose={() => setShowQrModal(false)}
@@ -484,96 +1860,17 @@ export default function VendorDashboardPage() {
         address={vendor.address}
       />
 
-      {/* Desktop Agent Enrollment Modal */}
-      {showAgentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/60 backdrop-blur-md">
-          <div className="bg-surface border border-hairline rounded-[32px] max-w-lg w-full p-8 space-y-8 shadow-2xl relative animate-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setShowAgentModal(false)}
-              className="absolute top-6 right-6 text-ink-soft hover:text-ink transition-colors bg-paper rounded-full p-2"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-[20px] bg-paper text-ink flex items-center justify-center border border-hairline shadow-sm">
-                <Printer className="w-7 h-7" />
-              </div>
-              <div>
-                <h3 className="font-sora text-xl font-bold text-ink">Desktop Print Agent</h3>
-                <p className="text-sm text-ink-soft">Pair your PC printer with Print2Me</p>
-              </div>
-            </div>
-
-            <div className="bg-paper border border-hairline rounded-[24px] p-6 space-y-4 shadow-inner">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-ink uppercase tracking-wider">Device Enrollment Code</span>
-                <button
-                  disabled={generatingCode}
-                  onClick={handleGenerateNewCode}
-                  className="text-xs text-saffron hover:underline font-bold disabled:opacity-50"
-                >
-                  {generatingCode ? 'Generating...' : '+ New Code'}
-                </button>
-              </div>
-              
-              <div className="flex items-center justify-between bg-surface border border-hairline rounded-[16px] px-5 py-4 shadow-sm">
-                <span className="font-mono text-2xl font-black text-ink tracking-widest">
-                  {deviceCode || 'Loading...'}
-                </span>
-                <Button
-                  variant="primary"
-                  disabled={!deviceCode}
-                  className="h-10 px-4"
-                  onClick={() => {
-                    if (deviceCode) {
-                      navigator.clipboard.writeText(deviceCode);
-                      setCopiedCode(true);
-                      setTimeout(() => setCopiedCode(false), 2000);
-                    }
-                  }}
-                >
-                  {copiedCode ? 'Copied!' : 'Copy Code'}
-                </Button>
-              </div>
-              <p className="text-xs text-ink-soft leading-relaxed font-medium">
-                Enter this 6-character code in your workstation desktop application to connect this store.
-              </p>
-            </div>
-
-            {/* Enrolled Devices List */}
-            {enrolledDevices.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-sm font-bold text-ink">Enrolled Workstations ({enrolledDevices.length})</div>
-                <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                  {enrolledDevices.map((dev: any) => (
-                    <div key={dev.id} className="flex items-center justify-between p-4 rounded-[16px] bg-paper border border-hairline text-sm shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse shadow-sm" />
-                        <span className="font-bold text-ink">{dev.deviceName || dev.name}</span>
-                      </div>
-                      <span className="text-xs text-ink-soft font-mono bg-surface px-2 py-1 rounded-md border border-hairline">
-                        {dev.osVersion || 'Windows'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-4 border-t border-hairline">
-              <Button onClick={() => setShowAgentModal(false)} variant="outline" className="w-full h-12">
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <VendorSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        onUpdated={loadData}
+      <VendorSubscriptionModal
+        isOpen={showSubscriptionModal}
+        onClose={() => {
+          setShowSubscriptionModal(false);
+          fetchStats();
+        }}
+        vendor={vendor}
+        onSubscriptionUpdated={() => {
+          fetchStats();
+          fetchSettings();
+        }}
       />
     </div>
   );

@@ -15,6 +15,12 @@ import {
   QrCode,
   User,
   Plus,
+  CreditCard,
+  Menu,
+  X,
+  HelpCircle,
+  Mail,
+  FileText,
 } from 'lucide-react';
 import { OrderTrackModal } from './OrderTrackModal';
 import { BrandLogo } from '@/components/BrandLogo';
@@ -45,15 +51,18 @@ export function GlobalNavbar() {
     }
     return null;
   });
-  const [loading, setLoading] = useState(false);
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
-    // Walk-in upload kiosk pages never require session checking
     if (isKioskUploadPage) return;
 
-    // Use cached session if still valid
     if (cachedUserSession && Date.now() - cachedUserSession.fetchedAt < SESSION_CACHE_TTL) {
       setSession(cachedUserSession.user);
       return;
@@ -95,7 +104,12 @@ export function GlobalNavbar() {
     }
   };
 
-  // On walk-in upload kiosk pages (/v/[vendorSlug]), the page renders its own dedicated kiosk header with the Print2Me BrandLogo & shop info.
+  // On dashboard pages (/vendor, /admin), hide consumer navbar for full-screen SaaS layout
+  if (pathname?.startsWith('/vendor') || pathname?.startsWith('/admin')) {
+    return null;
+  }
+
+  // On walk-in upload kiosk pages (/v/[vendorSlug]), header is clean and minimal
   if (isKioskUploadPage) {
     return (
       <OrderTrackModal
@@ -104,6 +118,15 @@ export function GlobalNavbar() {
       />
     );
   }
+
+  const navLinks = [
+    { label: 'Home', href: '/' },
+    { label: 'How It Works', href: '/how-it-works' },
+    { label: 'For Vendors', href: '/partner' },
+    { label: 'Services', href: '/document-printing' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Contact', href: '/contact' },
+  ];
 
   return (
     <>
@@ -133,41 +156,26 @@ export function GlobalNavbar() {
             </button>
           </div>
 
-          {/* Navigation Items */}
+          {/* Desktop Navigation Items */}
           <nav className="flex items-center gap-1 sm:gap-2.5 text-sm font-medium shrink-0">
-            
-            {/* Public SEO Nav Links (Hidden on walk-in upload kiosk pages) */}
-            {!isKioskUploadPage && (
-              <>
-                <Link
-                  href="/how-it-works"
-                  className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
-                >
-                  How It Works
-                </Link>
-
-                <Link
-                  href="/document-printing"
-                  className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
-                >
-                  Document Printing
-                </Link>
-
-                <Link
-                  href="/campus-printing"
-                  className="hidden lg:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
-                >
-                  Campus
-                </Link>
-
-                <Link
-                  href="/partner"
-                  className="hidden md:flex items-center text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
-                >
-                  Partner
-                </Link>
-              </>
-            )}
+            <div className="hidden lg:flex items-center gap-1">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-3 py-1.5 rounded-14 text-xs font-semibold whitespace-nowrap transition-colors ${
+                      isActive
+                        ? 'bg-paper text-ink border border-hairline'
+                        : 'text-ink-soft hover:text-ink hover:bg-paper'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
 
             {/* Mobile Track button */}
             <button
@@ -178,16 +186,7 @@ export function GlobalNavbar() {
               <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-saffron" />
             </button>
 
-            {/* Demo Link */}
-            <Link
-              href="/v/speedy-express"
-              className="hidden 2xl:flex items-center gap-1.5 text-ink-soft hover:text-ink transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
-            >
-              <QrCode className="w-3.5 h-3.5 text-ink-soft" />
-              <span>Demo Kiosk</span>
-            </Link>
-
-            {/* If Logged in */}
+            {/* Authenticated user menu */}
             {session ? (
               <div className="relative shrink-0">
                 <button
@@ -217,23 +216,38 @@ export function GlobalNavbar() {
                       </span>
                     </div>
 
-                    <Link
-                      href="/vendor"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-14 text-xs text-ink hover:bg-paper transition-colors font-medium"
-                    >
-                      <Store className="w-4 h-4 text-saffron" />
-                      <span>Vendor Dashboard</span>
-                    </Link>
+                    {/* If Vendor Owner: show store links */}
+                    {session.vendor && (
+                      <>
+                        <Link
+                          href="/vendor"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-14 text-xs text-ink hover:bg-paper transition-colors font-medium"
+                        >
+                          <Store className="w-4 h-4 text-saffron" />
+                          <span>Vendor Dashboard</span>
+                        </Link>
 
+                        <Link
+                          href="/vendor/subscription"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-14 text-xs text-ink hover:bg-paper transition-colors font-semibold"
+                        >
+                          <CreditCard className="w-4 h-4 text-emerald-600" />
+                          <span>SaaS Subscription</span>
+                        </Link>
+                      </>
+                    )}
+
+                    {/* If Admin / Super Admin: show Platform Admin link */}
                     {(session.role === 'ADMIN' || session.role === 'SUPER_ADMIN') && (
                       <Link
                         href="/admin"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 rounded-14 text-xs text-ink hover:bg-paper transition-colors font-medium"
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-14 text-xs text-ink hover:bg-paper transition-colors font-bold"
                       >
                         <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span>Admin Hub</span>
+                        <span>Platform Admin Hub</span>
                       </Link>
                     )}
 
@@ -249,18 +263,12 @@ export function GlobalNavbar() {
                   </div>
                 )}
               </div>
-            ) : isKioskUploadPage ? (
-              /* Dedicated walk-in customer kiosk view: Keep header minimal & focused on printing */
-              <div className="flex items-center gap-1.5 text-xs text-ink-soft bg-paper px-2.5 py-1 rounded-pill border border-hairline font-semibold shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Express Kiosk</span>
-              </div>
             ) : (
-              /* If Logged Out on regular public pages */
+              /* If Logged Out */
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 <Link
                   href="/login"
-                  className="flex items-center gap-1 sm:gap-1.5 text-ink hover:text-saffron transition-colors px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
+                  className="flex items-center gap-1 sm:gap-1.5 text-ink hover:text-saffron transition-colors px-2.5 py-1.5 rounded-14 hover:bg-paper text-xs font-semibold whitespace-nowrap shrink-0"
                 >
                   <LogIn className="w-3.5 h-3.5 shrink-0" />
                   <span>Sign In</span>
@@ -276,8 +284,48 @@ export function GlobalNavbar() {
                 </Link>
               </div>
             )}
+
+            {/* Mobile hamburger menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden flex items-center justify-center w-8 h-8 rounded-full bg-paper border border-hairline text-ink hover:bg-surface transition-colors ml-1"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
           </nav>
         </div>
+
+        {/* Mobile Dropdown Drawer */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-hairline mt-2.5 pt-3 pb-4 px-2 space-y-1.5 animate-in slide-in-from-top-2 duration-150">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block px-3.5 py-2.5 rounded-14 text-sm font-semibold transition-colors ${
+                  pathname === link.href ? 'bg-paper text-ink font-bold' : 'text-ink-soft hover:bg-paper'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            <div className="pt-2 border-t border-hairline/80 mt-2 space-y-2">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsTrackModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-14 text-sm font-semibold text-ink bg-paper border border-hairline"
+              >
+                <Search className="w-4 h-4 text-saffron" />
+                <span>Track Print Order</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Global Order Track Modal */}

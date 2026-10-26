@@ -118,6 +118,26 @@ export async function POST(
           },
         });
       }
+    } else if (action === 'START_PRINTING' || action === 'MARK_PRINTING') {
+      updatedOrder = await prisma.order.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.PROCESSING },
+      });
+    } else if (action === 'REPORT_ERROR' || action === 'PAPER_OUT') {
+      // Mark or log print error
+      const existingJob = await prisma.printJob.findFirst({
+        where: { orderId: order.id },
+      });
+      if (existingJob) {
+        await prisma.printJobEvent.create({
+          data: {
+            printJobId: existingJob.id,
+            status: PrintJobStatus.FAILED,
+            message: body.message || 'Technical error / paper finished during printing.',
+          },
+        });
+      }
+      updatedOrder = order;
     } else if (action === 'MARK_READY') {
       updatedOrder = await prisma.order.update({
         where: { id: order.id },

@@ -32,10 +32,17 @@ export default function OrderTrackingPage() {
   const fetchOrder = async () => {
     try {
       const res = await fetch(`/api/orders/${token}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch order');
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Request returned status ${res.status}`);
+      }
+      if (!res.ok) throw new Error(data?.error || 'Failed to fetch order');
       setOrder(data.order);
-      if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(data.order.status)) {
+      if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(data.order?.status)) {
         setIsTerminalState(true);
       }
     } catch (err: any) {
@@ -141,6 +148,11 @@ export default function OrderTrackingPage() {
             <div className="font-sora font-bold text-2xl text-ink">
               ₹{formatMinorToInr(order.totalAmountMinor)}
             </div>
+            {order.totalAmountMinor > (order.subtotalMinor || 0) && (
+              <div className="text-[11px] text-ink-soft font-mono">
+                Print: ₹{formatMinorToInr(order.subtotalMinor || order.totalAmountMinor)} + Fee: ₹{formatMinorToInr(order.totalAmountMinor - (order.subtotalMinor || 0))}
+              </div>
+            )}
           </div>
           <div>
             <span className={`px-3 py-1.5 rounded-pill text-xs font-bold uppercase ${

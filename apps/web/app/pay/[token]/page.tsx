@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -29,6 +29,7 @@ export default function PaymentCheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const hasAutoLaunched = useRef(false);
 
   // Initialize Payment Info
   useEffect(() => {
@@ -125,6 +126,14 @@ export default function PaymentCheckoutPage() {
     setIsProcessing(false);
   };
 
+  // Automatically launch Razorpay once payment gateway details are ready
+  useEffect(() => {
+    if (paymentData && !paymentData.isMock && !hasAutoLaunched.current) {
+      hasAutoLaunched.current = true;
+      handleLaunchRazorpay();
+    }
+  }, [paymentData]);
+
   // Sandbox simulation handler
   const handleSimulatePayment = async () => {
     setIsProcessing(true);
@@ -161,14 +170,22 @@ export default function PaymentCheckoutPage() {
   }
 
   if (error && !paymentData) {
+    const isCashOrder = error.toLowerCase().includes('cash') || error.toLowerCase().includes('counter');
     return (
       <div className="max-w-md mx-auto px-6 py-20 text-center space-y-4">
-        <AlertCircle className="w-12 h-12 text-rose-400 mx-auto" />
-        <h2 className="text-xl font-bold text-white">Payment Unavailable</h2>
-        <p className="text-sm text-slate-400">{error}</p>
-        <Link href={`/track/${token}`} className="inline-block text-xs text-emerald-400 hover:underline">
-          Return to Order Tracking
-        </Link>
+        <AlertCircle className="w-12 h-12 text-amber-400 mx-auto" />
+        <h2 className="text-xl font-bold text-white">
+          {isCashOrder ? 'Pay at Counter' : 'Online Payment Unavailable'}
+        </h2>
+        <p className="text-sm text-slate-300">{error}</p>
+        <div className="pt-2">
+          <Link
+            href={`/track/${token}`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-all"
+          >
+            Go to Order Ticket &amp; Pay at Counter
+          </Link>
+        </div>
       </div>
     );
   }
@@ -226,7 +243,7 @@ export default function PaymentCheckoutPage() {
           ) : (
             <>
               <Lock className="w-4 h-4 text-slate-950" />
-              <span>Open Razorpay Modal</span>
+              <span>Pay ₹{formatMinorToInr(paymentData.amountMinor)} via Razorpay</span>
             </>
           )}
         </button>

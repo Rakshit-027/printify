@@ -118,12 +118,13 @@ export async function GET(
           targetUrl,
           pricingConfig: vendor.pricingConfig || [],
           allowCashOnDesk: vendor.allowCashOnDesk ?? true,
+          allowOnlinePayment: vendor.allowOnlinePayment ?? true,
         },
         ...(dataUrl ? { dataUrl } : {}),
       },
       {
         headers: {
-          'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
       }
     );

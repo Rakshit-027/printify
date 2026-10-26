@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
               slug: true,
               razorpayKeyId: true,
               razorpayKeySecret: true,
+              allowOnlinePayment: true,
             },
           },
           payments: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -58,6 +59,13 @@ export async function POST(request: NextRequest) {
     if (order.paymentMethod !== PaymentMethod.RAZORPAY) {
       return NextResponse.json(
         { error: 'Order is configured for cash collection, not online payment.' },
+        { status: 400 }
+      );
+    }
+
+    if (order.vendor && order.vendor.allowOnlinePayment === false) {
+      return NextResponse.json(
+        { error: 'Online payment is disabled by this vendor. Please pay at counter.' },
         { status: 400 }
       );
     }

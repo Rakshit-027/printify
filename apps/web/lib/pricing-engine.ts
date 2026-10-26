@@ -40,10 +40,39 @@ export interface OrderCalculationSummary {
   items: ItemCalculationResult[];
   subtotalMinor: number;
   taxMinor: number;
+  convenienceFeeMinor: number;
   minimumOrderApplied: boolean;
   totalAmountMinor: number;
   totalSheets: number;
   totalSides: number;
+}
+
+/**
+ * Effective Razorpay fee rate: 2% base commission + 18% GST on the fee = 2.36% (0.0236)
+ */
+export const RAZORPAY_EFFECTIVE_RATE = 0.0236;
+
+/**
+ * Computes exact paise online payment gateway convenience fee using gross-up formula:
+ * Gross = Math.round(Net / (1 - 0.0236))
+ * Fee = Gross - Net
+ * This guarantees the vendor receives 100% of their print charges with zero shortfall.
+ */
+export function calculateConvenienceFeeMinor(subtotalMinor: number, isOnlinePayment: boolean): {
+  convenienceFeeMinor: number;
+  totalAmountMinor: number;
+} {
+  if (!isOnlinePayment || subtotalMinor <= 0) {
+    return { convenienceFeeMinor: 0, totalAmountMinor: subtotalMinor };
+  }
+
+  const grossTotalMinor = Math.round(subtotalMinor / (1 - RAZORPAY_EFFECTIVE_RATE));
+  const feeMinor = grossTotalMinor - subtotalMinor;
+
+  return {
+    convenienceFeeMinor: feeMinor,
+    totalAmountMinor: grossTotalMinor,
+  };
 }
 
 /**
@@ -148,7 +177,8 @@ export function calculateItemPricing(
 export function calculateOrderSummary(
   inputs: ItemCalculationInput[],
   pricingMatrix: PricingRule[],
-  vendorMinimumMinor: number = 500
+  vendorMinimumMinor: number = 500,
+  isOnlinePayment: boolean = false
 ): OrderCalculationSummary {
   const calculatedItems = inputs.map((item) => calculateItemPricing(item, pricingMatrix));
 
@@ -157,18 +187,24 @@ export function calculateOrderSummary(
   const totalSides = calculatedItems.reduce((acc, item) => acc + item.totalSides, 0);
 
   // Apply vendor minimum order charge if items exist but total is below minimum threshold
-  let totalAmountMinor = subtotalMinor;
+  let baseAmountMinor = subtotalMinor;
   let minimumOrderApplied = false;
 
   if (calculatedItems.length > 0 && subtotalMinor < vendorMinimumMinor) {
-    totalAmountMinor = vendorMinimumMinor;
+    baseAmountMinor = vendorMinimumMinor;
     minimumOrderApplied = true;
   }
 
+  const { convenienceFeeMinor, totalAmountMinor } = calculateConvenienceFeeMinor(
+    baseAmountMinor,
+    isOnlinePayment
+  );
+
   return {
     items: calculatedItems,
-    subtotalMinor,
+    subtotalMinor: baseAmountMinor,
     taxMinor: 0, // Tax can be configured or included
+    convenienceFeeMinor,
     minimumOrderApplied,
     totalAmountMinor,
     totalSheets,

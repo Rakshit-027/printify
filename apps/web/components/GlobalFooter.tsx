@@ -8,8 +8,8 @@ import { BrandLogo } from '@/components/BrandLogo';
 export function GlobalFooter() {
   const pathname = usePathname();
 
-  // If on walk-in upload kiosk pages (/v/[vendorSlug]), hide the global footer so customers have a distraction-free mobile screen
-  if (pathname?.startsWith('/v/')) {
+  // Suppress footer on kiosk and full-screen dashboards (/v/, /vendor, /admin)
+  if (pathname?.startsWith('/v/') || pathname?.startsWith('/vendor') || pathname?.startsWith('/admin')) {
     return null;
   }
 
@@ -72,24 +72,24 @@ export function GlobalFooter() {
             <h4 className="font-sora font-bold text-ink mb-5 text-sm uppercase tracking-wider">Help &amp; Inquiries</h4>
             <ul className="space-y-3 text-sm text-ink-soft">
               <li><Link href="/faq" className="hover:text-ink transition-colors">Frequently Asked Questions</Link></li>
+              <li><Link href="/contact" className="hover:text-ink transition-colors">Contact Support Desk</Link></li>
               <li>
                 <a href="mailto:support@print2me.in" className="hover:text-ink transition-colors flex items-center gap-2 font-medium text-ink">
                   <Mail className="w-3.5 h-3.5 text-saffron shrink-0" />
                   support@print2me.in
                 </a>
               </li>
-              <li>
-                <a href="mailto:support@print2me.com" className="hover:text-ink transition-colors text-xs text-ink-soft">
-                  support@print2me.com
-                </a>
-              </li>
-              <li><a href="/#contact" className="hover:text-ink transition-colors">Contact Sales Desk</a></li>
             </ul>
           </div>
         </div>
 
         <div className="pt-8 border-t border-hairline flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-ink-soft">
-          <div>© {new Date().getFullYear()} Print2Me (print2me.in). All rights reserved.</div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <span>© {new Date().getFullYear()} Print2Me (print2me.in). All rights reserved.</span>
+            <Link href="/privacy" className="hover:text-ink transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-ink transition-colors">Terms of Service</Link>
+            <Link href="/refund" className="hover:text-ink transition-colors">Refund Policy</Link>
+          </div>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-paper rounded-pill border border-hairline shadow-sm">
             <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
             <span>print2me.in Cloud: <strong>All Systems Operational</strong></span>

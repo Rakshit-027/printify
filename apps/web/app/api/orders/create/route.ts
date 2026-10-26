@@ -65,6 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (paymentMethod === PaymentMethod.RAZORPAY && !vendor.allowOnlinePayment) {
+      return NextResponse.json(
+        { error: 'This vendor only accepts Pay at Counter (Cash/UPI at desk). Online payment is currently disabled.' },
+        { status: 400 }
+      );
+    }
+
     // 2. Fetch Document records & inspect page count
     const documentIds = items.map((i) => i.documentId);
     let documents: any[] = [];
@@ -105,10 +112,12 @@ export async function POST(request: NextRequest) {
       version: p.version || 1,
     }));
 
+    const isOnline = paymentMethod === PaymentMethod.RAZORPAY;
     const orderSummary = calculateOrderSummary(
       calcInputs,
       pricingRules,
-      vendor.pricingConfig[0]?.minimumOrderMinor || 500
+      vendor.pricingConfig[0]?.minimumOrderMinor || 500,
+      isOnline
     );
 
     // 3. Determine Initial Lifecycle State
@@ -131,6 +140,11 @@ export async function POST(request: NextRequest) {
     const trackingToken = crypto.randomBytes(16).toString('hex');
     const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const feeNote = orderSummary.convenienceFeeMinor > 0
+      ? `[Online Fee: ₹${(orderSummary.convenienceFeeMinor / 100).toFixed(2)}]`
+      : '';
+    const finalNotes = [customerNotes, feeNote].filter(Boolean).join(' | ');
+
     // 4. Persist Order in Database
     let createdOrder: any = null;
     try {
@@ -142,7 +156,7 @@ export async function POST(request: NextRequest) {
             trackingToken,
             customerName: customerName || 'Guest Customer',
             customerPhone: customerPhone || null,
-            customerNotes: customerNotes || null,
+            customerNotes: finalNotes || null,
             status: initialOrderStatus,
             paymentMethod,
             paymentStatus: initialPaymentStatus,

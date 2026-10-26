@@ -97,14 +97,20 @@ export default function RegisterVendorPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to complete registration');
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || 'Registration request failed');
       }
 
-      router.push('/vendor');
-      router.refresh();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to complete registration');
+      }
+
+      window.location.href = '/vendor';
     } catch (err: any) {
       setErrorMessage(err.message || 'An error occurred during onboarding');
     } finally {

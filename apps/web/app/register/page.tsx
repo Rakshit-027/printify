@@ -46,8 +46,7 @@ export default function RegisterPage() {
       }
 
       // Success -> Redirect to vendor dashboard
-      router.push('/vendor');
-      router.refresh();
+      window.location.href = '/vendor';
     } catch (err: any) {
       setErrorMessage(err.message || 'An error occurred during registration');
     } finally {

@@ -32,13 +32,13 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Route according to user role
-      if (data.user.role === 'SUPER_ADMIN' || data.user.role === 'ADMIN') {
-        router.push('/admin');
+      // Route according to user role with hard navigation to clear any stale cache
+      const role = (data.user?.role || '').toUpperCase();
+      if (role === 'SUPER_ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN') {
+        window.location.href = '/admin';
       } else {
-        router.push('/vendor');
+        window.location.href = '/vendor';
       }
-      router.refresh();
     } catch (err: any) {
       setErrorMessage(err.message || 'An error occurred during authentication');
     } finally {
@@ -62,6 +62,31 @@ export default function LoginPage() {
           <div>
             <h1 className="text-2xl font-sora font-extrabold text-ink tracking-tight mb-1">Welcome back</h1>
             <p className="text-xs text-ink-soft font-medium">Access your Vendor Store or Administrative Command Portal</p>
+          </div>
+        </div>
+
+        {/* Quick Fill Demo Credentials */}
+        <div className="bg-paper p-3.5 rounded-[20px] border border-hairline space-y-2">
+          <div className="text-[11px] font-bold text-ink-soft uppercase tracking-wider text-center font-sora">
+            Quick Fill Credentials
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => fillDemoCredentials('rakshitwaghmare27@gmail.com', 'Password@123')}
+              className="px-3 py-2.5 bg-surface hover:border-saffron/50 border border-hairline rounded-[14px] text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 text-left"
+            >
+              <Store className="w-3.5 h-3.5 text-saffron flex-shrink-0" />
+              <span>Vendor Desk</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemoCredentials('admin@print2me.in', 'Admin@123456')}
+              className="px-3 py-2.5 bg-surface hover:border-emerald-500/50 border border-hairline rounded-[14px] text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 text-left"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+              <span>Super Admin</span>
+            </button>
           </div>
         </div>
 

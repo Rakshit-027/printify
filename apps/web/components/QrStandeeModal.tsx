@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import {
   QrCode,
   Download,
@@ -34,6 +35,7 @@ interface VendorRealData {
   contactPhone?: string | null;
   operatingHours?: string | null;
   pricingConfig?: PricingTier[];
+  targetUrl?: string;
 }
 
 interface QrStandeeModalProps {
@@ -54,6 +56,7 @@ export function QrStandeeModal({
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vendorData, setVendorData] = useState<VendorRealData | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   // Fetch real vendor details directly from the API whenever modal opens or slug changes
   useEffect(() => {
@@ -82,8 +85,6 @@ export function QrStandeeModal({
     };
   }, [isOpen, vendorSlug]);
 
-  if (!isOpen) return null;
-
   const resolvedName = vendorData?.name || initialName || 'Print Shop';
   const resolvedAddress = vendorData?.address || initialAddress || 'Campus Counter, Main Arcade';
   const resolvedPhone = vendorData?.contactPhone || null;
@@ -91,13 +92,32 @@ export function QrStandeeModal({
   const pricingTiers = vendorData?.pricingConfig || [];
 
   // Find lowest B&W price and Color price from actual vendor pricing
-  const bwTier = pricingTiers.find((t) => t.colorMode === 'BLACK_AND_WHITE');
-  const colorTier = pricingTiers.find((t) => t.colorMode === 'COLOR');
-  const bwPrice = bwTier ? `₹${(bwTier.pricePerSideMinor / 100).toFixed(2)}` : '₹2.00';
-  const colorPrice = colorTier ? `₹${(colorTier.pricePerSideMinor / 100).toFixed(2)}` : '₹10.00';
+  const bwTier = pricingTiers.find((t) => (t as any).colorMode === 'BLACK_AND_WHITE' || (t as any).color_mode === 'BLACK_AND_WHITE');
+  const colorTier = pricingTiers.find((t) => (t as any).colorMode === 'COLOR' || (t as any).color_mode === 'COLOR');
+  const bwPriceMinor = bwTier ? ((bwTier as any).pricePerSideMinor || (bwTier as any).price_per_side_minor) : 200;
+  const colorPriceMinor = colorTier ? ((colorTier as any).pricePerSideMinor || (colorTier as any).price_per_side_minor) : 1000;
+  const bwPrice = `₹${(bwPriceMinor / 100).toFixed(2)}`;
+  const colorPrice = `₹${(colorPriceMinor / 100).toFixed(2)}`;
 
-  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/v/${vendorSlug}` : `https://print2me.in/v/${vendorSlug}`;
-  const qrSvgUrl = `/api/qr/${vendorSlug}?format=svg&color=%230f172a`;
+  const publicUrl = vendorData?.targetUrl || (typeof window !== 'undefined' ? `${window.location.origin}/v/${vendorSlug}` : `https://print2me.in/v/${vendorSlug}`);
+
+  // Generate crisp client-side QR Data URL directly from resolved publicUrl
+  useEffect(() => {
+    if (!publicUrl) return;
+    QRCode.toDataURL(publicUrl, {
+      width: 480,
+      margin: 2,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'H',
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => console.error('Failed to generate local QR code:', err));
+  }, [publicUrl]);
+
+  if (!isOpen) return null;
 
   const copyUrl = () => {
     navigator.clipboard.writeText(publicUrl);
@@ -115,38 +135,33 @@ export function QrStandeeModal({
         className="w-full max-w-xl bg-slate-900 border border-slate-700/80 rounded-[32px] p-5 sm:p-7 shadow-2xl space-y-5 relative max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Modal Header */}
-        <div className="flex items-center gap-3.5 border-b border-slate-800 pb-4">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-saffron to-amber-500 flex items-center justify-center text-white font-bold shadow-lg shadow-saffron/20 flex-shrink-0">
-            <QrCode className="w-6 h-6" />
+        {/* Header Action Bar */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-saffron to-amber-500 flex items-center justify-center shadow-lg shadow-saffron/20">
+              <QrCode className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight">Counter QR Standee Plaque</h2>
+              <p className="text-xs text-slate-400">Live counter QR with real shop rates, address, and mobile self-checkout</p>
+            </div>
           </div>
-          <div className="min-w-0 pr-8">
-            <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2 truncate">
-              <span>Counter QR Standee Plaque</span>
-              {loading && <RefreshCw className="w-3.5 h-3.5 text-saffron animate-spin" />}
-            </h2>
-            <p className="text-xs text-slate-400 truncate">
-              Live counter QR with real shop rates, address, and mobile self-checkout
-            </p>
-          </div>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* HIGH-RESOLUTION PRINTABLE COUNTER PLAQUE */}
+        {/* The Standee Physical Plaque Preview */}
         <div
-          id="printable-standee"
-          className="bg-white rounded-3xl p-6 sm:p-8 text-slate-950 shadow-2xl space-y-4 text-center border-4 border-slate-900 relative overflow-hidden"
+          id="printable-standee-plaque"
+          className="bg-white rounded-3xl p-6 sm:p-8 text-center space-y-5 border-4 border-slate-950 shadow-2xl relative overflow-hidden"
         >
-          {/* Top Pill & Shop Title */}
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white font-extrabold text-[10px] uppercase tracking-widest shadow-sm">
+          {/* Top Brand Banner */}
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950 text-white text-[11px] font-bold tracking-wider uppercase">
               <Sparkles className="w-3 h-3 text-amber-400" />
               <span>Express Counter Self-Printing</span>
             </div>
@@ -172,14 +187,20 @@ export function QrStandeeModal({
 
           {/* QR Code Graphic with High Contrast Frame */}
           <div className="bg-gradient-to-b from-slate-50 to-slate-100 p-4 sm:p-5 rounded-2xl border-2 border-slate-900 inline-block mx-auto shadow-inner relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={qrSvgUrl}
-              alt={`Counter QR Code for ${resolvedName}`}
-              width={240}
-              height={240}
-              className="w-48 h-48 sm:w-56 sm:h-56 mx-auto transition-transform hover:scale-105 duration-300"
-            />
+            {qrDataUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={qrDataUrl}
+                alt={`Counter QR Code for ${resolvedName}`}
+                width={240}
+                height={240}
+                className="w-48 h-48 sm:w-56 sm:h-56 mx-auto transition-transform hover:scale-105 duration-300"
+              />
+            ) : (
+              <div className="w-48 h-48 sm:w-56 sm:h-56 mx-auto flex items-center justify-center">
+                <RefreshCw className="w-8 h-8 text-slate-400 animate-spin" />
+              </div>
+            )}
             <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-mono font-bold tracking-wider">
               SCAN WITH PHONE CAMERA
             </div>
@@ -222,8 +243,8 @@ export function QrStandeeModal({
               <span className="text-[10px] text-slate-400 font-medium">Network</span>
               <BrandLogo variant="horizontal" height={20} />
             </div>
-            <span className="font-mono font-bold text-slate-800 text-[11px]">
-              print2me.in/v/{vendorSlug}
+            <span className="font-mono font-bold text-slate-800 text-[11px] truncate max-w-[260px]">
+              {publicUrl.replace(/^https?:\/\//, '')}
             </span>
           </div>
         </div>

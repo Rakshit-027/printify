@@ -22,6 +22,17 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    const rustBackendUrl = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8080';
+    return {
+      beforeFiles: [
+        {
+          source: '/api/:path*',
+          destination: `${rustBackendUrl}/api/:path*`,
+        },
+      ],
+    };
+  },
   async headers() {
     return [
       {
@@ -29,7 +40,9 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: process.env.NODE_ENV === 'production'
+              ? 'public, max-age=31536000, immutable'
+              : 'no-cache, no-store, must-revalidate',
           },
         ],
       },
