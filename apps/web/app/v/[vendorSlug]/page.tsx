@@ -2883,6 +2883,21 @@ export default function VendorPublicOrderPage() {
             </div>
           </div>
         )}
+
+        {/* Kiosk Trust & Privacy Protection Footer */}
+        <div className="pt-8 pb-4 text-center space-y-2 max-w-md mx-auto">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-paper border border-hairline text-ink-soft text-[11px] font-medium shadow-xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-success shrink-0" />
+            <span>Ephemeral Privacy: Files encrypted &amp; auto-purged within 30 days</span>
+          </div>
+          <div className="flex items-center justify-center gap-3 text-[11px] text-ink-soft">
+            <Link href="/privacy" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Privacy Policy</Link>
+            <span>•</span>
+            <Link href="/terms" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Terms of Service</Link>
+            <span>•</span>
+            <Link href="/refund" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Refund Policy</Link>
+          </div>
+        </div>
       </main>
 
       {/* 4. MODERN STICKY BOTTOM CHECKOUT TRAY */}

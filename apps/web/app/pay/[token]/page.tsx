@@ -265,9 +265,18 @@ export default function PaymentCheckoutPage() {
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>256-Bit SSL Encrypted Razorpay Gateway</span>
+        <div className="space-y-2 pt-2 text-center">
+          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>256-Bit SSL Encrypted Razorpay Gateway</span>
+          </div>
+          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500">
+            <Link href="/privacy" target="_blank" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+            <span>•</span>
+            <Link href="/terms" target="_blank" className="hover:text-slate-300 transition-colors">Terms</Link>
+            <span>•</span>
+            <Link href="/refund" target="_blank" className="hover:text-slate-300 transition-colors">Refund Policy</Link>
+          </div>
         </div>
       </div>
     </div>
