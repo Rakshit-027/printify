@@ -79,9 +79,14 @@ export default function PayTokenPage() {
         description: `Order ${paymentData.orderNumber}`,
         order_id: paymentData.razorpayOrderId,
         prefill: {
-          name: paymentData.customerName || '',
-          email: paymentData.customerEmail || '',
-          contact: paymentData.customerPhone || '',
+          name: paymentData.customerName || 'Customer',
+          email: paymentData.customerEmail || 'orders@print2me.in',
+          contact: paymentData.customerPhone || '+919999999999',
+        },
+        readonly: {
+          contact: true,
+          email: true,
+          name: true,
         },
         theme: {
           color: '#FF8A1F',

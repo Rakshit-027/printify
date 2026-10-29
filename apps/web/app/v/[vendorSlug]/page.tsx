@@ -1706,8 +1706,14 @@ export default function VendorPublicOrderPage() {
             },
           },
           prefill: {
-            name: customerName.trim() || 'Guest Customer',
-            contact: customerPhone.trim() || '9876543210',
+            name: customerName.trim() || 'Print Customer',
+            email: 'orders@print2me.in',
+            contact: customerPhone.trim() || vendor?.contactPhone || '+919999999999',
+          },
+          readonly: {
+            contact: true,
+            email: true,
+            name: true,
           },
           theme: {
             color: '#0e1a3a',
