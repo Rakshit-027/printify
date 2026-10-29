@@ -1,3 +1,4 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -450,7 +451,7 @@ function CameraScanStudioModal({
   const cropHPercent = Math.round((crop.bottom - crop.top) * 100);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2 sm:p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
       <div className="bg-surface rounded-[24px] sm:rounded-[28px] border border-hairline max-w-lg w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-3.5 sm:p-4 border-b border-hairline flex items-center justify-between bg-surface">
@@ -480,7 +481,7 @@ function CameraScanStudioModal({
           <button
             type="button"
             onClick={() => setActiveTab('CROP')}
-            className={`flex-1 py-1.5 rounded-12 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 rounded-12 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 ${
               activeTab === 'CROP'
                 ? 'bg-ink text-white shadow-xs'
                 : 'bg-paper text-ink-soft hover:text-ink'
@@ -497,7 +498,7 @@ function CameraScanStudioModal({
                 applyDocumentFilter(imageObj, canvasRef.current, filter, rotation, crop);
               }
             }}
-            className={`flex-1 py-1.5 rounded-12 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 rounded-12 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 ${
               activeTab === 'FILTER'
                 ? 'bg-ink text-white shadow-xs'
                 : 'bg-paper text-ink-soft hover:text-ink'
@@ -513,7 +514,7 @@ function CameraScanStudioModal({
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          className="flex-1 overflow-hidden p-3 sm:p-4 bg-[#0A0F1D] flex flex-col items-center justify-center relative min-h-[300px] select-none touch-none"
+          className="flex-1 overflow-hidden p-3 sm:p-4 bg-ink flex flex-col items-center justify-center relative min-h-[300px] select-none touch-none"
         >
           {/* 1. INTERACTIVE HAND CROPPER CONTAINER (Visible on CROP tab) */}
           {rotatedSrc && (
@@ -569,7 +570,7 @@ function CameraScanStudioModal({
                   width: `${(crop.right - crop.left) * 100}%`,
                   height: `${(crop.bottom - crop.top) * 100}%`,
                 }}
-                className="absolute border border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.6)] touch-none"
+                className="absolute border border-white/90 shadow-sm touch-none"
               >
                 {/* Center Area Drag: Move entire box */}
                 <div
@@ -601,7 +602,7 @@ function CameraScanStudioModal({
                   onPointerDown={(e) => startDrag('TL', e)}
                   className="absolute -top-5 -left-5 w-11 h-11 flex items-center justify-center cursor-nwse-resize touch-none z-30 group"
                 >
-                  <div className="w-5 h-5 border-t-3 border-l-3 border-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] relative flex items-center justify-center">
+                  <div className="w-5 h-5 border-t-3 border-l-3 border-white drop-shadow-sm relative flex items-center justify-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-saffron border border-white shadow group-active:scale-125 transition-transform" />
                   </div>
                 </div>
@@ -611,7 +612,7 @@ function CameraScanStudioModal({
                   onPointerDown={(e) => startDrag('TR', e)}
                   className="absolute -top-5 -right-5 w-11 h-11 flex items-center justify-center cursor-nesw-resize touch-none z-30 group"
                 >
-                  <div className="w-5 h-5 border-t-3 border-r-3 border-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] relative flex items-center justify-center">
+                  <div className="w-5 h-5 border-t-3 border-r-3 border-white drop-shadow-sm relative flex items-center justify-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-saffron border border-white shadow group-active:scale-125 transition-transform" />
                   </div>
                 </div>
@@ -621,7 +622,7 @@ function CameraScanStudioModal({
                   onPointerDown={(e) => startDrag('BL', e)}
                   className="absolute -bottom-5 -left-5 w-11 h-11 flex items-center justify-center cursor-nesw-resize touch-none z-30 group"
                 >
-                  <div className="w-5 h-5 border-b-3 border-l-3 border-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] relative flex items-center justify-center">
+                  <div className="w-5 h-5 border-b-3 border-l-3 border-white drop-shadow-sm relative flex items-center justify-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-saffron border border-white shadow group-active:scale-125 transition-transform" />
                   </div>
                 </div>
@@ -631,7 +632,7 @@ function CameraScanStudioModal({
                   onPointerDown={(e) => startDrag('BR', e)}
                   className="absolute -bottom-5 -right-5 w-11 h-11 flex items-center justify-center cursor-nwse-resize touch-none z-30 group"
                 >
-                  <div className="w-5 h-5 border-b-3 border-r-3 border-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] relative flex items-center justify-center">
+                  <div className="w-5 h-5 border-b-3 border-r-3 border-white drop-shadow-sm relative flex items-center justify-center">
                     <div className="w-2.5 h-2.5 rounded-full bg-saffron border border-white shadow group-active:scale-125 transition-transform" />
                   </div>
                 </div>
@@ -642,28 +643,28 @@ function CameraScanStudioModal({
                   onPointerDown={(e) => startDrag('TOP', e)}
                   className="absolute -top-3.5 inset-x-8 h-7 flex items-center justify-center cursor-ns-resize touch-none z-20 group"
                 >
-                  <div className="w-10 h-1.5 bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-active:h-2 transition-all" />
+                  <div className="w-10 h-1.5 bg-white rounded-full shadow-sm group-active:h-2 transition-colors" />
                 </div>
                 {/* BOTTOM */}
                 <div
                   onPointerDown={(e) => startDrag('BOTTOM', e)}
                   className="absolute -bottom-3.5 inset-x-8 h-7 flex items-center justify-center cursor-ns-resize touch-none z-20 group"
                 >
-                  <div className="w-10 h-1.5 bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-active:h-2 transition-all" />
+                  <div className="w-10 h-1.5 bg-white rounded-full shadow-sm group-active:h-2 transition-colors" />
                 </div>
                 {/* LEFT */}
                 <div
                   onPointerDown={(e) => startDrag('LEFT', e)}
                   className="absolute -left-3.5 inset-y-8 w-7 flex items-center justify-center cursor-ew-resize touch-none z-20 group"
                 >
-                  <div className="h-10 w-1.5 bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-active:w-2 transition-all" />
+                  <div className="h-10 w-1.5 bg-white rounded-full shadow-sm group-active:w-2 transition-colors" />
                 </div>
                 {/* RIGHT */}
                 <div
                   onPointerDown={(e) => startDrag('RIGHT', e)}
                   className="absolute -right-3.5 inset-y-8 w-7 flex items-center justify-center cursor-ew-resize touch-none z-20 group"
                 >
-                  <div className="h-10 w-1.5 bg-white rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.8)] group-active:w-2 transition-all" />
+                  <div className="h-10 w-1.5 bg-white rounded-full shadow-sm group-active:w-2 transition-colors" />
                 </div>
               </div>
             </div>
@@ -675,7 +676,7 @@ function CameraScanStudioModal({
               activeTab === 'FILTER' ? 'inline-block' : 'hidden'
             }`}
           >
-            <canvas ref={canvasRef} className="max-h-[46vh] max-w-full block rounded-10 shadow-lg object-contain" />
+            <canvas ref={canvasRef} aria-hidden="true" className="max-h-[46vh] max-w-full block rounded-10 shadow-lg object-contain" />
           </div>
         </div>
 
@@ -685,7 +686,7 @@ function CameraScanStudioModal({
             <>
               {/* Preset Buttons */}
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10px] font-bold text-ink-soft mr-1 uppercase">Preset:</span>
+                <span className="text-xs font-semibold text-ink-soft mr-1">Preset:</span>
                 {[
                   { id: 'FREE', label: 'Free' },
                   { id: 'A4', label: 'A4 Document' },
@@ -696,7 +697,7 @@ function CameraScanStudioModal({
                     key={p.id}
                     type="button"
                     onClick={() => applyPreset(p.id as AspectPreset)}
-                    className={`px-2 py-1 rounded-10 text-[11px] font-bold transition-all ${
+                    className={`px-2 py-1 rounded-10 text-[11px] font-bold transition-colors ${
                       activePreset === p.id
                         ? 'bg-ink text-white shadow-xs'
                         : 'bg-surface border border-hairline text-ink-soft hover:text-ink'
@@ -709,7 +710,7 @@ function CameraScanStudioModal({
                 <button
                   type="button"
                   onClick={() => applyPreset('FULL')}
-                  className="px-2 py-1 rounded-10 bg-surface border border-hairline text-[11px] font-bold text-ink-soft hover:text-ink transition-all"
+                  className="px-2 py-1 rounded-10 bg-surface border border-hairline text-[11px] font-bold text-ink-soft hover:text-ink transition-colors"
                   title="Reset to 100% full frame"
                 >
                   Full Frame
@@ -720,7 +721,7 @@ function CameraScanStudioModal({
               <button
                 type="button"
                 onClick={handleRotate}
-                className="px-2.5 py-1 rounded-10 bg-surface border border-hairline text-ink font-bold flex items-center gap-1 hover:bg-hairline transition-all active:scale-95 shadow-xs shrink-0"
+                className="px-2.5 py-1 rounded-10 bg-surface border border-hairline text-ink font-bold flex items-center gap-1 hover:bg-hairline transition-colors active:scale-95 shadow-xs shrink-0"
                 title="Rotate image 90 degrees"
               >
                 <RotateCw className="w-3 h-3 text-saffron" />
@@ -732,7 +733,7 @@ function CameraScanStudioModal({
               <button
                 type="button"
                 onClick={() => setActiveTab('CROP')}
-                className="px-2.5 py-1 rounded-10 bg-surface border border-hairline text-ink font-bold flex items-center gap-1.5 hover:bg-hairline transition-all"
+                className="px-2.5 py-1 rounded-10 bg-surface border border-hairline text-ink font-bold flex items-center gap-1.5 hover:bg-hairline transition-colors"
               >
                 <Crop className="w-3.5 h-3.5 text-saffron" />
                 <span className="text-[11px]">← Re-adjust Crop Edges</span>
@@ -746,12 +747,12 @@ function CameraScanStudioModal({
 
         {/* Filter Selection & Action Footer */}
         <div className="p-3 sm:p-4 bg-surface border-t border-hairline space-y-3">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center justify-between">
+          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
             <span className="flex items-center gap-1">
               <Wand2 className="w-3.5 h-3.5 text-saffron" />
               <span>Document Filter</span>
             </span>
-            <span className="text-[10px] text-emerald-600 font-semibold font-mono">
+            <span className="text-[10px] text-emerald-600 font-semibold">
               High-Res Enhancement
             </span>
           </label>
@@ -770,7 +771,7 @@ function CameraScanStudioModal({
                   setFilter(f.id as any);
                   setActiveTab('FILTER');
                 }}
-                className={`py-1.5 sm:py-2 px-1 rounded-12 text-center transition-all ${
+                className={`py-1.5 sm:py-2 px-1 rounded-12 text-center transition-colors ${
                   filter === f.id
                     ? 'bg-ink text-white shadow-xs font-bold'
                     : 'text-ink-soft hover:text-ink'
@@ -796,11 +797,11 @@ function CameraScanStudioModal({
               type="button"
               disabled={isProcessing}
               onClick={handleDone}
-              className="flex-2 py-2.5 rounded-pill bg-ink hover:bg-ink/90 text-white text-xs font-bold shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+              className="flex-2 py-2.5 rounded-pill bg-ink hover:bg-ink/90 text-white text-xs font-bold shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-colors active:scale-95"
             >
               {isProcessing ? (
                 <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-saffron" />
+                  <RefreshCw className="w-3.5 h-3.5 motion-safe:animate-spin text-saffron" />
                   <span>Processing High-Res Crop...</span>
                 </>
               ) : (
@@ -935,7 +936,7 @@ function DocumentPreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3 sm:p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
       <div className="bg-surface rounded-[28px] border border-hairline max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Top Header */}
         <div className="p-4 border-b border-hairline flex items-center justify-between gap-3 bg-surface">
@@ -956,7 +957,7 @@ function DocumentPreviewModal({
                 href={doc.blobUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2.5 py-1.5 rounded-12 bg-paper hover:bg-hairline text-ink text-[11px] font-bold border border-hairline flex items-center gap-1 transition-all"
+                className="px-2.5 py-1.5 rounded-12 bg-paper hover:bg-hairline text-ink text-[11px] font-bold border border-hairline flex items-center gap-1 transition-colors"
                 title="Open in new window"
               >
                 <span>Full Tab</span>
@@ -973,10 +974,10 @@ function DocumentPreviewModal({
         </div>
 
         {/* Content Viewer */}
-        <div className="flex-1 overflow-auto p-4 bg-[#0F172A]/5 flex flex-col items-center justify-center relative min-h-[350px]">
+        <div className="flex-1 overflow-auto p-4 bg-paper flex flex-col items-center justify-center relative min-h-[350px]">
           {loading && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface/80 backdrop-blur-xs z-10 space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-saffron" />
+              <RefreshCw className="w-6 h-6 motion-safe:animate-spin text-saffron" />
               <span className="text-xs text-ink-soft font-medium">Rendering page preview...</span>
             </div>
           )}
@@ -1002,7 +1003,7 @@ function DocumentPreviewModal({
             ) : (
               <div className="flex flex-col items-center w-full">
                 <div className="rounded-16 shadow-lg overflow-hidden border border-hairline/80 bg-white">
-                  <canvas ref={canvasRef} className="max-w-full block" />
+                  <canvas ref={canvasRef} aria-hidden="true" className="max-w-full block" />
                 </div>
               </div>
             )
@@ -1027,9 +1028,9 @@ function DocumentPreviewModal({
                 type="button"
                 disabled={pageNumber <= 1}
                 onClick={() => changePage(-1)}
-                className="px-3 py-1.5 rounded-12 bg-surface border border-hairline text-ink font-bold disabled:opacity-40 transition-all hover:bg-hairline/50"
+                className="px-3 py-1.5 rounded-12 bg-surface border border-hairline text-ink font-bold disabled:opacity-40 transition-colors hover:bg-hairline/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
               >
-                ← Prev
+                Previous
               </button>
               <span className="font-mono text-xs font-bold text-ink px-1">
                 {pageNumber} / {numPages}
@@ -1038,9 +1039,9 @@ function DocumentPreviewModal({
                 type="button"
                 disabled={pageNumber >= numPages}
                 onClick={() => changePage(1)}
-                className="px-3 py-1.5 rounded-12 bg-surface border border-hairline text-ink font-bold disabled:opacity-40 transition-all hover:bg-hairline/50"
+                className="px-3 py-1.5 rounded-12 bg-surface border border-hairline text-ink font-bold disabled:opacity-40 transition-colors hover:bg-hairline/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
               >
-                Next →
+                Next
               </button>
             </div>
           ) : (
@@ -1049,7 +1050,7 @@ function DocumentPreviewModal({
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-pill bg-ink text-white font-bold text-xs shadow-xs hover:bg-ink/90 transition-all"
+            className="px-5 py-2 rounded-pill bg-ink text-white font-bold text-xs shadow-xs hover:bg-ink/90 transition-colors"
           >
             Done
           </button>
@@ -1733,8 +1734,8 @@ export default function VendorPublicOrderPage() {
   if (loadingVendor) {
     return (
       <div className="min-h-screen bg-paper flex flex-col items-center justify-center p-6 space-y-4">
-        <div className="w-16 h-16 rounded-24 bg-saffron-tint flex items-center justify-center text-saffron animate-bounce shadow-sm">
-          <RefreshCw className="w-8 h-8 animate-spin" />
+        <div className="w-16 h-16 rounded-24 bg-saffron-tint flex items-center justify-center text-saffron shadow-sm">
+          <RefreshCw className="w-8 h-8 motion-safe:animate-spin" />
         </div>
         <div className="text-center space-y-1">
           <h2 className="font-sora font-extrabold text-ink text-lg">Connecting to Print Station</h2>
@@ -1769,7 +1770,7 @@ export default function VendorPublicOrderPage() {
   const activeSizes = Array.from(new Set(vendor.pricingConfig.map((p) => p.paperSize)));
 
   return (
-    <div className="min-h-screen bg-[#F6F8FB] pb-40 text-ink selection:bg-saffron selection:text-white">
+    <div className="min-h-screen bg-paper pb-40 text-ink selection:bg-saffron selection:text-white">
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -1790,7 +1791,7 @@ export default function VendorPublicOrderPage() {
 
       {/* FLOATING TOAST NOTIFICATION */}
       {toastMessage && (
-        <div className="fixed top-18 inset-x-0 mx-auto w-max max-w-sm z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-18 inset-x-0 mx-auto w-max max-w-sm z-50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-4 motion-reduce:animate-none duration-300">
           <div className="bg-ink text-white px-4 py-2.5 rounded-pill shadow-xl text-xs font-bold flex items-center gap-2 border border-white/20">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{toastMessage}</span>
@@ -1799,14 +1800,14 @@ export default function VendorPublicOrderPage() {
       )}
 
       {/* 1. APP HEADER WITH BRAND & SHOP INFO */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-hairline/60 shadow-[0_2px_12px_rgba(14,26,58,0.04)]">
+      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-hairline/60 shadow-sm">
         <div className="border-b border-hairline/40 px-4 py-2 bg-paper/60">
           <div className="max-w-xl mx-auto flex items-center justify-between">
             <Link href="/" className="inline-flex items-center hover:opacity-90 transition-opacity">
               <BrandLogo variant="horizontal" height={28} />
             </Link>
             <div className="flex items-center gap-1.5 text-[11px] text-ink-soft bg-surface px-2.5 py-1 rounded-pill border border-hairline font-semibold shadow-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
               <span>Instant Kiosk</span>
             </div>
           </div>
@@ -1827,8 +1828,8 @@ export default function VendorPublicOrderPage() {
                   <h1 className="font-sora font-extrabold text-ink text-sm sm:text-base tracking-tight truncate">
                     {vendor.name}
                   </h1>
-                  <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="shrink-0 text-[9px] font-bold  px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
                     Counter Ready
                   </span>
                 </div>
@@ -1842,7 +1843,7 @@ export default function VendorPublicOrderPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowQrModal(true)}
-                className="w-8 h-8 rounded-12 bg-paper border border-hairline hover:border-saffron/40 flex items-center justify-center text-ink-soft hover:text-ink transition-all active:scale-95 shadow-sm"
+                className="w-8 h-8 rounded-12 bg-paper border border-hairline hover:border-saffron/40 flex items-center justify-center text-ink-soft hover:text-ink transition-colors active:scale-95 shadow-sm"
                 title="View Counter Standee QR"
                 aria-label="View QR"
               >
@@ -1858,7 +1859,7 @@ export default function VendorPublicOrderPage() {
         <div className="bg-surface rounded-20 p-1.5 border border-hairline/80 shadow-sm flex items-center gap-1">
           <button
             onClick={() => setStep('UPLOAD')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-colors ${
               step === 'UPLOAD'
                 ? 'bg-ink text-white shadow-sm'
                 : 'text-ink-soft hover:text-ink hover:bg-paper'
@@ -1878,7 +1879,7 @@ export default function VendorPublicOrderPage() {
           <button
             onClick={() => documents.length > 0 && setStep('PAYMENT')}
             disabled={documents.length === 0}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-colors ${
               step === 'PAYMENT'
                 ? 'bg-ink text-white shadow-sm'
                 : documents.length > 0
@@ -1907,7 +1908,7 @@ export default function VendorPublicOrderPage() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => !isUploading && fileInputRef.current?.click()}
-              className={`relative overflow-hidden rounded-[28px] border-2 border-dashed p-6 text-center cursor-pointer transition-all active:scale-[0.99] group ${
+              className={`relative overflow-hidden rounded-[28px] border-2 border-dashed p-6 text-center cursor-pointer transition-colors active:scale-[0.99] group ${
                 isDragging
                   ? 'border-saffron bg-saffron-tint/80 shadow-lg scale-[1.01]'
                   : 'border-saffron/40 bg-surface hover:border-saffron hover:bg-gradient-to-b hover:from-white hover:to-saffron-tint/20 shadow-ink-soft'
@@ -1916,10 +1917,10 @@ export default function VendorPublicOrderPage() {
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-saffron/15 to-transparent rounded-bl-full pointer-events-none" />
 
               {isUploading ? (
-                <div className="py-4 space-y-4 animate-in fade-in">
+                <div className="py-4 space-y-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none">
                   <div className="relative w-16 h-16 mx-auto">
                     <div className="absolute inset-0 rounded-full border-4 border-hairline" />
-                    <div className="absolute inset-0 rounded-full border-4 border-saffron border-t-transparent animate-spin" />
+                    <div className="absolute inset-0 rounded-full border-4 border-saffron border-t-transparent motion-safe:animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-xs font-mono font-extrabold text-ink">{uploadProgress}%</span>
                     </div>
@@ -1934,7 +1935,7 @@ export default function VendorPublicOrderPage() {
                   </div>
                   <div className="max-w-xs mx-auto bg-paper rounded-pill h-2 overflow-hidden border border-hairline/80">
                     <div
-                      className="bg-gradient-to-r from-saffron to-amber-500 h-full transition-all duration-300 rounded-pill"
+                      className="bg-gradient-to-r from-saffron to-amber-500 h-full transition-colors duration-300 rounded-pill"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
@@ -1973,7 +1974,7 @@ export default function VendorPublicOrderPage() {
               <button
                 type="button"
                 onClick={() => !isUploading && fileInputRef.current?.click()}
-                className="py-3 px-4 rounded-20 bg-surface border border-hairline/80 hover:border-saffron/60 text-ink text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:shadow-sm transition-all active:scale-[0.98]"
+                className="py-3 px-4 rounded-20 bg-surface border border-hairline/80 hover:border-saffron/60 text-ink text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:shadow-sm transition-colors active:scale-[0.98]"
               >
                 <UploadCloud className="w-4 h-4 text-saffron shrink-0" />
                 <span>Browse Files / PDF</span>
@@ -1982,7 +1983,7 @@ export default function VendorPublicOrderPage() {
               <button
                 type="button"
                 onClick={() => !isUploading && cameraInputRef.current?.click()}
-                className="py-3 px-4 rounded-20 bg-gradient-to-r from-saffron to-amber-500 hover:from-saffron/90 hover:to-amber-500/90 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-saffron/20 transition-all active:scale-[0.98]"
+                className="py-3 px-4 rounded-20 bg-gradient-to-r from-saffron to-amber-500 hover:from-saffron/90 hover:to-amber-500/90 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-saffron/20 transition-colors active:scale-[0.98]"
               >
                 <Camera className="w-4 h-4 text-white shrink-0" />
                 <span>Scan with Camera</span>
@@ -1991,7 +1992,7 @@ export default function VendorPublicOrderPage() {
 
             {/* ERROR BANNER */}
             {uploadError && (
-              <div className="p-3.5 rounded-20 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2.5 animate-in fade-in">
+              <div className="p-3.5 rounded-20 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2.5 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <span className="font-bold">Notice:</span> {uploadError}
@@ -2023,7 +2024,7 @@ export default function VendorPublicOrderPage() {
 
             {/* RICH EMPTY STATE: LIVE RATE CARD & STEP-BY-STEP KIOSK GUIDE */}
             {documents.length === 0 && vendor && (
-              <div className="space-y-4 pt-1 animate-in fade-in duration-300">
+              <div className="space-y-4 pt-1 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-300">
                 {/* 1. VENDOR PRINTING RATE CARD */}
                 <div className="bg-surface rounded-[24px] border border-hairline/80 p-4 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
@@ -2035,7 +2036,7 @@ export default function VendorPublicOrderPage() {
                         Printing Rates at this Counter
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 font-mono">
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
                       Live Prices
                     </span>
                   </div>
@@ -2211,7 +2212,7 @@ export default function VendorPublicOrderPage() {
                   return (
                     <div
                       key={doc.id}
-                      className={`bg-surface rounded-[24px] border transition-all overflow-hidden shadow-sm ${
+                      className={`bg-surface rounded-[24px] border transition-colors overflow-hidden shadow-sm ${
                         isActive
                           ? 'border-ink shadow-ink-soft ring-2 ring-ink/5'
                           : 'border-hairline hover:border-hairline/80'
@@ -2235,12 +2236,12 @@ export default function VendorPublicOrderPage() {
                             <span className="truncate">{doc.originalName}</span>
                           </div>
                           <div className="text-[11px] text-ink-soft flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="font-semibold text-ink font-mono">
-                              {effectivePages} of {doc.pageCount}p
+                            <span className="font-semibold text-ink">
+                              <span className="font-mono">{effectivePages}</span> of <span className="font-mono">{doc.pageCount}</span>p
                             </span>
-                            <span>•</span>
+                            <span aria-hidden="true" className="text-hairline">/</span>
                             <span>{doc.copies} {doc.copies === 1 ? 'copy' : 'copies'}</span>
-                            <span>•</span>
+                            <span aria-hidden="true" className="text-hairline">/</span>
                             <span className="font-bold text-saffron">₹{docCostRupees}</span>
                           </div>
                         </div>
@@ -2314,10 +2315,10 @@ export default function VendorPublicOrderPage() {
                       </div>
 
                       {/* MAIN CONFIGURATION SECTION */}
-                      <div className="bg-[#FAFBFD] p-4 border-t border-hairline/60 space-y-4">
+                      <div className="bg-surface p-4 border-t border-hairline/60 space-y-4">
                         {/* 1. Color vs B&W (Visual Toggle) */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center justify-between">
+                          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
                             <span>Color Mode</span>
                             <span className="text-[10px] text-ink-soft font-normal">
                               {doc.colorMode === 'COLOR' ? '₹10.00 / side' : '₹2.00 / side'}
@@ -2328,7 +2329,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { colorMode: 'BLACK_AND_WHITE' })}
-                              className={`p-3 rounded-16 border-2 flex items-center gap-3 transition-all ${
+                              className={`p-3 rounded-16 border-2 flex items-center gap-3 transition-colors ${
                                 doc.colorMode === 'BLACK_AND_WHITE'
                                   ? 'border-ink bg-surface shadow-xs font-bold text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2346,7 +2347,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { colorMode: 'COLOR' })}
-                              className={`p-3 rounded-16 border-2 flex items-center gap-3 transition-all ${
+                              className={`p-3 rounded-16 border-2 flex items-center gap-3 transition-colors ${
                                 doc.colorMode === 'COLOR'
                                   ? 'border-saffron bg-saffron-tint/60 shadow-xs font-bold text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2365,7 +2366,7 @@ export default function VendorPublicOrderPage() {
 
                         {/* 2. Sides (Single vs Double Duplex) */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center justify-between">
+                          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
                             <span>Sides</span>
                             <span className="text-[10px] text-emerald-600 font-semibold">
                               {doc.isDuplex ? 'Saves paper & 20% discount' : 'Standard 1-sided'}
@@ -2376,7 +2377,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { isDuplex: false })}
-                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-colors ${
                                 !doc.isDuplex
                                   ? 'border-ink bg-surface shadow-xs text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2389,7 +2390,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { isDuplex: true })}
-                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-colors ${
                                 doc.isDuplex
                                   ? 'border-ink bg-surface shadow-xs text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2404,7 +2405,7 @@ export default function VendorPublicOrderPage() {
                         {/* 3. Paper Size & Copies in compact row */}
                         <div className="grid grid-cols-2 gap-3 pt-1">
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft">
+                            <label className="text-[11px] font-bold  text-ink-soft">
                               Paper Size
                             </label>
                             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
@@ -2417,7 +2418,7 @@ export default function VendorPublicOrderPage() {
                                     type="button"
                                     disabled={!isAvailable}
                                     onClick={() => updateDocConfig(idx, { paperSize: size.toUpperCase() })}
-                                    className={`flex-1 py-2 rounded-12 text-xs font-bold border transition-all ${
+                                    className={`flex-1 py-2 rounded-12 text-xs font-bold border transition-colors ${
                                       isSelected
                                         ? 'bg-ink text-white border-ink shadow-xs'
                                         : isAvailable
@@ -2433,9 +2434,9 @@ export default function VendorPublicOrderPage() {
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft flex justify-between">
+                            <label className="text-[11px] font-bold  text-ink-soft flex justify-between">
                               <span>Copies</span>
-                              <span className="font-mono text-ink font-bold">{doc.copies} set</span>
+                              <span className="text-ink font-bold"><span className="font-mono">{doc.copies}</span> {doc.copies === 1 ? 'set' : 'sets'}</span>
                             </label>
 
                             <div className="flex items-center justify-between bg-surface border border-hairline rounded-14 p-1 h-[42px] shadow-2xs">
@@ -2443,7 +2444,7 @@ export default function VendorPublicOrderPage() {
                                 type="button"
                                 onClick={() => updateDocConfig(idx, { copies: Math.max(1, doc.copies - 1) })}
                                 disabled={doc.copies <= 1}
-                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-all"
+                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
                               >
                                 -
                               </button>
@@ -2454,7 +2455,7 @@ export default function VendorPublicOrderPage() {
                                 type="button"
                                 onClick={() => updateDocConfig(idx, { copies: Math.min(50, doc.copies + 1) })}
                                 disabled={doc.copies >= 50}
-                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-all"
+                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
                               >
                                 +
                               </button>
@@ -2474,7 +2475,7 @@ export default function VendorPublicOrderPage() {
                                 [doc.id]: !prev[doc.id],
                               }))
                             }
-                            className={`w-full py-2.5 px-3.5 rounded-16 border flex items-center justify-between text-xs font-bold transition-all ${
+                            className={`w-full py-2.5 px-3.5 rounded-16 border flex items-center justify-between text-xs font-bold transition-colors ${
                               isAdvancedOpen
                                 ? 'bg-ink text-white border-ink shadow-xs'
                                 : 'bg-surface hover:bg-paper border-hairline text-ink-soft hover:text-ink'
@@ -2484,7 +2485,7 @@ export default function VendorPublicOrderPage() {
                               <SlidersHorizontal className={`w-3.5 h-3.5 ${isAdvancedOpen ? 'text-saffron' : 'text-ink-soft'}`} />
                               <span>Advanced Options</span>
                               {hasAdvancedConfigured && (
-                                <span className={`text-[9px] px-2 py-0.5 rounded-pill font-mono font-bold ${
+                                <span className={`text-[9px] px-2 py-0.5 rounded-pill font-bold ${
                                   isAdvancedOpen ? 'bg-saffron text-white' : 'bg-saffron-tint text-saffron'
                                 }`}>
                                   Customized
@@ -2503,15 +2504,15 @@ export default function VendorPublicOrderPage() {
 
                           {/* EXPANDED ADVANCED CONTENT */}
                           {isAdvancedOpen && (
-                            <div className="mt-3 p-3.5 bg-paper rounded-20 border border-hairline/80 space-y-3.5 animate-in fade-in duration-200">
+                            <div className="mt-3 p-3.5 bg-paper rounded-20 border border-hairline/80 space-y-3.5 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
                               {/* A. Custom Page Range Selection */}
                               <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                  <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft">
+                                  <label className="text-[11px] font-bold  text-ink-soft">
                                     Pages to Print
                                   </label>
-                                  <span className="text-[11px] font-mono text-saffron font-bold">
-                                    {effectivePages} of {doc.pageCount} pages selected
+                                  <span className="text-[11px] text-saffron font-bold">
+                                    <span className="font-mono">{effectivePages}</span> of <span className="font-mono">{doc.pageCount}</span> pages selected
                                   </span>
                                 </div>
 
@@ -2521,7 +2522,7 @@ export default function VendorPublicOrderPage() {
                                       key={mode}
                                       type="button"
                                       onClick={() => updateDocConfig(idx, { pageRangeMode: mode })}
-                                      className={`py-1.5 rounded-10 text-[11px] font-bold transition-all ${
+                                      className={`py-1.5 rounded-10 text-[11px] font-bold transition-colors ${
                                         doc.pageRangeMode === mode
                                           ? 'bg-ink text-white shadow-xs'
                                           : 'text-ink-soft hover:text-ink'
@@ -2539,7 +2540,7 @@ export default function VendorPublicOrderPage() {
                                 </div>
 
                                 {doc.pageRangeMode === 'CUSTOM' && (
-                                  <div className="space-y-1 animate-in fade-in pt-1">
+                                  <div className="space-y-1 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none pt-1">
                                     <input
                                       type="text"
                                       value={doc.customPageSelection || ''}
@@ -2557,7 +2558,7 @@ export default function VendorPublicOrderPage() {
                               {/* B. Pages Per Sheet (N-Up Printing) & Orientation */}
                               <div className="grid grid-cols-2 gap-3 pt-1">
                                 <div className="space-y-1.5">
-                                  <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center justify-between">
+                                  <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
                                     <span>Pages Per Sheet</span>
                                     {doc.pagesPerSheet > 1 && (
                                       <span className="text-[10px] text-emerald-600 font-bold">
@@ -2571,7 +2572,7 @@ export default function VendorPublicOrderPage() {
                                         key={n}
                                         type="button"
                                         onClick={() => updateDocConfig(idx, { pagesPerSheet: n })}
-                                        className={`flex-1 py-1.5 rounded-10 text-xs font-bold transition-all ${
+                                        className={`flex-1 py-1.5 rounded-10 text-xs font-bold transition-colors ${
                                           doc.pagesPerSheet === n
                                             ? 'bg-ink text-white shadow-xs'
                                             : 'text-ink-soft hover:text-ink'
@@ -2584,7 +2585,7 @@ export default function VendorPublicOrderPage() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                  <label className="text-[11px] font-bold uppercase tracking-wider text-ink-soft">
+                                  <label className="text-[11px] font-bold  text-ink-soft">
                                     Orientation
                                   </label>
                                   <div className="flex gap-1.5 bg-surface p-1 rounded-14 border border-hairline">
@@ -2593,7 +2594,7 @@ export default function VendorPublicOrderPage() {
                                         key={ori}
                                         type="button"
                                         onClick={() => updateDocConfig(idx, { orientation: ori })}
-                                        className={`flex-1 py-1.5 rounded-10 text-[10px] font-bold uppercase transition-all ${
+                                        className={`flex-1 py-1.5 rounded-10 text-[10px] font-bold transition-colors ${
                                           doc.orientation === ori
                                             ? 'bg-ink text-white shadow-xs'
                                             : 'text-ink-soft hover:text-ink'
@@ -2615,7 +2616,7 @@ export default function VendorPublicOrderPage() {
                                   <button
                                     type="button"
                                     onClick={() => applyToAllDocs(idx)}
-                                    className="px-3 py-1.5 rounded-pill bg-surface border border-hairline text-ink text-[11px] font-bold hover:bg-hairline transition-all flex items-center gap-1.5"
+                                    className="px-3 py-1.5 rounded-pill bg-surface border border-hairline text-ink text-[11px] font-bold hover:bg-hairline transition-colors flex items-center gap-1.5"
                                   >
                                     <Copy className="w-3.5 h-3.5 text-saffron" />
                                     <span>Apply to all files</span>
@@ -2636,14 +2637,11 @@ export default function VendorPublicOrderPage() {
           /* ========================================================= */
           /* STEP 2: CHECKOUT & PAYMENT METHOD */
           /* ========================================================= */
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="space-y-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-reduce:animate-none duration-300">
             {/* Header summary banner */}
             <div className="bg-surface rounded-[24px] p-5 border border-hairline shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-saffron font-mono">
-                    Order Summary
-                  </div>
                   <h2 className="font-sora font-extrabold text-xl text-ink">
                     {documents.length} {documents.length === 1 ? 'Document' : 'Documents'}
                   </h2>
@@ -2665,7 +2663,7 @@ export default function VendorPublicOrderPage() {
                 <div className="p-2.5 rounded-14 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-medium flex items-center gap-2">
                   <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    🌱 <strong>Eco Impact:</strong> You saved <strong>{sheetsSaved} sheets of paper</strong> on this order!
+                    <strong>Eco impact:</strong> You saved <strong>{sheetsSaved} sheets of paper</strong> on this order!
                   </span>
                 </div>
               )}
@@ -2690,7 +2688,7 @@ export default function VendorPublicOrderPage() {
                       key={t.key}
                       type="button"
                       onClick={() => setPickupTiming(t.key as any)}
-                      className={`p-2.5 rounded-16 border text-center transition-all ${
+                      className={`p-2.5 rounded-16 border text-center transition-colors ${
                         pickupTiming === t.key
                           ? 'border-ink bg-ink text-white font-bold shadow-xs'
                           : 'border-hairline bg-paper text-ink-soft hover:text-ink'
@@ -2764,12 +2762,12 @@ export default function VendorPublicOrderPage() {
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="e.g. STUDENT10 or CAMPUS5"
-                  className="flex-1 bg-paper border border-hairline rounded-14 px-3.5 py-2 text-xs font-mono font-bold text-ink uppercase focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10"
+                  className="flex-1 bg-paper border border-hairline rounded-14 px-3.5 py-2 text-xs font-mono font-bold text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10"
                 />
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
-                  className="px-4 py-2 rounded-14 bg-ink text-white font-bold text-xs hover:bg-ink/90 transition-all active:scale-95"
+                  className="px-4 py-2 rounded-14 bg-ink text-white font-bold text-xs hover:bg-ink/90 transition-colors active:scale-95"
                 >
                   Apply
                 </button>
@@ -2793,7 +2791,7 @@ export default function VendorPublicOrderPage() {
 
               {vendor.allowOnlinePayment && (
                 <label
-                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-all ${
+                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-colors ${
                     paymentMethod === 'RAZORPAY'
                       ? 'border-ink bg-surface shadow-md'
                       : 'border-hairline bg-surface/60 hover:bg-surface'
@@ -2818,7 +2816,7 @@ export default function VendorPublicOrderPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-sora font-bold text-ink text-base">Pay Online (UPI / Cards)</span>
-                        <span className="bg-saffron-tint text-saffron text-[10px] uppercase font-bold px-2 py-0.5 rounded-pill">
+                        <span className="bg-saffron-tint text-saffron text-[10px] font-bold px-2 py-0.5 rounded-pill">
                           Instant Print
                         </span>
                       </div>
@@ -2837,7 +2835,7 @@ export default function VendorPublicOrderPage() {
 
               {vendor.allowCashOnDesk && (
                 <label
-                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-all ${
+                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-colors ${
                     paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment
                       ? 'border-ink bg-surface shadow-md'
                       : 'border-hairline bg-surface/60 hover:bg-surface'
@@ -2862,7 +2860,7 @@ export default function VendorPublicOrderPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-sora font-bold text-ink text-base">Pay at Counter (Cash on Pickup)</span>
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-pill">
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-pill">
                           ₹0 Gateway Fee
                         </span>
                       </div>
@@ -2890,12 +2888,10 @@ export default function VendorPublicOrderPage() {
             <ShieldCheck className="w-3.5 h-3.5 text-success shrink-0" />
             <span>Ephemeral Privacy: Files encrypted &amp; auto-purged within 30 days</span>
           </div>
-          <div className="flex items-center justify-center gap-3 text-[11px] text-ink-soft">
-            <Link href="/privacy" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Privacy Policy</Link>
-            <span>•</span>
-            <Link href="/terms" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Terms of Service</Link>
-            <span>•</span>
-            <Link href="/refund" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium">Refund Policy</Link>
+          <div className="flex items-center justify-center gap-4 text-xs text-ink-soft">
+            <Link href="/privacy" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Privacy policy</Link>
+            <Link href="/terms" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Terms of service</Link>
+            <Link href="/refund" target="_blank" className="hover:text-ink hover:underline transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Refund policy</Link>
           </div>
         </div>
       </main>
@@ -2903,9 +2899,9 @@ export default function VendorPublicOrderPage() {
       {/* 4. MODERN STICKY BOTTOM CHECKOUT TRAY */}
       {documents.length > 0 && (
         <aside aria-label="Order Checkout Bar" className="fixed bottom-0 inset-x-0 p-3 sm:p-4 z-40 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-          <div className="max-w-xl mx-auto bg-surface/95 backdrop-blur-2xl border border-hairline/80 rounded-[26px] shadow-[0_16px_40px_rgba(14,26,58,0.18)] p-3.5 pointer-events-auto transition-all">
+          <div className="max-w-xl mx-auto bg-surface/95 backdrop-blur-2xl border border-hairline/80 rounded-[26px] shadow-ink-soft p-3.5 pointer-events-auto transition-colors">
             {expandedReceipt && (
-              <div className="pb-3.5 mb-3 border-b border-dashed border-hairline animate-in fade-in slide-in-from-bottom-2 text-xs">
+              <div className="pb-3.5 mb-3 border-b border-dashed border-hairline motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-reduce:animate-none text-xs">
                 <div className="flex items-center justify-between font-sora font-bold text-ink mb-2.5">
                   <span>Price Calculation Matrix</span>
                   <button
@@ -2974,7 +2970,7 @@ export default function VendorPublicOrderPage() {
                 className="flex items-center gap-2 text-left group min-w-0"
               >
                 <div>
-                  <div className="text-[10px] font-bold text-ink-soft uppercase tracking-wider flex items-center gap-1">
+                  <div className="text-[10px] font-bold text-ink-soft  flex items-center gap-1">
                     <span>{documents.length} {documents.length === 1 ? 'file' : 'files'}</span>
                     <span>•</span>
                     <span>{totalSheets} {totalSheets === 1 ? 'sheet' : 'sheets'}</span>
@@ -2996,7 +2992,7 @@ export default function VendorPublicOrderPage() {
                   <button
                     type="button"
                     onClick={() => setStep('UPLOAD')}
-                    className="px-3 py-3 rounded-pill bg-paper border border-hairline text-ink text-xs font-bold hover:bg-hairline/40 transition-all active:scale-95"
+                    className="px-3 py-3 rounded-pill bg-paper border border-hairline text-ink text-xs font-bold hover:bg-hairline/40 transition-colors active:scale-95"
                   >
                     Back
                   </button>
@@ -3013,11 +3009,11 @@ export default function VendorPublicOrderPage() {
                       handleProceedToPayment();
                     }
                   }}
-                  className="px-6 py-3.5 rounded-pill bg-ink hover:bg-ink/90 active:scale-95 text-white font-sora font-bold text-xs sm:text-sm shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  className="px-6 py-3.5 rounded-pill bg-ink hover:bg-ink/90 active:scale-95 text-white font-sora font-bold text-xs sm:text-sm shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   {isPlacingOrder ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-saffron" />
+                      <RefreshCw className="w-4 h-4 motion-safe:animate-spin text-saffron" />
                       <span>{vendor?.allowOnlinePayment && paymentMethod === 'RAZORPAY' ? 'Launching Payment...' : 'Creating Order...'}</span>
                     </>
                   ) : step === 'UPLOAD' ? (
@@ -3066,7 +3062,7 @@ export default function VendorPublicOrderPage() {
 
       {/* 7. PASSWORD-PROTECTED PDF PROMPT MODAL */}
       {pendingPasswordFile && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
           <div className="bg-surface rounded-[28px] border border-hairline p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-20 bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs">
               <Lock className="w-6 h-6" />
@@ -3083,7 +3079,7 @@ export default function VendorPublicOrderPage() {
             <div className="bg-paper p-3.5 rounded-16 border border-hairline/80 space-y-2 text-xs">
               <div className="font-bold text-ink flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-saffron" />
-                <span>Quick 10-second fix to unlock:</span>
+                <span>How to print this file:</span>
               </div>
               <ol className="list-decimal list-inside space-y-1 text-ink-soft leading-relaxed text-[11px]">
                 <li>Open this PDF on your device and enter the password.</li>
@@ -3096,7 +3092,7 @@ export default function VendorPublicOrderPage() {
               <button
                 type="button"
                 onClick={handleUnlockPdfModalClose}
-                className="w-full py-3 rounded-pill bg-ink text-white text-xs font-bold hover:bg-ink/90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                className="w-full py-3 rounded-pill bg-ink text-white text-xs font-bold hover:bg-ink/90 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <span>Got It, Choose Another File</span>
               </button>

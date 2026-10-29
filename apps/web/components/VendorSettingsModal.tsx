@@ -459,44 +459,15 @@ export function VendorSettingsModal({ isOpen, onClose, onUpdated }: VendorSettin
                   </p>
                 </div>
 
-                {/* Razorpay Section */}
+                {/* Razorpay Partner Integration Callout */}
                 <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-emerald-400" />
-                      Razorpay Gateway (Cards, NetBanking, UPI)
-                    </span>
-                    <a
-                      href="https://dashboard.razorpay.com/app/keys"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
-                    >
-                      Get Razorpay Keys <ExternalLink className="w-3 h-3" />
-                    </a>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-white">Razorpay Partner Direct Bank Settlement</span>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-slate-400">Razorpay Key ID</label>
-                    <input
-                      type="text"
-                      placeholder="rzp_test_... or rzp_live_..."
-                      value={settings.razorpayKeyId}
-                      onChange={(e) => setSettings({ ...settings, razorpayKeyId: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-semibold text-slate-400">Razorpay Key Secret</label>
-                    <input
-                      type="password"
-                      placeholder="Enter Key Secret from Razorpay Dashboard"
-                      value={settings.razorpayKeySecret}
-                      onChange={(e) => setSettings({ ...settings, razorpayKeySecret: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 font-mono transition-colors"
-                    />
-                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Connect your Razorpay account securely through the <strong>Payments</strong> section in your dashboard. You never need to enter or share private API secrets on Print2Me.
+                  </p>
                 </div>
 
                 {/* Direct UPI ID */}

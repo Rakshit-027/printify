@@ -1,3 +1,4 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -287,8 +288,8 @@ export default function VendorSubscriptionPage() {
   if (loading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
-        <RefreshCw className="w-10 h-10 text-saffron animate-spin" />
-        <p className="font-sora font-bold text-ink">Loading Subscription & Plans...</p>
+        <RefreshCw className="w-8 h-8 text-saffron motion-safe:animate-spin" />
+        <p className="font-sora font-semibold text-ink text-sm">Loading plans…</p>
       </div>
     );
   }
@@ -323,38 +324,38 @@ export default function VendorSubscriptionPage() {
       <div className="bg-surface p-6 md:p-8 rounded-[32px] border border-hairline shadow-ink-soft space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-hairline">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-[20px] bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
-              <CreditCard className="w-7 h-7" />
+            <div className="w-12 h-12 rounded-16 bg-saffron-tint flex items-center justify-center text-saffron border border-saffron/20">
+              <CreditCard className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-sora font-extrabold text-xs uppercase px-2.5 py-0.5 rounded-pill bg-ink text-white">
+                <span className="font-sora font-semibold text-xs px-2.5 py-0.5 rounded-pill bg-ink text-white">
                   {sub?.planCode || 'TRIAL'}
                 </span>
                 {sub?.isActive ? (
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-pill bg-success/10 text-success border border-success/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-pill bg-success-tint text-success border border-success/20">
                     Active
                   </span>
                 ) : (
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-pill bg-danger/10 text-danger border border-danger/20">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-pill bg-danger/10 text-danger border border-danger/20">
                     Expired / Inactive
                   </span>
                 )}
               </div>
-              <h2 className="text-2xl font-extrabold font-sora text-ink">Store Subscription Status</h2>
+              <h2 className="text-xl font-bold font-sora text-ink">Store subscription status</h2>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
             <div>
-              <div className="text-xs text-ink-soft font-bold uppercase tracking-wider">Days Remaining</div>
-              <div className={`text-2xl font-extrabold font-sora ${sub?.daysRemaining <= 3 ? 'text-danger' : 'text-success'}`}>
+              <div className="text-xs text-ink-soft font-semibold">Days remaining</div>
+              <div className={`text-xl font-bold font-sora ${sub?.daysRemaining <= 3 ? 'text-danger' : 'text-success'}`}>
                 {sub?.daysRemaining || 0} Days
               </div>
             </div>
             <div>
-              <div className="text-xs text-ink-soft font-bold uppercase tracking-wider">Valid Until</div>
-              <div className="text-sm font-bold font-sora text-ink mt-1">
+              <div className="text-xs text-ink-soft font-semibold">Valid until</div>
+              <div className="text-xs font-bold font-sora text-ink mt-1">
                 {sub?.expiresAt ? new Date(sub.expiresAt).toLocaleDateString('en-IN') : 'Expired'}
               </div>
             </div>
@@ -382,20 +383,20 @@ export default function VendorSubscriptionPage() {
         <div className="inline-flex items-center p-1.5 rounded-pill bg-surface border border-hairline shadow-sm">
           <button
             onClick={() => setBillingCycle('MONTHLY')}
-            className={`px-5 py-2 rounded-pill text-xs font-bold transition-all ${
+            className={`px-5 py-2 rounded-pill text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron ${
               billingCycle === 'MONTHLY' ? 'bg-ink text-white shadow-sm' : 'text-ink-soft hover:text-ink'
             }`}
           >
-            Monthly Billing
+            Monthly billing
           </button>
           <button
             onClick={() => setBillingCycle('YEARLY')}
-            className={`px-5 py-2 rounded-pill text-xs font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-5 py-2 rounded-pill text-xs font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron ${
               billingCycle === 'YEARLY' ? 'bg-ink text-white shadow-sm' : 'text-ink-soft hover:text-ink'
             }`}
           >
-            <span>Annual Billing</span>
-            <span className="px-2 py-0.5 rounded-pill text-[10px] bg-saffron text-ink font-extrabold">Save ~17%</span>
+            <span>Annual billing</span>
+            <span className="px-2 py-0.5 rounded-pill text-xs bg-saffron text-ink font-bold">Save ~17%</span>
           </button>
         </div>
       </div>
@@ -410,23 +411,23 @@ export default function VendorSubscriptionPage() {
             <div
               key={p.id}
               onClick={() => setSelectedPlanCode(p.code)}
-              className={`p-6 rounded-[28px] border-2 transition-all cursor-pointer relative flex flex-col justify-between ${
+              className={`p-6 rounded-24 border-2 transition-colors cursor-pointer relative flex flex-col justify-between ${
                 isSelected
-                  ? 'border-saffron bg-surface shadow-lg ring-4 ring-saffron/10'
+                  ? 'border-saffron bg-surface shadow-ink-soft ring-2 ring-saffron/20'
                   : 'border-hairline bg-paper hover:bg-surface'
               }`}
             >
               {isSelected && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-pill bg-saffron text-ink text-[10px] font-extrabold uppercase tracking-wider shadow-sm flex items-center gap-1">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-pill bg-saffron text-ink text-xs font-semibold shadow-sm flex items-center gap-1">
                   <Check className="w-3 h-3" />
-                  Selected Plan
+                  Selected plan
                 </div>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-ink-soft">{p.code}</span>
-                  <h3 className="text-xl font-extrabold font-sora text-ink mt-0.5">{p.name}</h3>
+                  <span className="text-xs font-semibold text-ink-soft">{p.code}</span>
+                  <h3 className="text-xl font-bold font-sora text-ink mt-0.5">{p.name}</h3>
                   <p className="text-xs text-ink-soft mt-1 leading-relaxed">{p.description}</p>
                 </div>
 
@@ -438,10 +439,10 @@ export default function VendorSubscriptionPage() {
                 </div>
 
                 <div className="pt-4 border-t border-hairline space-y-2 text-xs">
-                  <div className="flex items-center gap-2 p-1.5 rounded-xl bg-success/10 border border-success/25 text-success">
+                  <div className="flex items-center gap-2 p-1.5 rounded-12 bg-success-tint border border-success/20 text-success">
                     <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
-                    <span className="font-extrabold text-[11px] uppercase tracking-wide">
-                      ⚡ Hero Feature: Zero-Touch Auto-Printing
+                    <span className="font-semibold text-xs">
+                      Zero-touch automated printing
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-ink">
@@ -458,7 +459,7 @@ export default function VendorSubscriptionPage() {
                     {p.hasColorRouting ? (
                       <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                     ) : (
-                      <span className="w-4 h-4 text-ink-soft/40 shrink-0 text-center font-bold">—</span>
+                      <span className="w-4 h-4 text-ink-soft/40 shrink-0 text-center font-bold">-</span>
                     )}
                     <span className={p.hasColorRouting ? 'text-ink font-semibold' : 'text-ink-soft line-through'}>
                       B&W & Color Split-Routing
@@ -468,7 +469,7 @@ export default function VendorSubscriptionPage() {
                     {p.hasPrioritySupport ? (
                       <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                     ) : (
-                      <span className="w-4 h-4 text-ink-soft/40 shrink-0 text-center font-bold">—</span>
+                      <span className="w-4 h-4 text-ink-soft/40 shrink-0 text-center font-bold">-</span>
                     )}
                     <span className={p.hasPrioritySupport ? 'text-ink font-semibold' : 'text-ink-soft'}>
                       Priority Kiosk Support
@@ -497,7 +498,7 @@ export default function VendorSubscriptionPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Left: Coupon Code Input */}
           <div className="space-y-4">
-            <label className="text-xs font-bold text-ink uppercase tracking-wider block">Have a Coupon or Voucher Code?</label>
+            <label className="text-xs font-bold text-ink block">Have a coupon or voucher code?</label>
 
             {!appliedCoupon ? (
               <div className="space-y-2">
@@ -509,16 +510,16 @@ export default function VendorSubscriptionPage() {
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       placeholder="e.g. WELCOME50 or PRINT2ME30"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-paper border border-hairline text-ink font-mono text-sm font-bold uppercase placeholder:normal-case placeholder:font-normal placeholder:text-ink-soft/60"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-12 bg-paper border border-hairline text-ink text-xs font-bold placeholder:font-normal placeholder:text-ink-soft/60 focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/20 transition-colors"
                     />
                   </div>
                   <Button
                     variant="secondary"
                     onClick={handleApplyCoupon}
                     disabled={couponValidating || !couponInput.trim()}
-                    className="rounded-xl px-5 text-xs font-bold h-[42px]"
+                    className="rounded-12 px-4 text-xs font-semibold h-[40px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
                   >
-                    {couponValidating ? 'Checking...' : 'Apply Code'}
+                    {couponValidating ? 'Checking…' : 'Apply code'}
                   </Button>
                 </div>
 
@@ -529,26 +530,26 @@ export default function VendorSubscriptionPage() {
                   </p>
                 )}
 
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <span className="text-[11px] text-ink-soft">Try available codes:</span>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="text-xs text-ink-soft">Available codes:</span>
                   <button
                     type="button"
                     onClick={() => { setCouponInput('WELCOME50'); }}
-                    className="text-[11px] font-bold text-saffron bg-saffron/10 px-2 py-0.5 rounded font-mono hover:bg-saffron/20"
+                    className="text-xs font-semibold text-saffron bg-saffron-tint px-2 py-0.5 rounded-pill hover:bg-saffron/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
                   >
                     WELCOME50
                   </button>
                   <button
                     type="button"
                     onClick={() => { setCouponInput('PRINT2ME30'); }}
-                    className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded font-mono hover:bg-emerald-500/20"
+                    className="text-xs font-semibold text-success bg-success-tint px-2 py-0.5 rounded-pill hover:bg-success/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
                   >
                     PRINT2ME30
                   </button>
                   <button
                     type="button"
                     onClick={() => { setCouponInput('FLAT200'); }}
-                    className="text-[11px] font-bold text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded font-mono hover:bg-indigo-500/20"
+                    className="text-xs font-semibold text-ink bg-paper border border-hairline px-2 py-0.5 rounded-pill hover:bg-hairline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
                   >
                     FLAT200
                   </button>
@@ -621,34 +622,34 @@ export default function VendorSubscriptionPage() {
         <div className="space-y-4">
           <h3 className="font-sora font-extrabold text-xl text-ink">Billing & Invoice History</h3>
           <div className="overflow-x-auto rounded-[24px] border border-hairline">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs uppercase tracking-wider">
-                  <th className="py-4 px-6">Invoice Date</th>
-                  <th className="py-4 px-6">Plan & Cycle</th>
-                  <th className="py-4 px-6">Discount Applied</th>
-                  <th className="py-4 px-6">Amount Paid</th>
-                  <th className="py-4 px-6">Status</th>
+                <tr className="bg-paper border-b border-hairline text-ink-soft font-semibold text-xs">
+                  <th className="py-3 px-4">Invoice date</th>
+                  <th className="py-3 px-4">Plan &amp; cycle</th>
+                  <th className="py-3 px-4">Discount applied</th>
+                  <th className="py-3 px-4">Amount paid</th>
+                  <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline bg-surface text-xs">
                 {invoices.map((inv: any) => (
                   <tr key={inv.id} className="hover:bg-paper">
-                    <td className="py-4 px-6 text-ink-soft font-mono">
+                    <td className="py-3 px-4 text-ink-soft">
                       {new Date(inv.createdAt).toLocaleDateString('en-IN')}
                     </td>
-                    <td className="py-4 px-6">
-                      <span className="font-bold text-ink">{inv.plan?.name || 'SaaS Plan'}</span>
-                      <span className="text-ink-soft ml-2">({inv.billingCycle})</span>
+                    <td className="py-3 px-4">
+                      <span className="font-semibold text-ink">{inv.plan?.name || 'SaaS Plan'}</span>
+                      <span className="text-ink-soft ml-1.5">({inv.billingCycle})</span>
                     </td>
-                    <td className="py-4 px-6 text-success font-semibold">
+                    <td className="py-3 px-4 text-success font-semibold">
                       {inv.couponCode ? `${inv.couponCode} (-${formatMinorToInr(inv.discountMinor)})` : 'None'}
                     </td>
-                    <td className="py-4 px-6 font-bold text-ink font-sora">
+                    <td className="py-3 px-4 font-bold text-ink">
                       {formatMinorToInr(inv.finalAmountMinor)}
                     </td>
-                    <td className="py-4 px-6">
-                      <span className="px-2.5 py-0.5 rounded-pill text-[10px] font-bold uppercase bg-success/10 text-success border border-success/20">
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded-pill text-xs font-semibold bg-success-tint text-success border border-success/20">
                         {inv.status}
                       </span>
                     </td>

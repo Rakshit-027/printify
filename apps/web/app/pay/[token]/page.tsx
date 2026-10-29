@@ -1,18 +1,12 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  CreditCard,
-  ShieldCheck,
-  ChevronLeft,
-  AlertCircle,
-  RefreshCw,
-  Lock,
-  Sparkles,
-} from 'lucide-react';
+import { CreditCard, Lock, ShieldCheck, AlertCircle, RefreshCw, ChevronLeft, Sparkles } from 'lucide-react';
 import { formatMinorToInr } from '@/lib/pricing-engine';
+import { Button } from '@/components/primitives';
 
 declare global {
   interface Window {
@@ -20,133 +14,132 @@ declare global {
   }
 }
 
-export default function PaymentCheckoutPage() {
+export default function PayTokenPage() {
   const params = useParams();
-  const router = useRouter();
   const token = params.token as string;
+  const router = useRouter();
 
-  const [paymentData, setPaymentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentData, setPaymentData] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const hasAutoLaunched = useRef(false);
 
-  // Initialize Payment Info
   useEffect(() => {
     async function initPayment() {
       try {
         setLoading(true);
+        setError('');
+
         const res = await fetch('/api/payments/razorpay/init', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ trackingToken: token }),
+          body: JSON.stringify({ trackingToken: token, token }),
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to initialize payment');
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to initialize payment');
+        }
+
         setPaymentData(data);
       } catch (err: any) {
-        setError(err.message || 'Error loading payment gateway');
+        setError(err.message || 'Payment initiation failed.');
       } finally {
         setLoading(false);
       }
     }
 
-    if (token) initPayment();
+    if (token) {
+      initPayment();
+    }
   }, [token]);
 
-  // Dynamically load Razorpay checkout script
-  const loadRazorpayScript = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) return resolve(true);
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
   const handleLaunchRazorpay = async () => {
+    if (!paymentData) return;
     setIsProcessing(true);
     setError('');
 
-    const loaded = await loadRazorpayScript();
-    if (!loaded) {
-      setError('Could not connect to Razorpay secure checkout script.');
-      setIsProcessing(false);
-      return;
-    }
+    try {
+      // Load Razorpay checkout script if not present
+      if (!window.Razorpay) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
+          document.body.appendChild(script);
+        });
+      }
 
-    const options = {
-      key: paymentData.razorpayKeyId,
-      amount: paymentData.amountMinor,
-      currency: paymentData.currency || 'INR',
-      name: paymentData.vendorName || 'Print2Me Station',
-      description: `Payment for Print Order ${paymentData.orderNumber}`,
-      order_id: paymentData.razorpayOrderId,
-      handler: async function (response: any) {
-        try {
-          const verifyRes = await fetch('/api/payments/razorpay/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              trackingToken: token,
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-            }),
-          });
+      const options = {
+        key: paymentData.razorpayKeyId || paymentData.keyId,
+        amount: paymentData.amountMinor,
+        currency: 'INR',
+        name: paymentData.vendorName || 'Print2Me',
+        description: `Order ${paymentData.orderNumber}`,
+        order_id: paymentData.razorpayOrderId,
+        prefill: {
+          name: paymentData.customerName || '',
+          email: paymentData.customerEmail || '',
+          contact: paymentData.customerPhone || '',
+        },
+        theme: {
+          color: '#FF8A1F',
+        },
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await fetch('/api/payments/razorpay/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trackingToken: token,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              }),
+            });
 
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok) {
-            throw new Error(verifyData.error || 'Payment signature verification failed');
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) throw new Error(verifyData.error || 'Payment verification failed');
+
+            router.push(`/track/${token}`);
+          } catch (verifyErr: any) {
+            setError(verifyErr.message || 'Payment verification failed.');
+            setIsProcessing(false);
           }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessing(false);
+          },
+        },
+      };
 
-          router.push(`/track/${token}`);
-        } catch (verifyErr: any) {
-          setError(verifyErr.message || 'Payment verification failed.');
-        }
-      },
-      prefill: {
-        name: 'Guest Customer',
-        contact: '9876543210',
-      },
-      theme: {
-        color: '#10b981',
-      },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.on('payment.failed', function (failureRes: any) {
-      setError(`Payment Failed: ${failureRes.error?.description || 'Transaction declined'}`);
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        setError(resp.error?.description || 'Payment failed. Please try again.');
+        setIsProcessing(false);
+      });
+      rzp.open();
+    } catch (launchErr: any) {
+      setError(launchErr.message || 'Failed to open checkout window.');
       setIsProcessing(false);
-    });
-    rzp.open();
-    setIsProcessing(false);
+    }
   };
 
-  // Automatically launch Razorpay once payment gateway details are ready
-  useEffect(() => {
-    if (paymentData && !paymentData.isMock && !hasAutoLaunched.current) {
-      hasAutoLaunched.current = true;
-      handleLaunchRazorpay();
-    }
-  }, [paymentData]);
-
-  // Sandbox simulation handler
   const handleSimulatePayment = async () => {
     setIsProcessing(true);
+    setError('');
+
     try {
-      const mockPaymentId = `pay_sim_${Date.now()}`;
       const verifyRes = await fetch('/api/payments/razorpay/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trackingToken: token,
           razorpayOrderId: paymentData.razorpayOrderId,
-          razorpayPaymentId: mockPaymentId,
-          razorpaySignature: 'simulated_signature',
+          razorpayPaymentId: `pay_sim_${Date.now()}`,
+          razorpaySignature: 'simulated_signature_development',
         }),
       });
 
@@ -162,9 +155,9 @@ export default function PaymentCheckoutPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4">
-        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
-        <p className="text-sm text-slate-400">Opening Secure Razorpay Gateway...</p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-4 text-ink">
+        <RefreshCw className="w-8 h-8 text-saffron motion-safe:animate-spin" />
+        <p className="text-xs text-ink-soft">Opening secure gateway…</p>
       </div>
     );
   }
@@ -172,18 +165,18 @@ export default function PaymentCheckoutPage() {
   if (error && !paymentData) {
     const isCashOrder = error.toLowerCase().includes('cash') || error.toLowerCase().includes('counter');
     return (
-      <div className="max-w-md mx-auto px-6 py-20 text-center space-y-4">
-        <AlertCircle className="w-12 h-12 text-amber-400 mx-auto" />
-        <h2 className="text-xl font-bold text-white">
-          {isCashOrder ? 'Pay at Counter' : 'Online Payment Unavailable'}
+      <div className="max-w-md mx-auto px-6 py-20 text-center space-y-4 text-ink">
+        <AlertCircle className="w-10 h-10 text-saffron mx-auto" />
+        <h2 className="text-lg font-bold text-ink">
+          {isCashOrder ? 'Pay at counter' : 'Online payment unavailable'}
         </h2>
-        <p className="text-sm text-slate-300">{error}</p>
+        <p className="text-xs text-ink-soft">{error}</p>
         <div className="pt-2">
           <Link
             href={`/track/${token}`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-all"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-pill bg-saffron text-ink font-semibold text-xs shadow-sm hover:brightness-105 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
           >
-            Go to Order Ticket &amp; Pay at Counter
+            Go to order ticket &amp; pay at desk
           </Link>
         </div>
       </div>
@@ -191,91 +184,90 @@ export default function PaymentCheckoutPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-6 py-12 md:py-16 space-y-6">
+    <div className="max-w-md mx-auto px-6 py-12 md:py-16 space-y-4 text-ink">
       <Link
         href={`/track/${token}`}
-        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+        className="inline-flex items-center gap-1.5 text-xs text-ink-soft hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
       >
         <ChevronLeft className="w-4 h-4" />
-        <span>Back to Order Tracking</span>
+        <span>Back to order tracking</span>
       </Link>
 
-      <div className="glass-panel p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center mx-auto text-slate-950 font-bold shadow-lg shadow-emerald-500/20">
-            <CreditCard className="w-6 h-6 text-slate-950" />
+      <div className="bg-surface p-6 sm:p-8 rounded-24 border border-hairline shadow-ink-soft space-y-5">
+        <div className="text-center space-y-1.5">
+          <div className="w-10 h-10 rounded-16 bg-saffron-tint text-saffron flex items-center justify-center mx-auto">
+            <CreditCard className="w-5 h-5" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Razorpay Checkout</h1>
-          <p className="text-xs text-slate-400">Order Reference: {paymentData.orderNumber}</p>
+          <h1 className="text-xl font-bold text-ink tracking-tight">Checkout</h1>
+          <p className="text-xs text-ink-soft">Order reference: {paymentData.orderNumber}</p>
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="p-3 rounded-14 bg-danger/10 border border-danger/20 text-danger text-xs flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-          <div className="flex justify-between text-xs text-slate-400">
-            <span>Vendor Merchant:</span>
-            <span className="font-semibold text-white">{paymentData.vendorName}</span>
+        <div className="p-4 rounded-16 bg-paper border border-hairline space-y-2">
+          <div className="flex justify-between text-xs text-ink-soft">
+            <span>Vendor:</span>
+            <span className="font-semibold text-ink">{paymentData.vendorName}</span>
           </div>
-          <div className="flex justify-between text-xs text-slate-400">
-            <span>Payment Mode:</span>
-            <span className="font-semibold text-emerald-400">UPI / Cards / Netbanking</span>
+          <div className="flex justify-between text-xs text-ink-soft">
+            <span>Payment mode:</span>
+            <span className="font-semibold text-success">UPI / Cards / Netbanking</span>
           </div>
-          <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
-            <span className="text-xs font-bold text-white">Payable Total:</span>
-            <span className="text-2xl font-extrabold text-emerald-400">
+          <div className="pt-2 border-t border-hairline flex justify-between items-center">
+            <span className="text-xs font-bold text-ink">Payable total:</span>
+            <span className="text-xl font-extrabold text-ink font-sora">
               ₹{formatMinorToInr(paymentData.amountMinor)}
             </span>
           </div>
         </div>
 
-        <button
+        <Button
           onClick={handleLaunchRazorpay}
           disabled={isProcessing}
-          className="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          variant="primary"
+          className="w-full h-12 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
         >
           {isProcessing ? (
-            <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-slate-950 border-t-transparent" />
+            <span className="inline-block motion-safe:animate-spin rounded-full h-4 w-4 border-2 border-ink border-t-transparent" />
           ) : (
-            <>
-              <Lock className="w-4 h-4 text-slate-950" />
+            <div className="flex items-center justify-center gap-1.5">
+              <Lock className="w-3.5 h-3.5" />
               <span>Pay ₹{formatMinorToInr(paymentData.amountMinor)} via Razorpay</span>
-            </>
+            </div>
           )}
-        </button>
+        </Button>
 
         {/* Development sandbox simulation button */}
         {paymentData.isMock && (
-          <div className="pt-4 border-t border-slate-800 text-center space-y-2">
-            <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-              Sandbox Test Mode
+          <div className="pt-3 border-t border-hairline text-center space-y-2">
+            <div className="text-xs text-ink-soft font-semibold">
+              Sandbox test mode
             </div>
             <button
               onClick={handleSimulatePayment}
               disabled={isProcessing}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 rounded-12 bg-paper hover:bg-hairline text-ink text-xs font-semibold border border-hairline transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Simulate Successful Payment</span>
+              <Sparkles className="w-3.5 h-3.5 text-saffron" />
+              <span>Simulate payment</span>
             </button>
           </div>
         )}
 
-        <div className="space-y-2 pt-2 text-center">
-          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>256-Bit SSL Encrypted Razorpay Gateway</span>
+        <div className="space-y-1.5 pt-1 text-center">
+          <div className="flex items-center justify-center gap-1.5 text-xs text-ink-soft">
+            <ShieldCheck className="w-3.5 h-3.5 text-success" />
+            <span>256-bit SSL encrypted Razorpay gateway</span>
           </div>
-          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500">
-            <Link href="/privacy" target="_blank" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
-            <span>•</span>
-            <Link href="/terms" target="_blank" className="hover:text-slate-300 transition-colors">Terms</Link>
-            <span>•</span>
-            <Link href="/refund" target="_blank" className="hover:text-slate-300 transition-colors">Refund Policy</Link>
+          <div className="flex items-center justify-center gap-3 text-xs text-ink-soft">
+            <Link href="/privacy" target="_blank" className="hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Privacy policy</Link>
+            <Link href="/terms" target="_blank" className="hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Terms</Link>
+            <Link href="/refund" target="_blank" className="hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">Refund policy</Link>
           </div>
         </div>
       </div>

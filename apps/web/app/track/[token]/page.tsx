@@ -1,3 +1,4 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -68,8 +69,8 @@ export default function OrderTrackingPage() {
   if (loading) {
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <RefreshCw className="w-10 h-10 text-saffron animate-spin mx-auto" />
-        <p className="font-sora font-bold text-ink">Finding your order...</p>
+        <RefreshCw className="w-8 h-8 text-saffron motion-safe:animate-spin mx-auto" />
+        <p className="font-sora font-semibold text-ink text-sm">Finding your order…</p>
       </div>
     );
   }
@@ -113,7 +114,7 @@ export default function OrderTrackingPage() {
 
   return (
     <div className="min-h-screen pb-20 pt-6 px-4 max-w-md mx-auto">
-      <Link href={`/v/${order.vendor.slug}`} className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink transition-colors mb-6 font-medium">
+      <Link href={`/v/${order.vendor.slug}`} className="inline-flex items-center gap-1.5 text-xs text-ink-soft hover:text-ink transition-colors mb-6 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded">
         <ChevronLeft className="w-4 h-4" />
         Back to {order.vendor.name}
       </Link>
@@ -124,8 +125,8 @@ export default function OrderTrackingPage() {
         <div className="ticket-notch-right" />
         
         <div className="p-8 text-center space-y-2">
-          <div className={`text-xs font-bold uppercase tracking-widest ${isReady ? 'text-success' : 'text-ink-soft'}`}>
-            {isReady ? 'Your prints are ready' : 'Pickup Token'}
+          <div className={`text-xs font-semibold ${isReady ? 'text-success' : 'text-ink-soft'}`}>
+            {isReady ? 'Your prints are ready' : 'Pickup token'}
           </div>
           <div className="font-mono text-5xl md:text-[56px] font-bold text-ink tracking-tight py-2 tabular-nums">
             {order.orderNumber}
@@ -134,7 +135,7 @@ export default function OrderTrackingPage() {
             {order.vendor.name}
           </div>
           {isReady && (
-            <div className="absolute top-4 right-4 bg-success text-white text-[10px] font-bold uppercase px-2 py-1 rounded-pill animate-stamp shadow-sm rotate-12">
+            <div className="absolute top-4 right-4 bg-success text-white text-xs font-semibold px-2 py-1 rounded-pill motion-safe:animate-stamp shadow-sm rotate-12">
               Ready
             </div>
           )}
@@ -155,10 +156,10 @@ export default function OrderTrackingPage() {
             )}
           </div>
           <div>
-            <span className={`px-3 py-1.5 rounded-pill text-xs font-bold uppercase ${
+            <span className={`px-3 py-1.5 rounded-pill text-xs font-semibold ${
               order.paymentMethod === 'RAZORPAY' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
             }`}>
-              {order.paymentMethod === 'RAZORPAY' ? 'Paid Online' : 'Cash Due'}
+              {order.paymentMethod === 'RAZORPAY' ? 'Paid online' : 'Cash due'}
             </span>
           </div>
         </div>

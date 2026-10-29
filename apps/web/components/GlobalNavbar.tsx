@@ -45,12 +45,7 @@ export function GlobalNavbar() {
   const router = useRouter();
   const pathname = usePathname();
   const isKioskUploadPage = pathname?.startsWith('/v/');
-  const [session, setSession] = useState<UserSession | null>(() => {
-    if (cachedUserSession && Date.now() - cachedUserSession.fetchedAt < SESSION_CACHE_TTL) {
-      return cachedUserSession.user;
-    }
-    return null;
-  });
+  const [session, setSession] = useState<UserSession | null>(null);
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

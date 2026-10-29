@@ -1,3 +1,4 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -37,7 +38,7 @@ import {
 import { formatMinorToInr } from '@/lib/pricing-engine';
 import { Button } from '@/components/primitives';
 
-type AdminNavTab = 'OVERVIEW' | 'VENDORS' | 'PLANS' | 'COUPONS' | 'AUDIT' | 'WEBHOOKS' | 'STORAGE';
+type AdminNavTab = 'OVERVIEW' | 'VENDORS' | 'PAYMENTS' | 'PLANS' | 'COUPONS' | 'AUDIT' | 'WEBHOOKS' | 'STORAGE';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -48,6 +49,20 @@ export default function AdminDashboardPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const [totalDiscountGiven, setTotalDiscountGiven] = useState(0);
+
+  // Payment Accounts (Razorpay Technology Partner)
+  const [paymentVendors, setPaymentVendors] = useState<any[]>([]);
+  const [paymentStats, setPaymentStats] = useState<any>({
+    totalVendors: 0,
+    activatedCount: 0,
+    underReviewCount: 0,
+    notConnectedCount: 0,
+    restrictedCount: 0,
+  });
+  const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [syncingVendorId, setSyncingVendorId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [activeNav, setActiveNav] = useState<AdminNavTab>('OVERVIEW');
@@ -104,13 +119,14 @@ export default function AdminDashboardPage() {
 
       setLoading(true);
 
-      const [metricsRes, vendorsRes, logsRes, webhooksRes, plansRes, couponsRes] = await Promise.all([
+      const [metricsRes, vendorsRes, logsRes, webhooksRes, plansRes, couponsRes, paymentsRes] = await Promise.all([
         fetch('/api/admin/metrics'),
         fetch(`/api/admin/vendors?filter=${vendorFilter}`),
         fetch('/api/admin/audit-logs'),
         fetch('/api/admin/webhooks'),
         fetch('/api/admin/plans'),
         fetch('/api/admin/coupons'),
+        fetch(`/api/admin/payment-accounts?filter=${paymentFilter}`),
       ]);
 
       if (metricsRes.status === 401 || metricsRes.status === 403) {
@@ -130,6 +146,7 @@ export default function AdminDashboardPage() {
       const webhooksData = await parseJson(webhooksRes);
       const plansData = await parseJson(plansRes);
       const couponsData = await parseJson(couponsRes);
+      const paymentsData = await parseJson(paymentsRes);
 
       setMetrics(metricsData?.metrics || null);
       setVendors(vendorsData?.vendors || []);
@@ -138,10 +155,47 @@ export default function AdminDashboardPage() {
       setPlans(plansData?.plans || []);
       setCoupons(couponsData?.coupons || []);
       setTotalDiscountGiven(couponsData?.totalDiscountGivenMinor || 0);
+      if (paymentsData) {
+        setPaymentVendors(paymentsData.vendors || []);
+        if (paymentsData.stats) setPaymentStats(paymentsData.stats);
+      }
     } catch (err) {
       console.error('Admin load error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPaymentAccounts = async (filter = paymentFilter) => {
+    setPaymentLoading(true);
+    try {
+      const res = await fetch(`/api/admin/payment-accounts?filter=${filter}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPaymentVendors(data.vendors || []);
+        if (data.stats) {
+          setPaymentStats(data.stats);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load payment accounts:', err);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleAdminSyncPayment = async (vendorId: string) => {
+    setSyncingVendorId(vendorId);
+    try {
+      const res = await fetch(`/api/admin/payment-accounts/${vendorId}/sync`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to sync status');
+      triggerToast('Vendor Razorpay status synchronized successfully');
+      await loadPaymentAccounts(paymentFilter);
+    } catch (err: any) {
+      triggerToast(err.message || 'Status sync failed');
+    } finally {
+      setSyncingVendorId(null);
     }
   };
 
@@ -152,6 +206,12 @@ export default function AdminDashboardPage() {
       loadData(true);
     }
   }, [vendorFilter]);
+
+  useEffect(() => {
+    if (activeNav === 'PAYMENTS') {
+      loadPaymentAccounts(paymentFilter);
+    }
+  }, [activeNav, paymentFilter]);
 
   const handleVendorAction = async (vendorId: string, action: string) => {
     setActionInProgress(vendorId);
@@ -315,6 +375,13 @@ export default function AdminDashboardPage() {
           count: vendors.length,
           badge: pendingVendorsCount > 0 ? `${pendingVendorsCount} PENDING` : undefined,
         },
+        {
+          id: 'PAYMENTS' as AdminNavTab,
+          label: 'Razorpay Accounts',
+          icon: CreditCard,
+          count: paymentVendors.length,
+          badge: paymentStats.underReviewCount > 0 ? `${paymentStats.underReviewCount} PENDING` : undefined,
+        },
       ],
     },
     {
@@ -360,11 +427,11 @@ export default function AdminDashboardPage() {
 
   if (loading && !metrics) {
     return (
-      <div className="min-h-screen bg-[#070B19] flex items-center justify-center text-white">
+      <div className="min-h-screen bg-ink flex items-center justify-center text-white">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-white/10 border-t-saffron rounded-full animate-spin" />
-          <div className="text-slate-300 text-xs font-mono font-bold tracking-widest uppercase">
-            Initializing Super Admin Control Plane...
+          <div className="w-10 h-10 border-4 border-white/10 border-t-saffron rounded-full motion-safe:animate-spin" />
+          <div className="text-white/80 text-xs font-semibold">
+            Initializing super admin control plane…
           </div>
         </div>
       </div>
@@ -372,10 +439,10 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6FB] flex flex-col md:flex-row text-ink antialiased">
+    <div className="min-h-screen bg-paper flex flex-col md:flex-row text-ink antialiased">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-[#0B132B] text-white px-5 py-3 rounded-20 shadow-2xl flex items-center gap-3 text-xs font-bold animate-in fade-in slide-in-from-top-3 border border-white/20">
+        <div className="fixed top-5 right-5 z-50 bg-ink text-white px-5 py-3 rounded-20 shadow-2xl flex items-center gap-3 text-xs font-bold animate-in fade-in slide-in-from-top-3 border border-white/20">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
@@ -384,11 +451,11 @@ export default function AdminDashboardPage() {
       {/* ============================================================== */}
       {/* MOBILE TOP BAR (Screens < md)                                  */}
       {/* ============================================================== */}
-      <div className="md:hidden bg-[#0B132B] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-white/10">
+      <div className="md:hidden bg-ink text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm border-b border-white/10">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
-            className="p-2 rounded-12 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="p-2 rounded-12 bg-white/10 hover:bg-white/20 text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
             aria-label="Toggle Navigation Drawer"
           >
             <Menu className="w-5 h-5 text-saffron" />
@@ -398,9 +465,9 @@ export default function AdminDashboardPage() {
               Super Admin Console
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-300 font-bold uppercase tracking-wider">
-                Root Mode
+              <span className="w-2 h-2 rounded-full bg-success motion-safe:animate-pulse" />
+              <span className="text-xs text-success font-semibold">
+                Root mode
               </span>
             </div>
           </div>
@@ -427,7 +494,7 @@ export default function AdminDashboardPage() {
       {/* PERMANENT COLLAPSIBLE SAAS COMMAND SIDEBAR                     */}
       {/* ============================================================== */}
       <aside
-        className={`bg-[#0B132B] text-white flex flex-col justify-between transition-all duration-300 ease-in-out border-r border-white/10 shrink-0 z-50 ${
+        className={`bg-ink text-white flex flex-col justify-between transition-colors duration-300 ease-in-out border-r border-white/10 shrink-0 z-50 ${
           sidebarCollapsed ? 'w-20' : 'w-64 lg:w-72'
         } ${
           mobileDrawerOpen
@@ -448,8 +515,8 @@ export default function AdminDashboardPage() {
                     <div className="font-sora font-extrabold text-base text-white tracking-tight leading-none">
                       Print<span className="text-saffron">2</span>Me
                     </div>
-                    <div className="text-[9px] font-mono text-saffron uppercase font-bold tracking-wider mt-0.5">
-                      Platform Core
+                    <div className="text-xs text-saffron font-semibold mt-0.5">
+                      Platform core
                     </div>
                   </div>
                 )}
@@ -477,7 +544,7 @@ export default function AdminDashboardPage() {
             {!sidebarCollapsed ? (
               <div className="p-3 rounded-16 bg-white/5 border border-white/10 space-y-1.5 animate-in fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-saffron font-sora">
+                  <span className="text-[10px] font-bold  text-saffron font-sora">
                     Master Console
                   </span>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold">
@@ -504,7 +571,7 @@ export default function AdminDashboardPage() {
             {navCategories.map((group) => (
               <div key={group.category} className="space-y-1">
                 {!sidebarCollapsed && (
-                  <div className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-sora">
+                  <div className="px-3 text-[10px] font-extrabold  text-slate-400 font-sora">
                     {group.category}
                   </div>
                 )}
@@ -521,7 +588,7 @@ export default function AdminDashboardPage() {
                       title={sidebarCollapsed ? item.label : undefined}
                       className={`w-full flex items-center ${
                         sidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'
-                      } rounded-12 text-xs font-semibold transition-all group ${
+                      } rounded-12 text-xs font-semibold transition-colors group ${
                         isActive
                           ? 'bg-saffron text-white font-bold shadow-md shadow-saffron/25'
                           : 'text-slate-300 hover:bg-white/10 hover:text-white'
@@ -540,7 +607,7 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center gap-1.5">
                           {(item as any).badge && (
                             <span
-                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-pill font-extrabold uppercase tracking-wider ${
+                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-pill font-extrabold  ${
                                 isActive
                                   ? 'bg-white/20 text-white'
                                   : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
@@ -572,7 +639,7 @@ export default function AdminDashboardPage() {
         <div className="p-4 border-t border-white/10 space-y-3">
           {!sidebarCollapsed && (
             <div className="p-3 rounded-16 bg-white/5 border border-white/10 space-y-1">
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold  font-mono">
                 <span>Rust Core Service</span>
                 <span className="text-emerald-400 font-bold">PORT 8080</span>
               </div>
@@ -612,16 +679,14 @@ export default function AdminDashboardPage() {
       {/* ============================================================== */}
       {/* MAIN VIEWPORT WORKBENCH                                         */}
       {/* ============================================================== */}
-      <main className="flex-1 min-w-0 bg-[#F4F6FB] overflow-y-auto">
+      <main className="flex-1 min-w-0 bg-paper overflow-y-auto">
         {/* Workspace Sticky Top Banner */}
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-hairline px-6 py-4 flex items-center justify-between gap-4">
           <div>
-            <div className="text-[10px] font-mono text-ink-soft uppercase font-bold tracking-wider">
-              Print2Me Multi-Tenant Operations
-            </div>
             <h1 className="text-xl font-sora font-extrabold text-ink tracking-tight">
               {activeNav === 'OVERVIEW' && 'Master Telemetry & Platform Overview'}
               {activeNav === 'VENDORS' && 'Vendor Directory & Partner KYC'}
+              {activeNav === 'PAYMENTS' && 'Razorpay Technology Partner Accounts & Direct Settlement'}
               {activeNav === 'PLANS' && 'SaaS Subscription Plans & Quotas'}
               {activeNav === 'COUPONS' && 'Promo Coupons & Discount Codes'}
               {activeNav === 'AUDIT' && 'Security Audit Trail & Actor Logs'}
@@ -634,7 +699,7 @@ export default function AdminDashboardPage() {
             <button
               onClick={handleTriggerRetention}
               disabled={retentionRunning}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-12 bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink-soft hover:text-ink transition-all active:scale-95 disabled:opacity-50"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-12 bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink-soft hover:text-ink transition-colors active:scale-95 disabled:opacity-50"
               title="Purge Expired Document Blobs"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-500" />
@@ -643,7 +708,7 @@ export default function AdminDashboardPage() {
 
             <button
               onClick={handleLogout}
-              className="px-3 py-1.5 rounded-12 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs"
+              className="px-3 py-1.5 rounded-12 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors active:scale-95 shadow-xs"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out</span>
@@ -655,96 +720,96 @@ export default function AdminDashboardPage() {
         <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
           {/* Top 5 KPI Cards: Always visible across tabs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="p-5 rounded-[22px] bg-surface border border-hairline shadow-xs space-y-2 group hover:shadow-md transition-all">
+            <div className="p-5 rounded-20 bg-surface border border-hairline shadow-xs space-y-2 group hover:border-saffron/40 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-soft font-sora">
+                <span className="text-xs font-semibold text-ink-soft">
                   Platform GMV
                 </span>
-                <div className="w-7 h-7 rounded-8 bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-8 bg-success-tint text-success flex items-center justify-center font-bold">
                   <IndianRupee className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-xl font-black font-sora text-ink">
+              <div className="text-xl font-bold font-sora text-ink">
                 {formatMinorToInr(metrics?.totalRevenueMinor || 0)}
               </div>
-              <div className="text-[10px] text-ink-soft font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <div className="text-xs text-ink-soft font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
                 Cumulative total volume
               </div>
             </div>
 
-            <div className="p-5 rounded-[22px] bg-surface border border-hairline shadow-xs space-y-2 group hover:shadow-md transition-all">
+            <div className="p-5 rounded-20 bg-surface border border-hairline shadow-xs space-y-2 group hover:border-saffron/40 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-soft font-sora">
+                <span className="text-xs font-semibold text-ink-soft">
                   Total Orders
                 </span>
-                <div className="w-7 h-7 rounded-8 bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-8 bg-saffron-tint text-saffron flex items-center justify-center font-bold">
                   <Layers className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-xl font-black font-sora text-ink">
+              <div className="text-xl font-bold font-sora text-ink">
                 {metrics?.totalOrders || 0}
               </div>
-              <div className="text-[10px] text-ink-soft font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+              <div className="text-xs text-ink-soft font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-saffron" />
                 Dispatched jobs
               </div>
             </div>
 
-            <div className="p-5 rounded-[22px] bg-surface border border-hairline shadow-xs space-y-2 group hover:shadow-md transition-all">
+            <div className="p-5 rounded-20 bg-surface border border-hairline shadow-xs space-y-2 group hover:border-saffron/40 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-soft font-sora">
+                <span className="text-xs font-semibold text-ink-soft">
                   Partner Shops
                 </span>
-                <div className="w-7 h-7 rounded-8 bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-8 bg-saffron-tint text-saffron flex items-center justify-center font-bold">
                   <Store className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-xl font-black font-sora text-ink">
+              <div className="text-xl font-bold font-sora text-ink">
                 {metrics?.activeVendors || 0}
               </div>
-              <div className="text-[10px] font-medium">
+              <div className="text-xs font-medium">
                 {pendingVendorsCount > 0 ? (
-                  <span className="text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded-full font-bold">
+                  <span className="text-saffron bg-saffron-tint px-1.5 py-0.5 rounded-pill font-semibold">
                     {pendingVendorsCount} pending
                   </span>
                 ) : (
-                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">
+                  <span className="text-success bg-success-tint px-1.5 py-0.5 rounded-pill font-semibold">
                     All verified
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="p-5 rounded-[22px] bg-surface border border-hairline shadow-xs space-y-2 group hover:shadow-md transition-all">
+            <div className="p-5 rounded-20 bg-surface border border-hairline shadow-xs space-y-2 group hover:border-saffron/40 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-soft font-sora">
+                <span className="text-xs font-semibold text-ink-soft">
                   SaaS Plans
                 </span>
-                <div className="w-7 h-7 rounded-8 bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-8 bg-paper border border-hairline text-ink flex items-center justify-center font-bold">
                   <CreditCard className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-xl font-black font-sora text-ink">
+              <div className="text-xl font-bold font-sora text-ink">
                 {plans.filter((p) => p.isActive).length}{' '}
-                <span className="text-xs font-normal text-ink-soft">Active</span>
+                <span className="text-xs font-normal text-ink-soft">active</span>
               </div>
-              <div className="text-[10px] text-ink-soft font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+              <div className="text-xs text-ink-soft font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
                 Live subscription tiers
               </div>
             </div>
 
-            <div className="p-5 rounded-[22px] bg-surface border border-hairline shadow-xs space-y-2 group hover:shadow-md transition-all">
+            <div className="p-5 rounded-20 bg-surface border border-hairline shadow-xs space-y-2 group hover:border-saffron/40 transition-colors">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-soft font-sora">
+                <span className="text-xs font-semibold text-ink-soft">
                   Active Coupons
                 </span>
-                <div className="w-7 h-7 rounded-8 bg-pink-50 text-pink-600 flex items-center justify-center font-bold">
+                <div className="w-7 h-7 rounded-8 bg-paper border border-hairline text-ink flex items-center justify-center font-bold">
                   <Gift className="w-3.5 h-3.5" />
                 </div>
               </div>
-              <div className="text-xl font-black font-sora text-ink">
+              <div className="text-xl font-bold font-sora text-ink">
                 {coupons.length}{' '}
                 <span className="text-xs font-normal text-ink-soft">Codes</span>
               </div>
@@ -771,9 +836,9 @@ export default function AdminDashboardPage() {
                       </h3>
                       <button
                         onClick={() => setActiveNav('VENDORS')}
-                        className="text-xs text-saffron font-bold hover:underline"
+                        className="text-xs text-saffron font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
                       >
-                        View All ({vendors.length}) →
+                        View all ({vendors.length})
                       </button>
                     </div>
                     <div className="space-y-2">
@@ -784,16 +849,16 @@ export default function AdminDashboardPage() {
                         >
                           <div>
                             <div className="font-bold text-ink">{v.name}</div>
-                            <div className="text-[11px] text-saffron font-mono">/v/{v.slug}</div>
+                            <div className="text-xs text-saffron font-semibold">/v/{v.slug}</div>
                           </div>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-pill text-xs font-semibold ${
                               !v.isApproved
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                ? 'bg-saffron-tint text-saffron border border-saffron/20'
+                                : 'bg-success-tint text-success border border-success/20'
                             }`}
                           >
-                            {!v.isApproved ? 'Needs Review' : 'Active'}
+                            {!v.isApproved ? 'Needs review' : 'Active'}
                           </span>
                         </div>
                       ))}
@@ -804,14 +869,14 @@ export default function AdminDashboardPage() {
                   <div className="p-6 rounded-[22px] bg-paper border border-hairline space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-sora font-extrabold text-base text-ink flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-indigo-500" />
-                        <span>Recent Audit Events</span>
+                        <Terminal className="w-4 h-4 text-ink" />
+                        <span>Recent audit events</span>
                       </h3>
                       <button
                         onClick={() => setActiveNav('AUDIT')}
-                        className="text-xs text-indigo-500 font-bold hover:underline"
+                        className="text-xs text-ink font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
                       >
-                        View All Logs →
+                        View all logs
                       </button>
                     </div>
                     <div className="space-y-2">
@@ -843,7 +908,7 @@ export default function AdminDashboardPage() {
                       <button
                         key={f}
                         onClick={() => setVendorFilter(f)}
-                        className={`px-3 py-1.5 rounded-10 text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-10 text-xs font-bold transition-colors ${
                           vendorFilter === f
                             ? 'bg-surface text-ink shadow-xs border border-hairline'
                             : 'text-ink-soft hover:text-ink'
@@ -861,7 +926,7 @@ export default function AdminDashboardPage() {
                       placeholder="Search name, slug, email, phone..."
                       value={vendorSearch}
                       onChange={(e) => setVendorSearch(e.target.value)}
-                      className="w-full bg-paper border border-hairline rounded-14 pl-10 pr-4 py-2 text-xs font-medium text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10 transition-all placeholder:text-ink-soft/60"
+                      className="w-full bg-paper border border-hairline rounded-14 pl-10 pr-4 py-2 text-xs font-medium text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10 transition-colors placeholder:text-ink-soft/60"
                     />
                   </div>
                 </div>
@@ -869,7 +934,7 @@ export default function AdminDashboardPage() {
                 <div className="overflow-x-auto rounded-[20px] border border-hairline shadow-xs">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs uppercase tracking-wider">
+                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs ">
                         <th className="py-3.5 px-5">Partner Shop & Kiosk</th>
                         <th className="py-3.5 px-5">Contact Details</th>
                         <th className="py-3.5 px-5">Throughput</th>
@@ -907,7 +972,7 @@ export default function AdminDashboardPage() {
                                     <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                                   </Link>
                                 ) : (
-                                  <span className="text-xs text-ink-soft font-mono">—</span>
+                                  <span className="text-xs text-ink-soft font-mono">-</span>
                                 )}
                               </td>
 
@@ -926,7 +991,7 @@ export default function AdminDashboardPage() {
                               <td className="py-4 px-5">
                                 <div className="flex flex-col gap-1">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-[11px] uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <span className="font-semibold text-xs px-2 py-0.5 rounded-pill bg-paper text-ink border border-hairline">
                                       {v.subscriptionPlan || 'TRIAL'}
                                     </span>
                                     {isSubExpired ? (
@@ -960,7 +1025,7 @@ export default function AdminDashboardPage() {
 
                               <td className="py-4 px-5">
                                 <span
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold  inline-flex items-center gap-1 ${
                                     !v.isApproved
                                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                       : v.isActive
@@ -1067,7 +1132,7 @@ export default function AdminDashboardPage() {
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold font-sora text-xs uppercase px-2.5 py-1 rounded-full bg-[#0B132B] text-white">
+                          <span className="font-semibold font-sora text-xs px-2.5 py-1 rounded-pill bg-ink text-white">
                             {p.code}
                           </span>
                           <span
@@ -1184,7 +1249,7 @@ export default function AdminDashboardPage() {
                 <div className="overflow-x-auto rounded-[20px] border border-hairline shadow-xs">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs uppercase tracking-wider">
+                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs ">
                         <th className="py-3.5 px-5">Coupon Code</th>
                         <th className="py-3.5 px-5">Discount Benefit</th>
                         <th className="py-3.5 px-5">Redemptions</th>
@@ -1225,7 +1290,7 @@ export default function AdminDashboardPage() {
                                 )}
                                 {c.discountType === 'FREE_DAYS' && (
                                   <span className="font-bold text-saffron bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-sora text-xs">
-                                    🎁 {c.freeDays || 30} Days Free Pass
+                                     {c.freeDays || 30} Days Free Pass
                                   </span>
                                 )}
                               </td>
@@ -1246,7 +1311,7 @@ export default function AdminDashboardPage() {
                               </td>
                               <td className="py-4 px-5">
                                 <span
-                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold  border ${
                                     c.isActive && !isExpired
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                       : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -1293,7 +1358,7 @@ export default function AdminDashboardPage() {
                 <div className="overflow-x-auto rounded-[20px] border border-hairline shadow-xs">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs uppercase tracking-wider">
+                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs ">
                         <th className="py-3.5 px-5">Timestamp</th>
                         <th className="py-3.5 px-5">Action / Event</th>
                         <th className="py-3.5 px-5">Resource ID</th>
@@ -1318,7 +1383,7 @@ export default function AdminDashboardPage() {
                                 {log.action}
                               </span>
                             </td>
-                            <td className="py-3 px-5 text-ink-soft">{log.resourceId || '—'}</td>
+                            <td className="py-3 px-5 text-ink-soft">{log.resourceId || '-'}</td>
                             <td className="py-3 px-5 text-ink-soft">{log.actorId || 'system-daemon'}</td>
                           </tr>
                         ))
@@ -1338,7 +1403,7 @@ export default function AdminDashboardPage() {
                 <div className="overflow-x-auto rounded-[20px] border border-hairline shadow-xs">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs uppercase tracking-wider">
+                      <tr className="bg-paper border-b border-hairline text-ink-soft font-sora font-bold text-xs ">
                         <th className="py-3.5 px-5">Timestamp</th>
                         <th className="py-3.5 px-5">Event Type</th>
                         <th className="py-3.5 px-5">Processing State</th>
@@ -1368,6 +1433,261 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
+            {/* PAYMENTS & RAZORPAY TECHNOLOGY PARTNER TAB */}
+            {activeNav === 'PAYMENTS' && (
+              <div className="space-y-6">
+                {/* Metric Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs space-y-1">
+                    <span className="text-[10px] font-bold text-ink-soft ">Total Vendors</span>
+                    <div className="text-2xl font-sora font-extrabold text-ink">{paymentStats.totalVendors}</div>
+                    <span className="text-[10px] text-ink-soft">Registered shops</span>
+                  </div>
+
+                  <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs space-y-1">
+                    <span className="text-[10px] font-bold text-success ">Active & Settling</span>
+                    <div className="text-2xl font-sora font-extrabold text-success">{paymentStats.activatedCount}</div>
+                    <span className="text-[10px] text-ink-soft">Direct payouts active</span>
+                  </div>
+
+                  <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs space-y-1">
+                    <span className="text-[10px] font-bold text-amber-500 ">Under Review</span>
+                    <div className="text-2xl font-sora font-extrabold text-amber-500">{paymentStats.underReviewCount}</div>
+                    <span className="text-[10px] text-ink-soft">KYC verification pending</span>
+                  </div>
+
+                  <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs space-y-1">
+                    <span className="text-[10px] font-bold text-ink-soft ">Not Connected</span>
+                    <div className="text-2xl font-sora font-extrabold text-slate-500">{paymentStats.notConnectedCount}</div>
+                    <span className="text-[10px] text-ink-soft">Onboarding not started</span>
+                  </div>
+
+                  <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs space-y-1">
+                    <span className="text-[10px] font-bold text-danger ">Restricted</span>
+                    <div className="text-2xl font-sora font-extrabold text-danger">{paymentStats.restrictedCount}</div>
+                    <span className="text-[10px] text-ink-soft">Suspended or rejected</span>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="p-5 rounded-20 bg-paper border border-hairline shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                      { id: 'ALL', label: 'All Accounts' },
+                      { id: 'ACTIVATED', label: 'Active & Verified' },
+                      { id: 'PENDING', label: 'Under Review' },
+                      { id: 'NOT_CONNECTED', label: 'Not Connected' },
+                      { id: 'RESTRICTED', label: 'Restricted' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => {
+                          setPaymentFilter(f.id);
+                          loadPaymentAccounts(f.id);
+                        }}
+                        className={`px-3 py-1.5 rounded-pill text-xs font-bold transition-colors ${
+                          paymentFilter === f.id
+                            ? 'bg-ink text-paper shadow-xs'
+                            : 'bg-surface hover:bg-hairline text-ink-soft'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-ink-soft absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search vendor or account..."
+                        value={paymentSearch}
+                        onChange={(e) => setPaymentSearch(e.target.value)}
+                        className="pl-8 pr-3 py-1.5 rounded-12 bg-surface border border-hairline text-xs text-ink placeholder:text-ink-soft focus:outline-none focus:border-saffron w-48 sm:w-60"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => loadPaymentAccounts(paymentFilter)}
+                      disabled={paymentLoading}
+                      className="p-2 rounded-12 bg-surface hover:bg-hairline border border-hairline text-ink-soft transition"
+                      title="Refresh list"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${paymentLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vendor Payment Accounts Table */}
+                <div className="bg-paper border border-hairline rounded-24 overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-hairline bg-surface/50 text-ink-soft font-bold text-[10px] ">
+                          <th className="py-3 px-4">Store Business Name</th>
+                          <th className="py-3 px-4">Razorpay Account ID</th>
+                          <th className="py-3 px-4">Onboarding State</th>
+                          <th className="py-3 px-4">Authoritative Status</th>
+                          <th className="py-3 px-4">Orders</th>
+                          <th className="py-3 px-4">Last Synced</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline">
+                        {paymentLoading ? (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-ink-soft animate-pulse">
+                              Loading vendor payment accounts...
+                            </td>
+                          </tr>
+                        ) : paymentVendors.filter((v) => {
+                            if (!paymentSearch) return true;
+                            const q = paymentSearch.toLowerCase();
+                            return (
+                              v.name?.toLowerCase().includes(q) ||
+                              v.slug?.toLowerCase().includes(q) ||
+                              v.paymentAccount?.razorpayAccountId?.toLowerCase().includes(q)
+                            );
+                          }).length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-ink-soft">
+                              No vendor payment accounts matching the current filter.
+                            </td>
+                          </tr>
+                        ) : (
+                          paymentVendors
+                            .filter((v) => {
+                              if (!paymentSearch) return true;
+                              const q = paymentSearch.toLowerCase();
+                              return (
+                                v.name?.toLowerCase().includes(q) ||
+                                v.slug?.toLowerCase().includes(q) ||
+                                v.paymentAccount?.razorpayAccountId?.toLowerCase().includes(q)
+                              );
+                            })
+                            .map((vendor) => {
+                              const acc = vendor.paymentAccount;
+                              const isActivated = acc?.activationStatus === 'ACTIVATED';
+                              const isUnderReview = acc?.activationStatus === 'UNDER_REVIEW';
+                              const isRestricted =
+                                acc?.activationStatus === 'SUSPENDED' || acc?.activationStatus === 'REJECTED';
+
+                              return (
+                                <tr key={vendor.id} className="hover:bg-surface/50 transition">
+                                  <td className="py-3.5 px-4">
+                                    <div className="font-bold text-ink">{vendor.name}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[10px] font-mono text-ink-soft">/{vendor.slug}</span>
+                                      <Link
+                                        href={`/shop/${vendor.slug}`}
+                                        target="_blank"
+                                        className="text-[10px] text-saffron hover:underline flex items-center gap-0.5 font-bold"
+                                      >
+                                        <span>Shop Page</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </Link>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3.5 px-4 font-mono text-xs">
+                                    {acc?.razorpayAccountId ? (
+                                      <span className="font-bold text-ink">{acc.razorpayAccountId}</span>
+                                    ) : (
+                                      <span className="text-ink-soft italic">Not connected</span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3.5 px-4">
+                                    <span className="text-[11px] font-medium text-ink">
+                                      {acc?.onboardingStatus || 'NOT_STARTED'}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3.5 px-4">
+                                    {isActivated ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-success/10 text-success border border-success/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                        ACTIVATED
+                                      </span>
+                                    ) : isUnderReview ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                        UNDER REVIEW
+                                      </span>
+                                    ) : isRestricted ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-danger/10 text-danger border border-danger/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-danger" />
+                                        {acc?.activationStatus}
+                                      </span>
+                                    ) : acc?.authStatus === 'AUTHORIZED' ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                                        AUTHORIZED
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500">
+                                        NOT CONNECTED
+                                      </span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3.5 px-4 font-mono font-bold text-ink">
+                                    {vendor._count?.orders || 0}
+                                  </td>
+
+                                  <td className="py-3.5 px-4 text-ink-soft text-[11px]">
+                                    {acc?.lastSyncedAt
+                                      ? new Date(acc.lastSyncedAt).toLocaleString('en-IN', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })
+                                      : '-'}
+                                  </td>
+
+                                  <td className="py-3.5 px-4 text-right">
+                                    {acc?.razorpayAccountId ? (
+                                      <button
+                                        onClick={() => handleAdminSyncPayment(vendor.id)}
+                                        disabled={syncingVendorId === vendor.id}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-10 bg-surface hover:bg-hairline border border-hairline text-[11px] font-bold text-ink transition active:scale-95 disabled:opacity-50"
+                                        title="Synchronize authoritative status from Razorpay"
+                                      >
+                                        <RefreshCw
+                                          className={`w-3 h-3 ${syncingVendorId === vendor.id ? 'animate-spin' : ''}`}
+                                        />
+                                        <span>{syncingVendorId === vendor.id ? 'Syncing...' : 'Sync Status'}</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-ink-soft italic">No account</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Compliance & Security Guard Banner */}
+                <div className="p-5 rounded-20 bg-paper border border-hairline space-y-2 text-xs text-ink-soft leading-relaxed">
+                  <div className="flex items-center gap-2 text-ink font-bold">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Administrator Security & Razorpay Compliance Principles</span>
+                  </div>
+                  <p>
+                    Print2Me is registered as a Technology Partner. All vendor payouts settle directly to each vendor&apos;s
+                    own bank account with 0% platform commission on print jobs. Administrators can view connection status and
+                    trigger safe status synchronizations, but cannot retrieve vendor access tokens or bypass Razorpay&apos;s
+                    regulatory KYC reviews.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* 7. STORAGE TAB */}
             {activeNav === 'STORAGE' && (
               <div className="space-y-6">
@@ -1383,20 +1703,20 @@ export default function AdminDashboardPage() {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4 border-t border-hairline">
                     <div>
-                      <div className="text-ink-soft font-bold text-[11px] uppercase tracking-wider">Service Status</div>
+                      <div className="text-ink-soft font-bold text-[11px] ">Service Status</div>
                       <div className="text-ink font-bold text-base mt-1 flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
                         {metrics?.storageHealth?.healthy ? 'Operational' : 'Active (Local Dev Mode)'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-ink-soft font-bold text-[11px] uppercase tracking-wider">Storage Mode</div>
+                      <div className="text-ink-soft font-bold text-[11px] ">Storage Mode</div>
                       <div className="text-emerald-600 font-mono font-bold text-base mt-1">
                         {metrics?.storageHealth?.mode || 'AZURE_BLOB'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-ink-soft font-bold text-[11px] uppercase tracking-wider">Diagnostic Note</div>
+                      <div className="text-ink-soft font-bold text-[11px] ">Diagnostic Note</div>
                       <div className="text-ink font-medium text-xs mt-1">
                         {metrics?.storageHealth?.message || 'Ready for document streaming & SAS generation'}
                       </div>
@@ -1709,7 +2029,7 @@ export default function AdminDashboardPage() {
               <div className="p-4 rounded-16 bg-paper border border-hairline space-y-2">
                 <div className="flex justify-between">
                   <span className="text-ink-soft">Current Plan:</span>
-                  <span className="font-bold text-ink uppercase">
+                  <span className="font-bold text-ink">
                     {selectedVendorForSub.subscriptionPlan || 'TRIAL'}
                   </span>
                 </div>
@@ -1732,9 +2052,9 @@ export default function AdminDashboardPage() {
                       key={d}
                       type="button"
                       onClick={() => setGrantDaysInput(d)}
-                      className={`px-3 py-1.5 rounded-12 border text-xs font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-12 border text-xs font-bold transition-colors ${
                         grantDaysInput === d
-                          ? 'bg-[#0B132B] text-white border-[#0B132B]'
+                          ? 'bg-ink text-white border-ink'
                           : 'bg-paper text-ink-soft border-hairline hover:bg-surface'
                       }`}
                     >

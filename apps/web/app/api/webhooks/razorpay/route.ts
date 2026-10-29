@@ -135,6 +135,110 @@ export async function POST(request: NextRequest) {
           console.error('Failed to record payment failure:', dbErr);
         }
       }
+    } else if (eventType === 'refund.processed') {
+      const refundEntity = event.payload?.refund?.entity;
+      const rzpPaymentId = refundEntity?.payment_id;
+      if (rzpPaymentId) {
+        try {
+          const payment = await prisma.payment.findUnique({
+            where: { razorpayPaymentId: rzpPaymentId },
+            include: { order: true },
+          });
+
+          if (payment) {
+            await prisma.$transaction(async (tx) => {
+              await tx.payment.update({
+                where: { id: payment.id },
+                data: { status: PaymentStatus.REFUNDED },
+              });
+              await tx.refund.upsert({
+                where: { razorpayRefundId: refundEntity.id },
+                update: {
+                  status: 'PROCESSED',
+                  amountMinor: Number(refundEntity.amount),
+                },
+                create: {
+                  paymentId: payment.id,
+                  razorpayRefundId: refundEntity.id,
+                  amountMinor: Number(refundEntity.amount),
+                  status: 'PROCESSED',
+                  reason: refundEntity.notes?.reason || 'Customer refund',
+                },
+              });
+            });
+          }
+        } catch (dbErr) {
+          console.error('Failed to process refund webhook:', dbErr);
+        }
+      }
+    } else if (eventType.startsWith('account.')) {
+      // Razorpay Technology Partner sub-merchant onboarding lifecycle events
+      const accountEntity = event.payload?.account?.entity || {};
+      const accountId = accountEntity.id || event.account_id;
+
+      if (accountId) {
+        try {
+          let newActivationStatus = 'UNDER_REVIEW';
+          let newOnboardingStatus = 'IN_PROGRESS';
+          let shouldAllowOnline = true;
+
+          switch (eventType) {
+            case 'account.activated':
+              newActivationStatus = 'ACTIVATED';
+              newOnboardingStatus = 'COMPLETED';
+              shouldAllowOnline = true;
+              break;
+            case 'account.under_review':
+              newActivationStatus = 'UNDER_REVIEW';
+              newOnboardingStatus = 'PENDING_VERIFICATION';
+              break;
+            case 'account.needs_clarification':
+              newActivationStatus = 'NEEDS_CLARIFICATION';
+              newOnboardingStatus = 'PENDING_VERIFICATION';
+              break;
+            case 'account.suspended':
+              newActivationStatus = 'SUSPENDED';
+              shouldAllowOnline = false;
+              break;
+            case 'account.rejected':
+              newActivationStatus = 'REJECTED';
+              shouldAllowOnline = false;
+              break;
+            default:
+              newActivationStatus = 'UNDER_REVIEW';
+              break;
+          }
+
+          const existingAccount = await prisma.vendorPaymentAccount.findUnique({
+            where: { razorpayAccountId: accountId },
+          });
+
+          if (existingAccount) {
+            await prisma.$transaction(async (tx) => {
+              await tx.vendorPaymentAccount.update({
+                where: { id: existingAccount.id },
+                data: {
+                  activationStatus: newActivationStatus,
+                  onboardingStatus: newOnboardingStatus,
+                  requirements: accountEntity.requirements || undefined,
+                  lastSyncedAt: new Date(),
+                },
+              });
+
+              if (newActivationStatus === 'ACTIVATED' || !shouldAllowOnline) {
+                await tx.vendor.update({
+                  where: { id: existingAccount.vendorId },
+                  data: {
+                    allowOnlinePayment: shouldAllowOnline,
+                  },
+                });
+              }
+            });
+          }
+        } catch (accErr) {
+          console.error('Failed to update account lifecycle from webhook:', accErr);
+        }
+      }
     }
 
     // Mark webhook as processed

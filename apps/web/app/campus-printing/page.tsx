@@ -1,17 +1,15 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   GraduationCap,
   Printer,
-  Zap,
   Clock,
-  CheckCircle2,
-  Sparkles,
-  ArrowRight,
-  ShieldAlert,
+  ShieldCheck,
   Smartphone,
-  BookOpen,
   Award,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/primitives';
 import { JsonLd } from '@/components/JsonLd';
@@ -54,89 +52,91 @@ export default function CampusPrintingPage() {
 
   const studentFeatures = [
     {
-      icon: <Clock className="w-6 h-6 text-saffron" />,
-      title: 'Beat 9:00 AM Deadlines',
-      desc: 'No more waiting 20 minutes while the xerox shopkeeper opens pen drives and deals with slow Windows computers. Upload ahead or scan right at the counter.',
+      icon: <Clock className="w-5 h-5 text-saffron" />,
+      title: 'Beat 9:00 AM deadlines',
+      desc: 'No more waiting in 20-minute xerox queues while slow counter computers freeze. Upload ahead or scan right at the desk.',
     },
     {
-      icon: <ShieldAlert className="w-6 h-6 text-emerald-600" />,
-      title: 'Zero USB Drive Viruses',
-      desc: 'Stop ruining your laptops and flash drives with shortcut trojans and campus PC malware. Print straight from your personal phone or laptop browser.',
+      icon: <ShieldCheck className="w-5 h-5 text-success" />,
+      title: 'Zero USB drive viruses',
+      desc: 'Stop infecting personal laptops with shortcut trojans from campus PCs. Print directly from your own phone browser.',
     },
     {
-      icon: <GraduationCap className="w-6 h-6 text-purple-600" />,
-      title: 'Tailored for Student Budgets',
-      desc: 'Transparent pricing with duplex (both sides) options that save paper and halve your print costs. Pay exact change online via UPI or pay cash on desk.',
+      icon: <GraduationCap className="w-5 h-5 text-saffron" />,
+      title: 'Student friendly pricing',
+      desc: 'Transparent rates with duplex long-edge options that halve paper consumption. Pay exact totals online via UPI.',
     },
     {
-      icon: <Zap className="w-6 h-6 text-blue-600" />,
-      title: 'Works on Any Phone',
-      desc: 'No apps to install on your limited storage. Just open your camera, point at the standee, choose your file, and grab your papers.',
+      icon: <Smartphone className="w-5 h-5 text-ink" />,
+      title: 'No app download needed',
+      desc: 'Save phone storage. Open your camera, scan the desk QR standee, select your PDF file, and collect your sheets.',
     },
   ];
 
   const academicItems = [
     {
-      title: 'Lab Manuals & Practical Records',
+      title: 'Lab manuals & practical records',
       desc: 'Print code outputs, circuit diagrams, and observation tables in crisp monochrome or high-contrast color.',
     },
     {
-      title: 'Final Year Project Reports & Theses',
-      desc: 'Complete multi-chapter project binders, executive summaries, certificates, and acknowledgments with proper page sequencing.',
+      title: 'Final year project reports & theses',
+      desc: 'Complete multi-chapter project binders, executive summaries, certificates, and acknowledgments in order.',
     },
     {
-      title: 'Lecture Notes & Study Guides',
-      desc: 'Print semester lecture slides, handwritten PDF scans, formula sheets, and question banks before midterms.',
+      title: 'Lecture notes & study guides',
+      desc: 'Print semester lecture slides, handwritten PDF scans, formula sheets, and question banks before exams.',
     },
     {
-      title: 'Admit Cards & Exam Hall Tickets',
-      desc: 'One-click emergency printouts for university entrance exams, semester hall tickets, and identity cards.',
+      title: 'Admit cards & exam hall tickets',
+      desc: 'Single-sheet urgent prints for university semester hall tickets, entrance exam permits, and verification IDs.',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-paper pb-24">
+    <div className="min-h-screen bg-paper pb-24 text-ink">
       <JsonLd data={[breadcrumbsSchema]} />
 
       {/* Hero */}
-      <section className="px-6 pt-16 pb-14 md:pt-24 md:pb-20 max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill bg-saffron-tint text-saffron text-xs font-bold uppercase tracking-wider mb-6">
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Built for College Campuses</span>
-        </div>
-        <h1 className="font-sora text-4xl sm:text-5xl lg:text-6xl font-extrabold text-ink tracking-tight mb-6">
-          The Smart Way to Print on Campus
+      <section className="px-6 pt-16 pb-12 md:pt-20 md:pb-16 max-w-4xl mx-auto text-center">
+        <h1 className="font-sora text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">
+          Campus printing without the queues
         </h1>
-        <p className="text-ink-soft text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
-          Skip crowded xerox shop lines, avoid virus-infected USB drives, and submit your college assignments on time with Print2Me.
+        <p className="text-ink-soft text-base sm:text-lg max-w-xl mx-auto leading-relaxed mb-8">
+          Upload documents from your phone and collect sheets at your college kiosk.
         </p>
 
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/v/speedy-express">
-            <Button variant="primary" className="h-13 px-8 text-base">
-              Try Kiosk Demo
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Link
+            href="/v/speedy-express"
+            className="w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 rounded-pill active:scale-[0.99] transition-transform motion-reduce:transform-none"
+          >
+            <Button variant="primary" className="w-full sm:w-auto h-12 px-8 text-sm">
+              Try kiosk demo
             </Button>
           </Link>
-          <Link href="/locations">
-            <Button variant="outline" className="h-13 px-8 text-base">
-              Find Campus Kiosks
+          <Link
+            href="/locations"
+            className="w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 rounded-pill active:scale-[0.99] transition-transform motion-reduce:transform-none"
+          >
+            <Button variant="outline" className="w-full sm:w-auto h-12 px-8 text-sm">
+              Find campus kiosks
             </Button>
           </Link>
         </div>
       </section>
 
       {/* Features Grid */}
-      <section className="px-6 max-w-6xl mx-auto mb-24">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="px-6 max-w-5xl mx-auto mb-20">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {studentFeatures.map((feat, i) => (
             <div
               key={i}
-              className="bg-surface p-7 rounded-[24px] border border-hairline shadow-ink-soft space-y-3"
+              className="bg-surface p-6 rounded-24 border border-hairline shadow-ink-soft space-y-3"
             >
-              <div className="w-12 h-12 rounded-16 bg-paper border border-hairline flex items-center justify-center">
+              <div className="w-10 h-10 rounded-16 bg-paper border border-hairline flex items-center justify-center">
                 {feat.icon}
               </div>
-              <h2 className="font-sora text-lg font-bold text-ink">
+              <h2 className="font-sora text-base font-bold text-ink">
                 {feat.title}
               </h2>
               <p className="text-ink-soft text-sm leading-relaxed">
@@ -148,27 +148,27 @@ export default function CampusPrintingPage() {
       </section>
 
       {/* Academic Documents Section */}
-      <section className="px-6 max-w-5xl mx-auto mb-24">
-        <div className="text-center mb-12">
-          <h2 className="font-sora text-3xl font-extrabold text-ink mb-3">
-            What Students Print Every Day
+      <section className="px-6 max-w-4xl mx-auto mb-20">
+        <div className="mb-8">
+          <h2 className="font-sora text-2xl font-extrabold text-ink mb-2">
+            Everyday academic documents
           </h2>
-          <p className="text-ink-soft text-base max-w-xl mx-auto">
-            From emergency 5-minute printouts before class to semester-end thesis volumes.
+          <p className="text-ink-soft text-sm max-w-xl">
+            From last-minute classroom submission runs to bound project submissions.
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-6">
+        <div className="grid sm:grid-cols-2 gap-4">
           {academicItems.map((item, i) => (
             <div
               key={i}
-              className="bg-surface p-7 rounded-[24px] border border-hairline shadow-ink-soft flex items-start gap-4"
+              className="bg-surface p-6 rounded-24 border border-hairline shadow-ink-soft flex items-start gap-3.5"
             >
-              <div className="w-10 h-10 rounded-full bg-saffron-tint text-saffron flex items-center justify-center shrink-0 mt-1 font-bold">
+              <div className="w-7 h-7 rounded-full bg-saffron-tint text-saffron flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
                 ✓
               </div>
               <div>
-                <h3 className="font-sora text-lg font-bold text-ink mb-1">
+                <h3 className="font-sora text-base font-bold text-ink mb-1">
                   {item.title}
                 </h3>
                 <p className="text-ink-soft text-sm leading-relaxed">
@@ -181,21 +181,24 @@ export default function CampusPrintingPage() {
       </section>
 
       {/* Student Representative / Campus Partner Card */}
-      <section className="px-6 max-w-4xl mx-auto mb-24">
-        <div className="bg-ink rounded-[32px] p-8 md:p-12 text-white text-center space-y-6">
-          <div className="w-14 h-14 rounded-24 bg-white/10 text-saffron flex items-center justify-center mx-auto">
-            <Award className="w-7 h-7" />
+      <section className="px-6 max-w-4xl mx-auto">
+        <div className="bg-ink rounded-24 p-8 text-white space-y-5">
+          <div className="w-12 h-12 rounded-16 bg-white/10 text-saffron flex items-center justify-center">
+            <Award className="w-6 h-6" />
           </div>
-          <h2 className="font-sora text-2xl sm:text-3xl font-extrabold text-white">
-            Want Print2Me at your college xerox shop?
+          <h2 className="font-sora text-2xl font-bold text-white">
+            Bring Print2Me to your college xerox shop
           </h2>
-          <p className="text-white/80 max-w-lg mx-auto text-sm sm:text-base leading-relaxed">
-            Let your campus print vendor know, or recommend your college xerox store to us. We set them up with free standees and our Windows spooler agent in 10 minutes.
+          <p className="text-white/80 max-w-xl text-sm leading-relaxed">
+            Tell your campus print vendor or recommend their counter to us. We provide them with free desk standees and automated spooler setup in minutes.
           </p>
-          <div className="pt-2">
-            <Link href="/register-vendor">
-              <Button variant="saffron" className="h-13 px-8 text-base">
-                Recommend or Partner a Campus Shop
+          <div className="pt-1">
+            <Link
+              href="/register-vendor"
+              className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 rounded-pill active:scale-[0.99] transition-transform motion-reduce:transform-none"
+            >
+              <Button variant="saffron" className="h-11 px-6 text-sm">
+                Recommend or register a shop
               </Button>
             </Link>
           </div>

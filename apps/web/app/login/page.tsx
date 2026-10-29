@@ -1,18 +1,41 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogIn, Lock, Mail, ShieldAlert, ArrowRight, Store, ShieldCheck } from 'lucide-react';
-import { Button } from '@/components/primitives';
+import {
+  Lock,
+  Mail,
+  ShieldAlert,
+  ArrowRight,
+  Store,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  HelpCircle,
+  X,
+  CheckCircle2,
+} from 'lucide-react';
 import { BrandLogo } from '@/components/BrandLogo';
+
+type RoleTab = 'VENDOR' | 'ADMIN';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [activeRole, setActiveRole] = useState<RoleTab>('VENDOR');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showForgotModal, setShowForgotModal] = useState(false);
+
+  const handleRoleSwitch = (role: RoleTab) => {
+    setActiveRole(role);
+    setErrorMessage('');
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,10 +52,10 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.error || 'Authentication failed. Please check your email and password.');
       }
 
-      // Route according to user role with hard navigation to clear any stale cache
+      // Hard redirect to load fresh authorized dashboard state
       const role = (data.user?.role || '').toUpperCase();
       if (role === 'SUPER_ADMIN' || role === 'SUPERADMIN' || role === 'ADMIN') {
         window.location.href = '/admin';
@@ -46,120 +69,235 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemoCredentials = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setErrorMessage('');
-  };
-
   return (
-    <div className="max-w-md mx-auto px-6 py-12 md:py-24 min-h-screen">
-      <div className="bg-surface p-8 md:p-10 rounded-[32px] border border-hairline shadow-ink-soft space-y-8">
-        <div className="text-center space-y-4">
+    <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-8 text-ink">
+      <div className="w-full max-w-[420px] bg-surface p-6 sm:p-8 rounded-[24px] border border-hairline shadow-ink-soft space-y-5">
+        {/* Header Section */}
+        <div className="text-center space-y-2">
           <div className="flex justify-center mb-1">
-            <BrandLogo variant="horizontal" height={42} withLink href="/" />
+            <BrandLogo variant="horizontal" height={36} withLink href="/" />
           </div>
           <div>
-            <h1 className="text-2xl font-sora font-extrabold text-ink tracking-tight mb-1">Welcome back</h1>
-            <p className="text-xs text-ink-soft font-medium">Access your Vendor Store or Administrative Command Portal</p>
+            <h1 className="text-xl font-sora font-extrabold text-ink tracking-tight mb-0.5">
+              Welcome back
+            </h1>
+            <p className="text-xs text-ink-soft font-medium">
+              Sign in to manage printing stations, queues, and platform telemetry
+            </p>
           </div>
         </div>
 
-        {/* Quick Fill Demo Credentials */}
-        <div className="bg-paper p-3.5 rounded-[20px] border border-hairline space-y-2">
-          <div className="text-[11px] font-bold text-ink-soft uppercase tracking-wider text-center font-sora">
-            Quick Fill Credentials
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => fillDemoCredentials('rakshitwaghmare27@gmail.com', 'Password@123')}
-              className="px-3 py-2.5 bg-surface hover:border-saffron/50 border border-hairline rounded-[14px] text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 text-left"
-            >
-              <Store className="w-3.5 h-3.5 text-saffron flex-shrink-0" />
-              <span>Vendor Desk</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillDemoCredentials('admin@print2me.in', 'Admin@123456')}
-              className="px-3 py-2.5 bg-surface hover:border-emerald-500/50 border border-hairline rounded-[14px] text-xs font-bold text-ink flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 text-left"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-              <span>Super Admin</span>
-            </button>
-          </div>
+        {/* Role Segmented Switcher */}
+        <div className="bg-paper p-1 rounded-[16px] border border-hairline grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            onClick={() => handleRoleSwitch('VENDOR')}
+            className={`py-2 px-3 rounded-[12px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron active:scale-95 motion-reduce:transform-none disabled:opacity-50 ${
+              activeRole === 'VENDOR'
+                ? 'bg-surface text-ink shadow-xs border border-hairline/80'
+                : 'text-ink-soft hover:text-ink'
+            }`}
+          >
+            <Store className={`w-3.5 h-3.5 ${activeRole === 'VENDOR' ? 'text-saffron' : 'text-ink-soft'}`} />
+            <span>Vendor desk</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRoleSwitch('ADMIN')}
+            className={`py-2 px-3 rounded-[12px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron active:scale-95 motion-reduce:transform-none disabled:opacity-50 ${
+              activeRole === 'ADMIN'
+                ? 'bg-surface text-ink shadow-xs border border-hairline/80'
+                : 'text-ink-soft hover:text-ink'
+            }`}
+          >
+            <ShieldCheck className={`w-3.5 h-3.5 ${activeRole === 'ADMIN' ? 'text-success' : 'text-ink-soft'}`} />
+            <span>Super admin</span>
+          </button>
         </div>
 
+        {/* Error Alert Banner */}
         {errorMessage && (
-          <div className="p-4 rounded-[16px] bg-danger/10 border border-danger/20 text-danger text-sm flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <span className="font-semibold">{errorMessage}</span>
+          <div className="p-3 rounded-[14px] bg-danger/10 border border-danger/20 text-danger text-xs flex items-start gap-2.5">
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="flex-1 font-semibold">{errorMessage}</div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage('')}
+              className="text-danger/70 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger rounded"
+              aria-label="Dismiss error"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-ink ml-1">Email Address</label>
-            <div className="relative">
-              <Mail className="w-5 h-5 text-ink-soft absolute left-4 top-4" />
+        {/* Sign In Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Email field with guaranteed flex spacing (no absolute overlap) */}
+          <div className="space-y-1.5">
+            <label htmlFor="login-email" className="text-xs font-bold text-ink ml-1 block">
+              Email address
+            </label>
+            <div className="flex items-center gap-2.5 bg-paper border border-hairline rounded-[14px] px-3.5 py-2.5 focus-within:border-saffron focus-within:ring-2 focus-within:ring-saffron/20 transition-colors">
+              <Mail className="w-4 h-4 text-ink-soft shrink-0" />
               <input
+                id="login-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@yourdomain.com"
-                className="w-full bg-paper border border-hairline rounded-[16px] pl-12 pr-5 py-4 font-medium text-ink focus:outline-none focus:border-saffron focus:ring-4 focus:ring-saffron/10 transition-all placeholder:text-ink-soft/50"
+                placeholder={activeRole === 'VENDOR' ? 'shopkeeper@campusprint.in' : 'admin@print2me.in'}
+                className="w-full bg-transparent border-0 outline-none text-xs font-medium text-ink placeholder:text-ink-soft/50 p-0 focus:ring-0 focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-ink ml-1">Password</label>
-            <div className="relative">
-              <Lock className="w-5 h-5 text-ink-soft absolute left-4 top-4" />
+          {/* Password field with guaranteed flex spacing (no absolute overlap) */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between ml-1">
+              <label htmlFor="login-password" className="text-xs font-bold text-ink block">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-[11px] font-semibold text-saffron hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
+              >
+                Forgot password?
+              </button>
+            </div>
+            <div className="flex items-center gap-2.5 bg-paper border border-hairline rounded-[14px] px-3.5 py-2.5 focus-within:border-saffron focus-within:ring-2 focus-within:ring-saffron/20 transition-colors">
+              <Lock className="w-4 h-4 text-ink-soft shrink-0" />
               <input
-                type="password"
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full bg-paper border border-hairline rounded-[16px] pl-12 pr-5 py-4 font-medium text-ink focus:outline-none focus:border-saffron focus:ring-4 focus:ring-saffron/10 transition-all placeholder:text-ink-soft/50"
+                className="w-full bg-transparent border-0 outline-none text-xs font-medium text-ink placeholder:text-ink-soft/50 p-0 focus:ring-0 focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-ink-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded p-0.5 shrink-0"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
-          <Button
-            variant="primary"
+          {/* Remember Session Checkbox */}
+          <div className="flex items-center justify-between pt-0.5">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-hairline text-ink focus:ring-saffron/20 focus:ring-2 accent-saffron"
+              />
+              <span className="text-xs text-ink-soft font-medium">Keep me signed in on this station</span>
+            </label>
+          </div>
+
+          {/* Submit Button */}
+          <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-14 text-base"
+            className="w-full h-11 rounded-pill bg-ink text-white font-sora font-bold text-xs shadow-md shadow-ink/20 flex items-center justify-center gap-2 hover:bg-ink/90 active:scale-95 motion-reduce:transform-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron disabled:opacity-50"
           >
             {isLoading ? (
-              <span className="inline-block animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+              <span className="inline-block motion-safe:animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
             ) : (
-              <div className="flex items-center gap-2">
-                Authenticate Session
-                <ArrowRight className="w-5 h-5" />
+              <div className="flex items-center gap-1.5">
+                <span>Sign in to {activeRole === 'VENDOR' ? 'station' : 'portal'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </div>
             )}
-          </Button>
+          </button>
         </form>
 
-        <div className="text-center text-xs font-medium text-ink-soft pt-2 space-y-2">
-          <div>
+        {/* Footer Navigation */}
+        <div className="text-center text-xs font-medium text-ink-soft pt-1 space-y-1.5 border-t border-hairline/60">
+          <div className="pt-2">
             Want to register your print shop?{' '}
-            <Link href="/register-vendor" className="text-saffron font-bold hover:underline">
-              Register Business
+            <Link
+              href="/register-vendor"
+              className="text-saffron font-bold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
+            >
+              Register business
             </Link>
           </div>
           <div className="text-[11px] text-ink-soft/70">
-            Need assistance? Reach us at{' '}
-            <a href="mailto:support@print2me.in" className="hover:text-ink text-ink font-semibold underline">
+            Need technical help? Email{' '}
+            <a
+              href="mailto:support@print2me.in"
+              className="hover:text-ink text-ink font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
+            >
               support@print2me.in
             </a>
           </div>
         </div>
+
+        {/* Security Trust Strip */}
+        <div className="pt-2 border-t border-hairline/40 flex items-center justify-center gap-4 text-[10px] text-ink-soft/70">
+          <span className="flex items-center gap-1">
+            <Lock className="w-3 h-3 text-ink-soft" />
+            <span>256-bit TLS</span>
+          </span>
+          <span aria-hidden="true" className="text-hairline">/</span>
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-success" />
+            <span>Session verified</span>
+          </span>
+          <span aria-hidden="true" className="text-hairline">/</span>
+          <span>Zero plain text</span>
+        </div>
       </div>
+
+      {/* Forgot Password Help Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
+          <div className="bg-surface rounded-[24px] border border-hairline p-6 max-w-sm w-full shadow-ink-soft space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-[12px] bg-saffron-tint text-saffron flex items-center justify-center">
+                  <HelpCircle className="w-4 h-4" />
+                </div>
+                <h2 className="font-sora font-extrabold text-sm text-ink">
+                  Credential Recovery
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="w-7 h-7 rounded-full bg-paper hover:bg-hairline flex items-center justify-center text-ink-soft hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-ink-soft leading-relaxed">
+              For security compliance, kiosk and admin accounts cannot be reset via unverified emails. Please contact your organization administrator or our support team:
+            </p>
+
+            <div className="bg-paper p-3 rounded-[14px] border border-hairline text-xs text-ink space-y-1">
+              <div>Email: <span className="font-mono font-medium">support@print2me.in</span></div>
+              <div>Counter Hotline: <span className="font-mono font-medium">+91 98765 43210</span></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="w-full py-2.5 rounded-pill bg-ink text-white text-xs font-bold hover:bg-ink/90 active:scale-95 motion-reduce:transform-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createRazorpayOrder } from '@/lib/razorpay';
+import { createPartnerOrder } from '@/lib/razorpay-partner';
 import { OrderStatus, PaymentMethod } from '@printflow/shared-types';
 
 export async function POST(request: NextRequest) {
@@ -22,9 +22,16 @@ export async function POST(request: NextRequest) {
             select: {
               name: true,
               slug: true,
-              razorpayKeyId: true,
-              razorpayKeySecret: true,
               allowOnlinePayment: true,
+              paymentAccount: {
+                select: {
+                  razorpayAccountId: true,
+                  publicToken: true,
+                  accessToken: true,
+                  authStatus: true,
+                  activationStatus: true,
+                },
+              },
             },
           },
           payments: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -36,7 +43,12 @@ export async function POST(request: NextRequest) {
 
     if (!order) {
       // Demo fallback mock order
-      const rzpMock = await createRazorpayOrder(1550, 'ORD-8921', { trackingToken });
+      const rzpMock = await createPartnerOrder({
+        amountMinor: 1550,
+        receipt: 'ORD-8921',
+        notes: { trackingToken },
+        paymentAccount: null,
+      });
       return NextResponse.json({
         success: true,
         razorpayKeyId: rzpMock.keyId,
@@ -65,24 +77,22 @@ export async function POST(request: NextRequest) {
 
     if (order.vendor && order.vendor.allowOnlinePayment === false) {
       return NextResponse.json(
-        { error: 'Online payment is disabled by this vendor. Please pay at counter.' },
+        { error: 'Online payment is currently disabled by this vendor. Please pay cash at the counter.' },
         { status: 400 }
       );
     }
 
-    // Call Razorpay API to generate order with vendor's own credentials
-    const rzpOrder = await createRazorpayOrder(
-      order.totalAmountMinor,
-      order.orderNumber,
-      {
+    // Call officially supported Partner Order creation API using sub-merchant OAuth token
+    const rzpOrder = await createPartnerOrder({
+      amountMinor: order.totalAmountMinor,
+      receipt: order.orderNumber,
+      notes: {
         trackingToken,
         vendorSlug: order.vendor.slug,
+        orderNumber: order.orderNumber,
       },
-      {
-        keyId: order.vendor.razorpayKeyId,
-        keySecret: order.vendor.razorpayKeySecret,
-      }
-    );
+      paymentAccount: order.vendor.paymentAccount,
+    });
 
     // Update pending Payment record with razorpayOrderId
     try {
@@ -109,6 +119,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Payment init error:', error);
-    return NextResponse.json({ error: 'Failed to initialize payment checkout' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to initialize payment checkout' },
+      { status: 500 }
+    );
   }
 }

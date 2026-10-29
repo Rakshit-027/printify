@@ -1,6 +1,7 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Mail, Globe, MapPin, Phone, MessageSquare, Clock, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Mail, Phone, Clock, ArrowRight } from 'lucide-react';
 import { HomeContactForm } from '@/components/HomeContactForm';
 import { JsonLd } from '@/components/JsonLd';
 
@@ -24,82 +25,83 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="py-12 px-4 sm:px-6 max-w-5xl mx-auto space-y-12">
-      <JsonLd data={breadcrumbSchema} />
+    <div className="min-h-screen bg-paper pb-24 text-ink">
+      <JsonLd data={[breadcrumbSchema]} />
 
       {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-paper border border-hairline text-ink-soft text-xs font-bold uppercase tracking-wider">
-          <MessageSquare className="w-3.5 h-3.5 text-saffron" />
-          Always Here to Help
-        </div>
-        <h1 className="text-3xl sm:text-5xl font-sora font-extrabold text-ink tracking-tight">
-          Contact Print2Me
+      <section className="px-6 pt-16 pb-12 md:pt-20 md:pb-16 max-w-4xl mx-auto text-center">
+        <h1 className="font-sora text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">
+          Contact Print2Me support
         </h1>
-        <p className="text-ink-soft max-w-2xl mx-auto text-sm sm:text-base">
-          Have questions about your print job, need vendor onboarding assistance, or want to deploy Print2Me at your campus? We are ready to assist.
+        <p className="text-ink-soft text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
+          Get assistance with orders, shop onboarding, or campus kiosk inquiries.
         </p>
-      </div>
+      </section>
 
       {/* Direct Contact Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-3">
-          <div className="w-10 h-10 rounded-full bg-saffron-tint text-saffron flex items-center justify-center font-bold">
-            <Mail className="w-5 h-5" />
+      <section className="px-6 max-w-5xl mx-auto mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-surface p-6 rounded-24 border border-hairline shadow-ink-soft space-y-2.5">
+            <div className="w-10 h-10 rounded-16 bg-saffron-tint text-saffron flex items-center justify-center font-bold">
+              <Mail className="w-5 h-5" />
+            </div>
+            <h3 className="font-sora font-bold text-ink text-base">Customer support</h3>
+            <p className="text-xs text-ink-soft leading-relaxed">
+              Order status, refund requests, and user help:
+            </p>
+            <a
+              href="mailto:support@print2me.in"
+              className="inline-block text-xs font-semibold text-saffron hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
+            >
+              support@print2me.in
+            </a>
           </div>
-          <h3 className="font-sora font-bold text-ink text-base">Customer Support</h3>
-          <p className="text-xs text-ink-soft leading-relaxed">
-            Order assistance, refund processing, and technical support:
-          </p>
-          <a
-            href="mailto:support@print2me.in"
-            className="inline-block text-sm font-bold text-saffron hover:underline"
-          >
-            support@print2me.in
-          </a>
-        </div>
 
-        <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <Phone className="w-5 h-5" />
+          <div className="bg-surface p-6 rounded-24 border border-hairline shadow-ink-soft space-y-2.5">
+            <div className="w-10 h-10 rounded-16 bg-success-tint text-success flex items-center justify-center font-bold">
+              <Phone className="w-5 h-5" />
+            </div>
+            <h3 className="font-sora font-bold text-ink text-base">Shop partnerships</h3>
+            <p className="text-xs text-ink-soft leading-relaxed">
+              Onboarding assistance for print shops and college xerox counters:
+            </p>
+            <Link
+              href="/register-vendor"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-success hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron rounded"
+            >
+              <span>Register store online</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <h3 className="font-sora font-bold text-ink text-base">Shop Partnerships</h3>
-          <p className="text-xs text-ink-soft leading-relaxed">
-            Fast-track onboarding for printing shops and college photocopy kiosks:
-          </p>
-          <Link
-            href="/register-vendor"
-            className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700 hover:underline"
-          >
-            Register Store Online <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
 
-        <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-3">
-          <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Clock className="w-5 h-5" />
+          <div className="bg-surface p-6 rounded-24 border border-hairline shadow-ink-soft space-y-2.5">
+            <div className="w-10 h-10 rounded-16 bg-paper border border-hairline text-ink flex items-center justify-center font-bold">
+              <Clock className="w-5 h-5" />
+            </div>
+            <h3 className="font-sora font-bold text-ink text-base">Operating hours</h3>
+            <p className="text-xs text-ink-soft leading-relaxed">
+              Platform cloud: 24/7 automated queues
+            </p>
+            <p className="text-xs text-ink-soft">
+              Support desk: Mon to Sat, 09:00 AM to 08:00 PM IST
+            </p>
           </div>
-          <h3 className="font-sora font-bold text-ink text-base">Operating Hours</h3>
-          <p className="text-xs text-ink-soft leading-relaxed">
-            Platform Cloud: <strong>24/7 Operational</strong>
-          </p>
-          <p className="text-xs text-ink-soft">
-            Support Desk: Mon - Sat, 09:00 AM - 08:00 PM IST
-          </p>
         </div>
-      </div>
+      </section>
 
       {/* Interactive Form Card */}
-      <div className="bg-surface p-8 sm:p-12 rounded-[28px] border border-hairline shadow-ink-soft text-center space-y-6">
-        <div className="max-w-xl mx-auto space-y-2">
-          <h2 className="text-2xl font-sora font-bold text-ink">Send Us a Direct Message</h2>
-          <p className="text-xs sm:text-sm text-ink-soft">
-            Fill in your details below and our team will get back to you promptly.
-          </p>
-        </div>
+      <section className="px-6 max-w-4xl mx-auto">
+        <div className="bg-surface p-6 sm:p-10 rounded-24 border border-hairline shadow-ink-soft space-y-6">
+          <div className="max-w-xl space-y-1">
+            <h2 className="text-xl font-sora font-bold text-ink">Send a message</h2>
+            <p className="text-xs text-ink-soft">
+              Provide your details and order reference if applicable.
+            </p>
+          </div>
 
-        <HomeContactForm />
-      </div>
+          <HomeContactForm />
+        </div>
+      </section>
     </div>
   );
 }

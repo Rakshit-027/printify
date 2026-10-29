@@ -1,3 +1,4 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -122,6 +123,12 @@ export default function VendorDashboardPage() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
+  // Razorpay Technology Partner Payment Account State
+  const [paymentAccount, setPaymentAccount] = useState<any>(null);
+  const [paymentAccountLoading, setPaymentAccountLoading] = useState(false);
+  const [paymentAccountSyncing, setPaymentAccountSyncing] = useState(false);
+  const [connectingPayment, setConnectingPayment] = useState(false);
+
   const authCheckedRef = useRef(false);
 
   // Toast / Status notification helper
@@ -129,6 +136,88 @@ export default function VendorDashboardPage() {
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // URL query params listener (handles callback return)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const nav = params.get('nav');
+      const onboarding = params.get('onboarding');
+      const error = params.get('error');
+      if (nav === 'PAYMENTS') {
+        setActiveNav('PAYMENTS');
+      }
+      if (onboarding === 'success') {
+        triggerToast('Razorpay account connected successfully!');
+      } else if (error) {
+        triggerToast(`Setup alert: ${error}`);
+      }
+    }
+  }, []);
+
+  const fetchPaymentAccount = async () => {
+    setPaymentAccountLoading(true);
+    try {
+      const res = await fetch('/api/vendor/payments/razorpay/status');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPaymentAccount(data.account);
+      }
+    } catch (err) {
+      console.error('Error fetching payment account:', err);
+    } finally {
+      setPaymentAccountLoading(false);
+    }
+  };
+
+  const handleConnectRazorpay = async () => {
+    setConnectingPayment(true);
+    try {
+      const res = await fetch('/api/vendor/payments/razorpay/connect', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to initialize connection');
+      if (data.authorizeUrl) {
+        window.location.href = data.authorizeUrl;
+      }
+    } catch (err: any) {
+      triggerToast(err.message || 'Connection initiation failed');
+      setConnectingPayment(false);
+    }
+  };
+
+  const handleSyncPaymentStatus = async () => {
+    setPaymentAccountSyncing(true);
+    try {
+      const res = await fetch('/api/vendor/payments/razorpay/sync', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+      setPaymentAccount(data.account);
+      triggerToast('Payment account status refreshed from Razorpay');
+    } catch (err: any) {
+      triggerToast(err.message || 'Status sync failed');
+    } finally {
+      setPaymentAccountSyncing(false);
+    }
+  };
+
+  const handleDisconnectPayment = async () => {
+    if (
+      !confirm(
+        'Are you sure you want to disconnect your Razorpay account? Customer online payments will be disabled for your store.'
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/vendor/payments/razorpay/disconnect', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Disconnect failed');
+      triggerToast('Razorpay account disconnected');
+      fetchPaymentAccount();
+    } catch (err: any) {
+      triggerToast(err.message || 'Disconnect failed');
+    }
   };
 
   const safeJson = async (res: Response) => {
@@ -282,6 +371,10 @@ export default function VendorDashboardPage() {
     }
     if (activeNav === 'PROFILE' || activeNav === 'QR_STANDEE') {
       fetchSettings();
+      fetchPaymentAccount();
+    }
+    if (activeNav === 'PAYMENTS') {
+      fetchPaymentAccount();
     }
     if (activeNav === 'PRICING') {
       fetchPricing();
@@ -466,14 +559,14 @@ export default function VendorDashboardPage() {
     <div className="min-h-screen bg-paper flex flex-col md:flex-row text-ink antialiased">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 bg-[#0B132B] text-white px-5 py-3 rounded-20 shadow-2xl flex items-center gap-3 text-xs font-bold animate-in fade-in slide-in-from-top-3 border border-white/20">
+        <div className="fixed top-5 right-5 z-50 bg-ink text-white px-5 py-3 rounded-20 shadow-2xl flex items-center gap-3 text-xs font-bold motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-3 border border-white/20">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Mobile Top Header Bar (Shown only on <md screens) */}
-      <div className="md:hidden bg-[#0B132B] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-white/10">
+      <div className="md:hidden bg-ink text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-md border-b border-white/10">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
@@ -488,7 +581,7 @@ export default function VendorDashboardPage() {
             </div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-300 font-bold uppercase tracking-wider">
+              <span className="text-[10px] font-mono text-emerald-300 font-bold ">
                 Live Station
               </span>
             </div>
@@ -526,7 +619,7 @@ export default function VendorDashboardPage() {
 
       {/* Permanent Collapsible SaaS Command Sidebar: ALWAYS visible on md+ */}
       <aside
-        className={`bg-[#0B132B] text-white flex flex-col justify-between transition-all duration-300 ease-in-out border-r border-white/10 shrink-0 z-50 ${
+        className={`bg-ink text-white flex flex-col justify-between transition-colors duration-300 ease-in-out border-r border-white/10 shrink-0 z-50 ${
           sidebarCollapsed ? 'w-20' : 'w-64 lg:w-72'
         } ${
           mobileDrawerOpen
@@ -547,8 +640,8 @@ export default function VendorDashboardPage() {
                     <div className="font-sora font-extrabold text-base text-white tracking-tight leading-none">
                       Print<span className="text-saffron">2</span>Me
                     </div>
-                    <div className="text-[9px] font-mono text-saffron uppercase font-bold tracking-wider mt-0.5">
-                      Vendor Desk
+                    <div className="text-xs text-saffron font-semibold mt-0.5">
+                      Vendor desk
                     </div>
                   </div>
                 )}
@@ -580,7 +673,7 @@ export default function VendorDashboardPage() {
             {!sidebarCollapsed ? (
               <div className="p-3 rounded-16 bg-white/5 border border-white/10 space-y-1.5 animate-in fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-saffron font-sora">
+                  <span className="text-[10px] font-bold  text-saffron font-sora">
                     Active Partner
                   </span>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-mono font-bold">
@@ -619,7 +712,7 @@ export default function VendorDashboardPage() {
             {navCategories.map((group) => (
               <div key={group.category} className="space-y-1">
                 {!sidebarCollapsed && (
-                  <div className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-sora">
+                  <div className="px-3 text-[10px] font-extrabold  text-slate-400 font-sora">
                     {group.category}
                   </div>
                 )}
@@ -636,7 +729,7 @@ export default function VendorDashboardPage() {
                       title={sidebarCollapsed ? item.label : undefined}
                       className={`w-full flex items-center ${
                         sidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'
-                      } rounded-12 text-xs font-semibold transition-all group ${
+                      } rounded-12 text-xs font-semibold transition-colors group ${
                         isActive
                           ? 'bg-saffron text-white font-bold shadow-md shadow-saffron/25'
                           : 'text-slate-300 hover:bg-white/10 hover:text-white'
@@ -655,7 +748,7 @@ export default function VendorDashboardPage() {
                         <div className="flex items-center gap-1.5">
                           {item.badge && (
                             <span
-                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-pill font-extrabold uppercase tracking-wider ${
+                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-pill font-extrabold  ${
                                 isActive
                                   ? 'bg-white/20 text-white'
                                   : 'bg-saffron/20 text-saffron border border-saffron/30'
@@ -690,7 +783,7 @@ export default function VendorDashboardPage() {
           {!sidebarCollapsed && (
             <div className="p-3 rounded-16 bg-white/5 border border-white/10 flex items-center justify-between">
               <div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                <div className="text-[10px] text-slate-400 font-bold ">
                   Store SaaS Tier
                 </div>
                 <div className="text-xs font-extrabold text-white flex items-center gap-1 mt-0.5 font-sora">
@@ -748,7 +841,7 @@ export default function VendorDashboardPage() {
                   setSearchQuery(e.target.value);
                   if (activeNav !== 'ORDERS') setActiveNav('ORDERS');
                 }}
-                className="w-full pl-10 pr-4 py-2 rounded-full bg-paper border border-hairline text-xs font-medium text-ink placeholder:text-ink-soft/60 focus:outline-hidden focus:border-saffron focus:bg-surface transition-all"
+                className="w-full pl-10 pr-4 py-2 rounded-full bg-paper border border-hairline text-xs font-medium text-ink placeholder:text-ink-soft/60 focus:outline-hidden focus:border-saffron focus:bg-surface transition-colors"
               />
             </div>
           </div>
@@ -757,7 +850,7 @@ export default function VendorDashboardPage() {
             {/* Live Desktop Spooler Status Pill */}
             <div
               onClick={() => setActiveNav('DEVICES')}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-semibold cursor-pointer hover:bg-emerald-500/20 transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 text-xs font-semibold cursor-pointer hover:bg-emerald-500/20 transition-colors"
               title="Desktop Print Spooler Connection"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -768,7 +861,7 @@ export default function VendorDashboardPage() {
             {/* Quick Standee Button */}
             <button
               onClick={() => setShowQrModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors shadow-xs"
             >
               <QrCode className="w-3.5 h-3.5 text-saffron" />
               <span className="hidden md:inline">Standee</span>
@@ -779,7 +872,7 @@ export default function VendorDashboardPage() {
               <Link
                 href={publicQrUrl}
                 target="_blank"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-saffron text-white hover:bg-saffron/90 text-xs font-bold transition-all shadow-xs"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-saffron text-white hover:bg-saffron/90 text-xs font-bold transition-colors shadow-xs"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Test Kiosk</span>
@@ -793,7 +886,7 @@ export default function VendorDashboardPage() {
                 fetchOrders();
                 triggerToast('Refreshed queue & store statistics');
               }}
-              className="p-2 rounded-full bg-paper hover:bg-surface border border-hairline text-ink-soft hover:text-ink transition-all shadow-xs"
+              className="p-2 rounded-full bg-paper hover:bg-surface border border-hairline text-ink-soft hover:text-ink transition-colors shadow-xs"
               title="Refresh Queue & Data"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${ordersLoading ? 'animate-spin text-saffron' : ''}`} />
@@ -801,12 +894,12 @@ export default function VendorDashboardPage() {
 
             {/* Store Profile Avatar */}
             <div className="flex items-center gap-2 pl-2 border-l border-hairline">
-              <div className="w-8 h-8 rounded-full bg-[#0B132B] text-white font-sora font-extrabold text-xs flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-ink text-white font-sora font-extrabold text-xs flex items-center justify-center shadow-sm">
                 {vendor.name.charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:block text-left">
                 <div className="text-xs font-bold text-ink truncate max-w-[120px]">{vendor.name}</div>
-                <div className="text-[10px] text-ink-soft font-mono uppercase">Vendor Partner</div>
+                <div className="text-xs text-ink-soft font-medium">Vendor partner</div>
               </div>
             </div>
           </div>
@@ -818,7 +911,7 @@ export default function VendorDashboardPage() {
           <div className="bg-surface p-6 rounded-[24px] border border-hairline shadow-ink-soft flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-saffron font-mono">
+                <span className="text-[11px] font-bold  text-saffron font-mono">
                   {activeNav.replace(/_/g, ' ')}
                 </span>
                 <span className="text-hairline">•</span>
@@ -837,7 +930,7 @@ export default function VendorDashboardPage() {
                   fetchStats();
                   fetchOrders();
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors shadow-sm"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-ink-soft ${ordersLoading ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
@@ -845,7 +938,7 @@ export default function VendorDashboardPage() {
 
               <button
                 onClick={() => setShowQrModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-paper hover:bg-surface border border-hairline text-xs font-bold text-ink transition-colors shadow-sm"
               >
                 <QrCode className="w-3.5 h-3.5 text-saffron" />
                 <span>Print Standee</span>
@@ -853,7 +946,7 @@ export default function VendorDashboardPage() {
 
               <button
                 onClick={() => setShowSubscriptionModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-xs font-bold transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 text-xs font-bold transition-colors shadow-sm"
               >
                 <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
                 <span>SaaS Subscription</span>
@@ -883,7 +976,7 @@ export default function VendorDashboardPage() {
 
               <div 
                 onClick={() => setActiveNav('QUEUE')}
-                className="bg-surface p-5 rounded-20 border border-hairline shadow-ink-soft space-y-2 cursor-pointer hover:border-ink/30 transition-all"
+                className="bg-surface p-5 rounded-20 border border-hairline shadow-ink-soft space-y-2 cursor-pointer hover:border-ink/30 transition-colors"
               >
                 <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
                   <span>Active Spooler Queue</span>
@@ -902,7 +995,7 @@ export default function VendorDashboardPage() {
                   setActiveNav('ORDERS');
                   setOrderStatusFilter('AWAITING_VENDOR_APPROVAL');
                 }}
-                className="bg-surface p-5 rounded-20 border border-warning/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-warning transition-all relative overflow-hidden"
+                className="bg-surface p-5 rounded-20 border border-warning/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-warning transition-colors relative overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-1 h-full bg-warning" />
                 <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
@@ -922,7 +1015,7 @@ export default function VendorDashboardPage() {
                   setActiveNav('ORDERS');
                   setOrderStatusFilter('CASH_PENDING');
                 }}
-                className="bg-surface p-5 rounded-20 border border-saffron/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-saffron transition-all relative overflow-hidden"
+                className="bg-surface p-5 rounded-20 border border-saffron/30 shadow-ink-soft space-y-2 cursor-pointer hover:border-saffron transition-colors relative overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-1 h-full bg-saffron" />
                 <div className="flex items-center justify-between text-ink-soft text-xs font-semibold">
@@ -939,14 +1032,10 @@ export default function VendorDashboardPage() {
             </div>
 
             {/* Live QR Standee Banner */}
-            <div className="p-6 rounded-[24px] bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-white/10 text-saffron text-[10px] font-bold uppercase tracking-wider border border-white/10">
-                  <QrCode className="w-3.5 h-3.5" />
-                  Live Walk-in Customer Kiosk
-                </div>
+            <div className="p-6 rounded-24 bg-ink text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+              <div className="space-y-1">
                 <h3 className="text-xl sm:text-2xl font-sora font-extrabold text-white">
-                  Your Express Upload URL is Live
+                  Your express upload URL is live
                 </h3>
                 <p className="text-xs text-white/70 max-w-lg font-mono">
                   {publicQrUrl}
@@ -960,7 +1049,7 @@ export default function VendorDashboardPage() {
                     setCopiedQrLink(true);
                     setTimeout(() => setCopiedQrLink(false), 2000);
                   }}
-                  className="px-4 py-2.5 rounded-pill bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-pill bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-colors flex items-center gap-1.5"
                 >
                   <Copy className="w-3.5 h-3.5 text-saffron" />
                   <span>{copiedQrLink ? 'Copied URL!' : 'Copy Link'}</span>
@@ -968,7 +1057,7 @@ export default function VendorDashboardPage() {
 
                 <button
                   onClick={() => setShowQrModal(true)}
-                  className="px-5 py-2.5 rounded-pill bg-saffron hover:bg-saffron/90 text-ink text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-pill bg-saffron hover:bg-saffron/90 text-ink text-xs font-extrabold transition-colors shadow-md flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download Standee</span>
@@ -1002,7 +1091,7 @@ export default function VendorDashboardPage() {
                     <div key={o.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                       <div className="flex items-center gap-3">
                         <span className="font-mono font-bold text-ink text-sm">{o.orderNumber}</span>
-                        <span className="px-2.5 py-0.5 rounded-pill bg-paper border border-hairline font-semibold text-ink-soft text-[10px] uppercase">
+                        <span className="px-2.5 py-0.5 rounded-pill bg-paper border border-hairline font-semibold text-ink-soft text-xs">
                           {o.status.replace(/_/g, ' ')}
                         </span>
                         <span className="text-ink-soft">{o.customerName || 'Customer'}</span>
@@ -1078,7 +1167,7 @@ export default function VendorDashboardPage() {
                       setOrderStatusFilter(tab.id);
                       fetchOrders(tab.id);
                     }}
-                    className={`px-3.5 py-1.5 rounded-pill transition-all whitespace-nowrap border text-xs font-bold ${
+                    className={`px-3.5 py-1.5 rounded-pill transition-colors whitespace-nowrap border text-xs font-bold ${
                       orderStatusFilter === tab.id
                         ? 'bg-ink text-white border-ink shadow-sm'
                         : 'bg-paper text-ink-soft hover:bg-surface border-hairline'
@@ -1112,7 +1201,7 @@ export default function VendorDashboardPage() {
                   return (
                     <div
                       key={order.id}
-                      className="p-6 rounded-[24px] bg-surface border border-hairline shadow-ink-soft hover:shadow-md transition-all space-y-4"
+                      className="p-6 rounded-[24px] bg-surface border border-hairline shadow-ink-soft hover:shadow-md transition-colors space-y-4"
                     >
                       {/* Top Header of Card */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-hairline pb-4">
@@ -1120,7 +1209,7 @@ export default function VendorDashboardPage() {
                           <span className="font-sora font-extrabold text-lg text-ink tracking-tight">
                             {order.orderNumber}
                           </span>
-                          <span className="text-[10px] font-bold px-3 py-1 rounded-pill bg-paper border border-hairline uppercase text-ink">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-pill bg-paper border border-hairline text-ink">
                             {order.status.replace(/_/g, ' ')}
                           </span>
                           <span className="text-xs text-ink-soft font-mono">
@@ -1254,7 +1343,7 @@ export default function VendorDashboardPage() {
         ========================================================================= */}
         {activeNav === 'QUEUE' && (
           <div className="space-y-6 animate-in fade-in duration-150">
-            <div className="p-5 rounded-[22px] bg-gradient-to-r from-blue-950/20 via-indigo-950/10 to-slate-900/10 border border-blue-500/20 flex items-center justify-between">
+            <div className="p-5 rounded-[22px] bg-gradient-to-r bg-surface border border-blue-500/20 flex items-center justify-between">
               <div>
                 <h3 className="font-sora font-extrabold text-lg text-ink">Active Spooler Queue</h3>
                 <p className="text-xs text-ink-soft">
@@ -1440,37 +1529,39 @@ export default function VendorDashboardPage() {
                 </label>
               </div>
 
-              {/* Razorpay Gateway Keys */}
-              <div className="pt-4 border-t border-hairline space-y-4">
+              {/* Razorpay Partner Onboarding Callout */}
+              <div className="pt-4 border-t border-hairline space-y-3">
                 <div>
-                  <h4 className="text-sm font-bold text-ink">Vendor-Owned Razorpay Account (Direct Bank Settlement)</h4>
+                  <h4 className="text-sm font-bold text-ink">Razorpay Partner Payment Account (Direct Bank Settlement)</h4>
                   <p className="text-xs text-ink-soft">
-                    Optional: Connect your own Razorpay API keys so customer payments deposit directly into your bank account.
+                    Customer payments settle directly into your verified bank account with 0% platform commission.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-ink">Razorpay Key ID</label>
-                    <input
-                      type="text"
-                      placeholder="rzp_live_... or rzp_test_..."
-                      value={settings.razorpayKeyId || ''}
-                      onChange={(e) => setSettings({ ...settings, razorpayKeyId: e.target.value })}
-                      className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink font-mono focus:outline-none focus:border-saffron"
-                    />
+                <div className="p-4 rounded-16 bg-paper border border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <CreditCard className="w-5 h-5 text-saffron shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-ink">
+                        {paymentAccount?.authStatus === 'AUTHORIZED'
+                          ? `Connected Account: ${paymentAccount.razorpayAccountId}`
+                          : 'No Razorpay Account Connected'}
+                      </div>
+                      <div className="text-[11px] text-ink-soft">
+                        {paymentAccount?.authStatus === 'AUTHORIZED'
+                          ? `Status: ${paymentAccount.activationStatus || 'Active'}`
+                          : 'Connect your account securely via Razorpay OAuth in the Payments section.'}
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-ink">Razorpay Key Secret</label>
-                    <input
-                      type="password"
-                      placeholder={settings.razorpayKeySecretMasked ? `Saved: ${settings.razorpayKeySecretMasked}` : 'Enter Key Secret'}
-                      value={settings.razorpayKeySecret || ''}
-                      onChange={(e) => setSettings({ ...settings, razorpayKeySecret: e.target.value })}
-                      className="w-full bg-paper border border-hairline rounded-14 px-4 py-2.5 text-xs text-ink font-mono focus:outline-none focus:border-saffron"
-                    />
-                  </div>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setActiveNav('PAYMENTS')}
+                    className="text-xs font-bold shrink-0 h-9 px-4"
+                  >
+                    Open Payments Setup
+                  </Button>
                 </div>
               </div>
 
@@ -1490,14 +1581,11 @@ export default function VendorDashboardPage() {
           <div className="space-y-6 animate-in fade-in duration-150">
             <div className="bg-surface p-8 rounded-[28px] border border-hairline shadow-ink-soft text-center space-y-6 max-w-2xl mx-auto">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-saffron font-mono">
-                  Express Kiosk Standee
-                </span>
-                <h3 className="text-2xl font-sora font-extrabold text-ink mt-1">
-                  Place this QR Code at Your Counter
+                <h3 className="text-2xl font-sora font-extrabold text-ink">
+                  Place this QR code at your counter
                 </h3>
                 <p className="text-xs text-ink-soft max-w-md mx-auto mt-1">
-                  Customers scan with Google Lens, Paytm, PhonePe, or Camera to upload documents in seconds.
+                  Customers scan with Google Lens, Paytm, PhonePe, or camera to upload documents in seconds.
                 </p>
               </div>
 
@@ -1650,22 +1738,69 @@ export default function VendorDashboardPage() {
         ========================================================================= */}
         {activeNav === 'PAYMENTS' && (
           <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Header & Description */}
+            <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-sora font-extrabold text-ink">
+                    Razorpay payment setup &amp; bank settlement
+                  </h3>
+                  <p className="text-xs text-ink-soft max-w-2xl mt-1">
+                    Connect your own approved Razorpay account so 100% of customer printing revenue settles directly
+                    into your bank account. Print2Me operates on a subscription model and{' '}
+                    <strong className="text-ink">never charges commission on printing orders</strong>.
+                  </p>
+                </div>
+
+                {vendor.slug && (
+                  <Link
+                    href={`/shop/${vendor.slug}`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-paper border border-hairline rounded-12 text-xs font-bold text-ink hover:border-saffron transition shrink-0"
+                  >
+                    <span>View Public Shop Page</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-saffron" />
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Overview Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
                 <span className="text-xs text-ink-soft font-semibold">Total Revenue</span>
                 <div className="font-sora text-3xl font-black text-ink">
                   ₹{formatMinorToInr(stats.totalRevenueMinor)}
                 </div>
-                <span className="text-[11px] text-ink-soft">Lifetime store volume</span>
+                <span className="text-[11px] text-ink-soft">Lifetime printing volume</span>
               </div>
 
               <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
-                <span className="text-xs text-ink-soft font-semibold">Settlement Mechanism</span>
-                <div className="font-sora text-lg font-extrabold text-ink">
-                  {settings.razorpayKeyId ? 'Direct to Your Bank' : 'Platform Escrow'}
+                <span className="text-xs text-ink-soft font-semibold">Settlement Routing</span>
+                <div className="font-sora text-lg font-extrabold text-ink flex items-center gap-2">
+                  {paymentAccount?.authStatus === 'AUTHORIZED' ? (
+                    paymentAccount?.activationStatus === 'ACTIVATED' ? (
+                      <span className="text-success flex items-center gap-1.5">
+                        <CheckCircle2 className="w-5 h-5 text-success" />
+                        Direct to Vendor Bank
+                      </span>
+                    ) : (
+                      <span className="text-amber-500 flex items-center gap-1.5">
+                        <Clock className="w-5 h-5 text-amber-500" />
+                        Under Verification
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-ink-soft flex items-center gap-1.5">
+                      <AlertTriangle className="w-5 h-5 text-ink-soft" />
+                      Not Connected
+                    </span>
+                  )}
                 </div>
                 <span className="text-[11px] text-ink-soft font-mono">
-                  {settings.razorpayKeyId ? 'Merchant Gateway Active' : 'print2me.in UPI Hub'}
+                  {paymentAccount?.razorpayAccountId
+                    ? `Account: ${paymentAccount.razorpayAccountId}`
+                    : 'Online payments disabled'}
                 </span>
               </div>
 
@@ -1674,7 +1809,197 @@ export default function VendorDashboardPage() {
                 <div className="font-sora text-3xl font-black text-saffron">
                   {stats.cashPending} Orders
                 </div>
-                <span className="text-[11px] text-ink-soft">Collect before customer leaves</span>
+                <span className="text-[11px] text-ink-soft">Collect before customer leaves shop</span>
+              </div>
+            </div>
+
+            {/* Razorpay Partner Integration Card */}
+            <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-hairline">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-16 bg-indigo-500/10 flex items-center justify-center text-indigo-600 font-bold">
+                    <CreditCard className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-sora font-extrabold text-ink">
+                      Razorpay Technology Partner Onboarding
+                    </h4>
+                    <p className="text-xs text-ink-soft">
+                      Application: <strong className="text-ink">Print2me</strong> • RBI Authorized Payment Aggregator Partner
+                    </p>
+                  </div>
+                </div>
+
+                {/* Connection Status Badge */}
+                <div>
+                  {paymentAccountLoading ? (
+                    <span className="text-xs text-ink-soft animate-pulse">Loading status...</span>
+                  ) : paymentAccount?.authStatus === 'AUTHORIZED' ? (
+                    paymentAccount.activationStatus === 'ACTIVATED' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-success/10 text-success border border-success/20">
+                        <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                        Active & Verified
+                      </span>
+                    ) : paymentAccount.activationStatus === 'UNDER_REVIEW' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        Pending Verification
+                      </span>
+                    ) : paymentAccount.activationStatus === 'SUSPENDED' || paymentAccount.activationStatus === 'REJECTED' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-danger/10 text-danger border border-danger/20">
+                        <span className="w-2 h-2 rounded-full bg-danger" />
+                        Restricted ({paymentAccount.activationStatus})
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-600 border border-indigo-500/20">
+                        Authorized ({paymentAccount.activationStatus || 'In Progress'})
+                      </span>
+                    )
+                  ) : paymentAccount?.authStatus === 'DISCONNECTED' ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20">
+                      Disconnected
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-paper text-ink-soft border border-hairline">
+                      Not Connected
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Information Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-16 bg-paper border border-hairline space-y-1">
+                  <span className="text-[10px] font-bold text-ink-soft ">
+                    Merchant Account ID
+                  </span>
+                  <div className="text-xs font-bold text-ink font-mono truncate">
+                    {paymentAccount?.razorpayAccountId || '—'}
+                  </div>
+                  <span className="text-[10px] text-ink-soft">Assigned by Razorpay</span>
+                </div>
+
+                <div className="p-4 rounded-16 bg-paper border border-hairline space-y-1">
+                  <span className="text-[10px] font-bold text-ink-soft ">
+                    Onboarding State
+                  </span>
+                  <div className="text-xs font-bold text-ink">
+                    {paymentAccount?.onboardingStatus || 'NOT_STARTED'}
+                  </div>
+                  <span className="text-[10px] text-ink-soft">OAuth Authorization</span>
+                </div>
+
+                <div className="p-4 rounded-16 bg-paper border border-hairline space-y-1">
+                  <span className="text-[10px] font-bold text-ink-soft ">
+                    Activation Status
+                  </span>
+                  <div className="text-xs font-bold text-ink">
+                    {paymentAccount?.activationStatus || 'NOT_ACTIVATED'}
+                  </div>
+                  <span className="text-[10px] text-ink-soft">KYC & Bank Verification</span>
+                </div>
+
+                <div className="p-4 rounded-16 bg-paper border border-hairline space-y-1">
+                  <span className="text-[10px] font-bold text-ink-soft ">
+                    Last Synchronized
+                  </span>
+                  <div className="text-xs font-bold text-ink">
+                    {paymentAccount?.lastSyncedAt
+                      ? new Date(paymentAccount.lastSyncedAt).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'Never'}
+                  </div>
+                  <span className="text-[10px] text-ink-soft">Authoritative provider sync</span>
+                </div>
+              </div>
+
+              {/* Alert / Guidance Box */}
+              {paymentAccount?.lastError && (
+                <div className="p-4 rounded-16 bg-danger/10 border border-danger/20 text-xs text-danger flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block font-bold">Status Notification:</strong>
+                    <span>{paymentAccount.lastError}</span>
+                  </div>
+                </div>
+              )}
+
+              {paymentAccount?.requirements && (
+                <div className="p-4 rounded-16 bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 flex items-start gap-2.5">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                  <div>
+                    <strong className="block font-bold">Pending Actions from Razorpay:</strong>
+                    <pre className="text-[11px] mt-1 font-mono whitespace-pre-wrap">
+                      {typeof paymentAccount.requirements === 'string'
+                        ? paymentAccount.requirements
+                        : JSON.stringify(paymentAccount.requirements, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  {(!paymentAccount || paymentAccount.authStatus !== 'AUTHORIZED') ? (
+                    <Button
+                      variant="primary"
+                      type="button"
+                      disabled={connectingPayment}
+                      onClick={handleConnectRazorpay}
+                      className="h-11 px-6 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>{connectingPayment ? 'Initiating Razorpay...' : 'Connect Razorpay Account'}</span>
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        disabled={paymentAccountSyncing}
+                        onClick={handleSyncPaymentStatus}
+                        className="h-10 px-4 font-bold text-xs flex items-center gap-1.5"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${paymentAccountSyncing ? 'animate-spin' : ''}`} />
+                        <span>{paymentAccountSyncing ? 'Synchronizing...' : 'Re-sync Status from Razorpay'}</span>
+                      </Button>
+
+                      <button
+                        type="button"
+                        onClick={handleDisconnectPayment}
+                        className="h-10 px-4 rounded-12 text-xs font-semibold text-danger hover:bg-danger/10 border border-danger/20 transition"
+                      >
+                        Disconnect Account
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="text-[11px] text-ink-soft">
+                  Secure OAuth 2.0 flow • Razorpay hosted onboarding
+                </div>
+              </div>
+
+              {/* Security & Zero Commission Policy Callout */}
+              <div className="p-5 rounded-20 bg-paper border border-hairline space-y-2 text-xs text-ink-soft leading-relaxed">
+                <div className="flex items-center gap-2 text-ink font-bold">
+                  <ShieldCheck className="w-4 h-4 text-success" />
+                  <span>Transparent Fee Disclosure & Print2Me Zero-Commission Guarantee</span>
+                </div>
+                <p>
+                  Print2Me never takes a commission or percentage cut from your printing orders. Customer payments settle
+                  directly into your connected bank account according to Razorpay&apos;s standard settlement cycle (T+2
+                  business days). Standard gateway processing fees charged by Razorpay apply as per your direct merchant agreement.
+                </p>
+                <p className="text-[11px]">
+                  <strong>Security Note:</strong> Print2Me never asks you to enter or paste your Razorpay API secret keys.
+                  All authorization occurs securely on Razorpay&apos;s hosted consent screen.
+                </p>
               </div>
             </div>
           </div>
@@ -1705,7 +2030,7 @@ export default function VendorDashboardPage() {
 
               {/* Enrollment Code Box */}
               <div className="p-6 rounded-[22px] bg-paper border border-hairline shadow-inner max-w-md space-y-3">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                <span className="text-[10px] font-extrabold  text-ink-soft">
                   One-Time Workstation Pair Code
                 </span>
                 <div className="flex items-center justify-between bg-surface border border-hairline rounded-14 px-4 py-3">
@@ -1765,10 +2090,10 @@ export default function VendorDashboardPage() {
         ========================================================================= */}
         {activeNav === 'SUBSCRIPTION' && (
           <div className="space-y-6 animate-in fade-in duration-150">
-            <div className="p-6 rounded-[24px] bg-gradient-to-r from-blue-950/30 to-indigo-950/20 border border-blue-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-6 rounded-[24px] bg-gradient-to-r bg-surface border border-blue-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-400">Current Plan Status</span>
+                  <span className="text-xs font-bold  text-blue-400">Current Plan Status</span>
                   <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${vendor.isSubscriptionActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
                     ● {vendor.isSubscriptionActive ? 'ACTIVE' : 'EXPIRED'}
                   </span>
@@ -1780,13 +2105,13 @@ export default function VendorDashboardPage() {
                     : 'Free Store Trial'}
                 </h3>
                 <p className="text-xs text-ink-soft mt-1">
-                  ⚡ Hero Feature: Zero-Touch Auto-Printing Active across counter workstations.
+                  Hero Feature: Zero-Touch Auto-Printing Active across counter workstations.
                 </p>
               </div>
 
               <button
                 onClick={() => setShowSubscriptionModal(true)}
-                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-sora font-extrabold text-xs transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
+                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-sora font-extrabold text-xs transition-colors shadow-lg shadow-blue-500/25 flex items-center gap-2"
               >
                 <CreditCard className="w-4 h-4" />
                 Open Plan Checkout &amp; Pay
@@ -1797,7 +2122,7 @@ export default function VendorDashboardPage() {
         </main>
 
         {/* Mobile Sticky Bottom Quick-Nav Bar (< md) */}
-        <div className="md:hidden sticky bottom-0 z-40 bg-[#0B132B] text-white border-t border-white/10 px-2 py-2 flex items-center justify-around shadow-2xl">
+        <div className="md:hidden sticky bottom-0 z-40 bg-ink text-white border-t border-white/10 px-2 py-2 flex items-center justify-around shadow-2xl">
           <button
             onClick={() => setActiveNav('OVERVIEW')}
             className={`flex flex-col items-center gap-1 p-1.5 rounded-8 text-[10px] font-semibold transition-colors ${

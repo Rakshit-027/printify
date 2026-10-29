@@ -1,163 +1,42 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
-import { RegisterVendorInputSchema, UserRole, PaperSize, PrintColor } from '@printflow/shared-types';
-import { prisma } from '@/lib/prisma';
-import { hashPassword, createSessionToken, setSessionCookie, logAuditEvent } from '@/lib/auth';
+
+const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8080';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const parseResult = RegisterVendorInputSchema.safeParse(body);
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: parseResult.error.flatten().fieldErrors },
-        { status: 400 }
-      );
-    }
-
-    const { email, password, fullName, vendorName, vendorSlug, contactPhone, address } = parseResult.data;
-
-    // Check duplicate email
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-    if (existingUser) {
-      return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
-    }
-
-    // Check duplicate slug
-    const normalizedSlug = vendorSlug.toLowerCase().trim();
-    const existingVendor = await prisma.vendor.findUnique({
-      where: { slug: normalizedSlug },
-    });
-    if (existingVendor) {
-      return NextResponse.json({ error: 'This business slug/URL handle is already in use' }, { status: 409 });
-    }
-
-    const passwordHash = await hashPassword(password);
-
-    // Atomically create User, Vendor, Membership, and Default Pricing in transaction
-    // 1. Create User
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        passwordHash,
-        fullName,
-        phoneNumber: contactPhone,
-        role: UserRole.VENDOR_OWNER,
-        isActive: true,
-      },
-    });
-
-    // 2. Create Vendor with relations
-    const vendor = await prisma.vendor.create({
-      data: {
-        name: vendorName,
-        slug: normalizedSlug,
-        contactPhone,
-        contactEmail: email.toLowerCase(),
-        address,
-        isActive: true,
-        isApproved: true,
-        allowCashOnDesk: true,
-        requireApproval: false,
-        retentionDays: 30,
-        memberships: {
-          create: {
-            userId: user.id,
-            role: UserRole.VENDOR_OWNER,
-          },
-        },
-        qrConfig: {
-          create: {
-            customColor: '#0f172a',
-            instructions: 'Scan to upload documents and print instantly.',
-          },
-        },
-      },
-    });
-
-    // 3. Default baseline pricing (Paise units)
-    await prisma.vendorPricing.createMany({
-      data: [
-        {
-          vendorId: vendor.id,
-          paperSize: PaperSize.A4,
-          colorMode: PrintColor.BLACK_AND_WHITE,
-          isDuplex: false,
-          pricePerSideMinor: 200, // ₹2.00
-          sheetChargeMinor: 0,
-          minimumOrderMinor: 500,
-        },
-        {
-          vendorId: vendor.id,
-          paperSize: PaperSize.A4,
-          colorMode: PrintColor.BLACK_AND_WHITE,
-          isDuplex: true,
-          pricePerSideMinor: 175, // ₹3.50 duplex sheet
-          sheetChargeMinor: 0,
-          minimumOrderMinor: 500,
-        },
-        {
-          vendorId: vendor.id,
-          paperSize: PaperSize.A4,
-          colorMode: PrintColor.COLOR,
-          isDuplex: false,
-          pricePerSideMinor: 1000, // ₹10.00
-          sheetChargeMinor: 0,
-          minimumOrderMinor: 500,
-        },
-      ],
-    });
-
-    const result = { user, vendor };
-
-    const sessionPayload = {
-      userId: result.user.id,
-      email: result.user.email,
-      fullName: result.user.fullName,
-      role: result.user.role,
-      vendorId: result.vendor.id,
+    const body = await request.text();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     };
 
-    const token = await createSessionToken(sessionPayload);
+    const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
+    if (clientIp) headers['x-forwarded-for'] = clientIp;
 
-    // Audit Log
-    const ipAddress = request.headers.get('x-forwarded-for') || '127.0.0.1';
-    const userAgent = request.headers.get('user-agent') || 'Unknown';
-    await logAuditEvent({
-      userId: result.user.id,
-      action: 'VENDOR_REGISTRATION_SUCCESS',
-      resource: 'Vendor',
-      resourceId: result.vendor.id,
-      ipAddress,
-      userAgent,
-      details: { slug: result.vendor.slug, businessName: result.vendor.name },
+    const userAgent = request.headers.get('user-agent');
+    if (userAgent) headers['user-agent'] = userAgent;
+
+    const res = await fetch(`${RUST_BACKEND_URL}/api/auth/register-vendor`, {
+      method: 'POST',
+      headers,
+      body,
     });
 
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        fullName: result.user.fullName,
-        role: result.user.role,
-      },
-      vendor: {
-        id: result.vendor.id,
-        name: result.vendor.name,
-        slug: result.vendor.slug,
-      },
-    });
+    const data = await res.json().catch(() => ({}));
+    const response = NextResponse.json(data, { status: res.status });
 
-    setSessionCookie(response, token);
+    // Forward Set-Cookie header (JWT session) from Rust backend
+    const setCookie = res.headers.get('set-cookie');
+    if (setCookie) {
+      response.headers.set('set-cookie', setCookie);
+    }
+
     return response;
   } catch (error: any) {
-    console.error('Registration error:', error);
+    console.error('Registration proxy error:', error);
     return NextResponse.json(
-      { error: 'Failed to complete vendor registration' },
-      { status: 500 }
+      { error: error.message || 'Failed to connect to backend server' },
+      { status: 502 }
     );
   }
 }

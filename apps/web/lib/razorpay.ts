@@ -95,8 +95,14 @@ export function verifyRazorpaySignature(params: {
   const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = params;
   const secret = params.secret || KEY_SECRET;
 
+  const isProd = process.env.NODE_ENV === 'production';
+  const allowMock = !isProd && (process.env.ALLOW_MOCK_PAYMENTS === 'true' || !isRazorpayConfigured());
+
   if (razorpayOrderId.startsWith('order_mock_')) {
-    // In mock simulation mode, verify simulation signatures
+    if (!allowMock) {
+      return false;
+    }
+    // In development mock simulation mode, verify simulation signatures
     return (
       Boolean(razorpayPaymentId) &&
       (razorpaySignature === 'simulated_signature' || razorpaySignature.length >= 10)

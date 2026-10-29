@@ -8,8 +8,14 @@ import { BrandLogo } from '@/components/BrandLogo';
 export function GlobalFooter() {
   const pathname = usePathname();
 
-  // Suppress footer on kiosk and full-screen dashboards (/v/, /vendor, /admin)
-  if (pathname?.startsWith('/v/') || pathname?.startsWith('/vendor') || pathname?.startsWith('/admin')) {
+  // Suppress footer on kiosk, auth, and full-screen dashboards
+  if (
+    pathname?.startsWith('/v/') ||
+    pathname?.startsWith('/vendor') ||
+    pathname?.startsWith('/admin') ||
+    pathname === '/login' ||
+    pathname === '/register'
+  ) {
     return null;
   }
 
@@ -85,7 +91,7 @@ export function GlobalFooter() {
 
         <div className="pt-8 border-t border-hairline flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-ink-soft">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <span>© {new Date().getFullYear()} Print2Me (print2me.in). All rights reserved.</span>
+            <span suppressHydrationWarning>© {new Date().getFullYear()} Print2Me (print2me.in). All rights reserved.</span>
             <Link href="/privacy" className="hover:text-ink transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-ink transition-colors">Terms of Service</Link>
             <Link href="/refund" className="hover:text-ink transition-colors">Refund Policy</Link>

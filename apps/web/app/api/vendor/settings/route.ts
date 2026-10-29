@@ -23,12 +23,20 @@ export async function GET(request: NextRequest) {
         allowCashOnDesk: true,
         allowOnlinePayment: true,
         requireApproval: true,
-        razorpayKeyId: true,
-        razorpayKeySecret: true,
         upiId: true,
         subscriptionPlan: true,
         subscriptionExpiresAt: true,
         isSubscriptionActive: true,
+        paymentAccount: {
+          select: {
+            id: true,
+            razorpayAccountId: true,
+            authStatus: true,
+            onboardingStatus: true,
+            activationStatus: true,
+            lastSyncedAt: true,
+          },
+        },
       },
     });
 
@@ -36,15 +44,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Vendor profile not found' }, { status: 404 });
     }
 
+    const hasConnectedRazorpay =
+      vendor.paymentAccount?.authStatus === 'AUTHORIZED' &&
+      vendor.paymentAccount?.activationStatus === 'ACTIVATED';
+
     return NextResponse.json({
       success: true,
       settings: {
         ...vendor,
-        // Mask secret for UI security
-        razorpayKeySecretMasked: vendor.razorpayKeySecret
-          ? `••••••••${vendor.razorpayKeySecret.slice(-4)}`
-          : '',
-        hasConfiguredRazorpay: Boolean(vendor.razorpayKeyId && vendor.razorpayKeySecret),
+        hasConfiguredRazorpay: Boolean(hasConnectedRazorpay),
+        paymentAccount: vendor.paymentAccount,
       },
     });
   } catch (error: any) {
@@ -68,8 +77,6 @@ export async function PUT(request: NextRequest) {
       operatingHours,
       allowCashOnDesk,
       allowOnlinePayment,
-      razorpayKeyId,
-      razorpayKeySecret,
       upiId,
     } = body;
 
@@ -82,30 +89,32 @@ export async function PUT(request: NextRequest) {
     if (allowOnlinePayment !== undefined) updateData.allowOnlinePayment = Boolean(allowOnlinePayment);
     if (upiId !== undefined) updateData.upiId = upiId.trim() || null;
 
-    if (razorpayKeyId !== undefined) {
-      updateData.razorpayKeyId = razorpayKeyId.trim() || null;
-    }
-    // Only update secret if non-empty string provided
-    if (razorpayKeySecret && razorpayKeySecret.trim() && !razorpayKeySecret.includes('••••')) {
-      updateData.razorpayKeySecret = razorpayKeySecret.trim();
-    }
-
     const updatedVendor = await prisma.vendor.update({
       where: { id: session.vendorId },
       data: updateData,
+      include: {
+        paymentAccount: {
+          select: {
+            id: true,
+            razorpayAccountId: true,
+            authStatus: true,
+            activationStatus: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Store and payment settings updated successfully',
+      message: 'Store profile settings updated successfully',
       vendor: {
         id: updatedVendor.id,
         name: updatedVendor.name,
         slug: updatedVendor.slug,
-        razorpayKeyId: updatedVendor.razorpayKeyId,
         upiId: updatedVendor.upiId,
         allowOnlinePayment: updatedVendor.allowOnlinePayment,
         allowCashOnDesk: updatedVendor.allowCashOnDesk,
+        paymentAccount: updatedVendor.paymentAccount,
       },
     });
   } catch (error: any) {

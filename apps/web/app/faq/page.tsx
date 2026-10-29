@@ -1,7 +1,8 @@
+// hallmark:v1 theme=sticker shape=workbench density=balanced
 'use client';
 
 import Link from 'next/link';
-import { HelpCircle, Mail, ArrowRight } from 'lucide-react';
+import { Mail, ArrowRight } from 'lucide-react';
 import { Accordion, Button } from '@/components/primitives';
 import { JsonLd } from '@/components/JsonLd';
 
@@ -115,29 +116,25 @@ export default function FaqPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper pb-24">
+    <div className="min-h-screen bg-paper pb-24 text-ink">
       <JsonLd data={[breadcrumbsSchema, faqSchema]} />
 
       {/* Hero */}
-      <section className="px-6 pt-16 pb-14 md:pt-24 md:pb-20 max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill bg-saffron-tint text-saffron text-xs font-bold uppercase tracking-wider mb-6">
-          <HelpCircle className="w-3.5 h-3.5" />
-          <span>Help &amp; Answers</span>
-        </div>
-        <h1 className="font-sora text-4xl sm:text-5xl lg:text-6xl font-extrabold text-ink tracking-tight mb-6">
-          Frequently Asked Questions
+      <section className="px-6 pt-16 pb-12 md:pt-20 md:pb-16 max-w-4xl mx-auto text-center">
+        <h1 className="font-sora text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">
+          Frequently asked questions
         </h1>
-        <p className="text-ink-soft text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
-          Everything you need to know about using Print2Me for fast, private, and convenient document printing.
+        <p className="text-ink-soft text-base sm:text-lg max-w-xl mx-auto leading-relaxed mb-4">
+          Answers on file security, printer spooling, pickup tokens, and payment.
         </p>
       </section>
 
       {/* Categorized FAQs */}
-      <section className="px-6 max-w-4xl mx-auto mb-24 space-y-12">
+      <section className="px-6 max-w-3xl mx-auto mb-20 space-y-10">
         {faqItems.map((section, idx) => (
-          <div key={idx} className="space-y-4">
-            <h2 className="font-sora text-xl font-bold text-ink pl-1 border-l-4 border-saffron">
-              &nbsp;{section.category}
+          <div key={idx} className="space-y-3">
+            <h2 className="font-sora text-lg font-bold text-ink pl-2 border-l-2 border-saffron">
+              {section.category}
             </h2>
             <Accordion items={section.items} />
           </div>
@@ -146,21 +143,24 @@ export default function FaqPage() {
 
       {/* Still Have Questions Box */}
       <section className="px-6 max-w-3xl mx-auto text-center">
-        <div className="bg-surface rounded-[28px] p-8 md:p-12 border border-hairline shadow-ink-soft space-y-5">
-          <div className="w-12 h-12 rounded-full bg-saffron-tint text-saffron flex items-center justify-center mx-auto">
-            <Mail className="w-6 h-6" />
+        <div className="bg-surface rounded-24 p-6 sm:p-8 border border-hairline shadow-ink-soft space-y-4">
+          <div className="w-10 h-10 rounded-full bg-saffron-tint text-saffron flex items-center justify-center mx-auto">
+            <Mail className="w-5 h-5" />
           </div>
-          <h2 className="font-sora text-2xl font-bold text-ink">
+          <h2 className="font-sora text-xl font-bold text-ink">
             Still have questions?
           </h2>
-          <p className="text-ink-soft text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-            Can&apos;t find what you&apos;re looking for? Reach our support team anytime. We typically respond within 2 to 4 hours.
+          <p className="text-ink-soft text-sm max-w-md mx-auto leading-relaxed">
+            Reach our support team anytime. We respond within 2 to 4 business hours.
           </p>
-          <div className="pt-2">
-            <a href="mailto:support@print2me.in">
-              <Button variant="primary" className="h-12 px-6 gap-2">
+          <div className="pt-1">
+            <a
+              href="mailto:support@print2me.in"
+              className="inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 rounded-pill active:scale-[0.99] transition-transform motion-reduce:transform-none"
+            >
+              <Button variant="primary" className="h-11 px-6 text-xs gap-1.5">
                 <span>Email support@print2me.in</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </a>
           </div>

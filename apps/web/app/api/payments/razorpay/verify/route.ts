@@ -14,13 +14,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required payment verification parameters' }, { status: 400 });
     }
 
-    // 1. Fetch Order and Associated Vendor Secrets
+    // 1. Fetch Order and Associated Vendor details
     let order: any = null;
     try {
       order = await prisma.order.findUnique({
         where: { trackingToken },
         include: {
-          vendor: { select: { name: true, slug: true, razorpayKeySecret: true } },
+          vendor: { select: { name: true, slug: true } },
           payments: true,
         },
       });
@@ -28,12 +28,11 @@ export async function POST(request: NextRequest) {
       order = null;
     }
 
-    // 2. Authoritative Signature Verification (using vendor's secret if configured)
+    // 2. Authoritative Signature Verification
     const isValid = verifyRazorpaySignature({
       razorpayOrderId,
       razorpayPaymentId,
       razorpaySignature,
-      secret: order?.vendor?.razorpayKeySecret || undefined,
     });
 
     if (!isValid) {
