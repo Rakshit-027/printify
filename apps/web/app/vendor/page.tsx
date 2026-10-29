@@ -143,13 +143,16 @@ export default function VendorDashboardPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const nav = params.get('nav');
+      const tab = params.get('tab');
       const onboarding = params.get('onboarding');
-      const error = params.get('error');
-      if (nav === 'PAYMENTS') {
+      const payment = params.get('payment');
+      const error = params.get('error') || params.get('message');
+      if (nav === 'PAYMENTS' || payment === 'connected' || tab === 'settings') {
         setActiveNav('PAYMENTS');
       }
-      if (onboarding === 'success') {
+      if (onboarding === 'success' || payment === 'connected') {
         triggerToast('Razorpay account connected successfully!');
+        fetchPaymentAccount();
       } else if (error) {
         triggerToast(`Setup alert: ${error}`);
       }
@@ -1778,7 +1781,7 @@ export default function VendorDashboardPage() {
               <div className="bg-surface p-6 rounded-20 border border-hairline shadow-ink-soft space-y-2">
                 <span className="text-xs text-ink-soft font-semibold">Settlement Routing</span>
                 <div className="font-sora text-lg font-extrabold text-ink flex items-center gap-2">
-                  {paymentAccount?.authStatus === 'AUTHORIZED' ? (
+                  {(paymentAccount?.authStatus === 'AUTHORIZED' || paymentAccount?.authStatus === 'CONNECTED') ? (
                     paymentAccount?.activationStatus === 'ACTIVATED' ? (
                       <span className="text-success flex items-center gap-1.5">
                         <CheckCircle2 className="w-5 h-5 text-success" />
@@ -1834,7 +1837,7 @@ export default function VendorDashboardPage() {
                 <div>
                   {paymentAccountLoading ? (
                     <span className="text-xs text-ink-soft animate-pulse">Loading status...</span>
-                  ) : paymentAccount?.authStatus === 'AUTHORIZED' ? (
+                  ) : (paymentAccount?.authStatus === 'AUTHORIZED' || paymentAccount?.authStatus === 'CONNECTED') ? (
                     paymentAccount.activationStatus === 'ACTIVATED' ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-success/10 text-success border border-success/20">
                         <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
@@ -1945,7 +1948,7 @@ export default function VendorDashboardPage() {
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                 <div className="flex flex-wrap items-center gap-3">
-                  {(!paymentAccount || paymentAccount.authStatus !== 'AUTHORIZED') ? (
+                  {(!paymentAccount || (paymentAccount.authStatus !== 'AUTHORIZED' && paymentAccount.authStatus !== 'CONNECTED')) ? (
                     <Button
                       variant="primary"
                       type="button"
