@@ -88,6 +88,24 @@ export default function PayTokenPage() {
           email: true,
           name: true,
         },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay using UPI / QR',
+                instruments: [
+                  {
+                    method: 'upi',
+                  },
+                ],
+              },
+            },
+            sequence: ['block.upi'],
+            preferences: {
+              show_default_blocks: false,
+            },
+          },
+        },
         theme: {
           color: '#FF8A1F',
         },
