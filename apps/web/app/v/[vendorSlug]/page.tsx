@@ -1716,39 +1716,25 @@ export default function VendorPublicOrderPage() {
             email: true,
             name: true,
           },
+          method: {
+            netbanking: false,
+            card: false,
+            wallet: false,
+            upi: true,
+            paylater: false,
+            emi: false,
+          },
           config: {
             display: {
-              blocks: {
-                upi: {
-                  name: 'Pay using UPI / QR',
-                  instruments: [
-                    {
-                      method: 'upi',
-                      flows: ['intent'],
-                      apps: ['google_pay', 'com.google.android.apps.nbu.paisa.user'],
-                    },
-                    {
-                      method: 'upi',
-                      flows: ['intent'],
-                      apps: ['phonepe', 'com.phonepe.app'],
-                    },
-                    {
-                      method: 'upi',
-                      flows: ['paytm', 'net.one97.paytm'],
-                    },
-                    {
-                      method: 'upi',
-                      flows: ['qr'],
-                    },
-                    {
-                      method: 'upi',
-                    },
-                  ],
-                },
-              },
-              sequence: ['block.upi'],
+              hide: [
+                { method: 'card' },
+                { method: 'netbanking' },
+                { method: 'wallet' },
+                { method: 'emi' },
+                { method: 'paylater' },
+              ],
               preferences: {
-                show_default_blocks: false,
+                show_default_blocks: true,
               },
             },
           },
