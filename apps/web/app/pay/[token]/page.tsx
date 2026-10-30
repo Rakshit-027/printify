@@ -82,6 +82,7 @@ export default function PayTokenPage() {
           name: paymentData.customerName || 'Customer',
           email: paymentData.customerEmail || 'orders@print2me.in',
           contact: paymentData.customerPhone || '+919999999999',
+          method: 'upi',
         },
         readonly: {
           contact: true,
@@ -94,6 +95,24 @@ export default function PayTokenPage() {
               upi: {
                 name: 'Pay using UPI / QR',
                 instruments: [
+                  {
+                    method: 'upi',
+                    flows: ['intent'],
+                    apps: ['google_pay', 'com.google.android.apps.nbu.paisa.user'],
+                  },
+                  {
+                    method: 'upi',
+                    flows: ['intent'],
+                    apps: ['phonepe', 'com.phonepe.app'],
+                  },
+                  {
+                    method: 'upi',
+                    flows: ['paytm', 'net.one97.paytm'],
+                  },
+                  {
+                    method: 'upi',
+                    flows: ['qr'],
+                  },
                   {
                     method: 'upi',
                   },

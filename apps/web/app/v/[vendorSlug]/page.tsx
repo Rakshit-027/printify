@@ -1709,6 +1709,7 @@ export default function VendorPublicOrderPage() {
             name: customerName.trim() || 'Print Customer',
             email: 'orders@print2me.in',
             contact: customerPhone.trim() || vendor?.contactPhone || '+919999999999',
+            method: 'upi',
           },
           readonly: {
             contact: true,
@@ -1721,6 +1722,24 @@ export default function VendorPublicOrderPage() {
                 upi: {
                   name: 'Pay using UPI / QR',
                   instruments: [
+                    {
+                      method: 'upi',
+                      flows: ['intent'],
+                      apps: ['google_pay', 'com.google.android.apps.nbu.paisa.user'],
+                    },
+                    {
+                      method: 'upi',
+                      flows: ['intent'],
+                      apps: ['phonepe', 'com.phonepe.app'],
+                    },
+                    {
+                      method: 'upi',
+                      flows: ['paytm', 'net.one97.paytm'],
+                    },
+                    {
+                      method: 'upi',
+                      flows: ['qr'],
+                    },
                     {
                       method: 'upi',
                     },
