@@ -23,7 +23,10 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    const rustBackendUrl = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8080';
+    const rustBackendUrl = process.env.RUST_BACKEND_URL;
+    if (!rustBackendUrl || rustBackendUrl === 'none' || rustBackendUrl === 'disabled') {
+      return [];
+    }
     return {
       beforeFiles: [
         {

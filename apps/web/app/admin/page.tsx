@@ -105,7 +105,13 @@ export default function AdminDashboardPage() {
     window.location.href = '/login';
   };
 
-  // Load Administrative Data
+  const parseJson = async (res: Response) => {
+    if (!res.ok) return null;
+    const ct = res.headers.get('content-type') || '';
+    return ct.includes('application/json') ? await res.json() : null;
+  };
+
+  // Load Administrative Data (Initial core load: Metrics & Vendors only)
   const loadData = async (filterOnly = false) => {
     try {
       if (filterOnly) {
@@ -119,14 +125,9 @@ export default function AdminDashboardPage() {
 
       setLoading(true);
 
-      const [metricsRes, vendorsRes, logsRes, webhooksRes, plansRes, couponsRes, paymentsRes] = await Promise.all([
+      const [metricsRes, vendorsRes] = await Promise.all([
         fetch('/api/admin/metrics'),
         fetch(`/api/admin/vendors?filter=${vendorFilter}`),
-        fetch('/api/admin/audit-logs'),
-        fetch('/api/admin/webhooks'),
-        fetch('/api/admin/plans'),
-        fetch('/api/admin/coupons'),
-        fetch(`/api/admin/payment-accounts?filter=${paymentFilter}`),
       ]);
 
       if (metricsRes.status === 401 || metricsRes.status === 403) {
@@ -134,35 +135,58 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      const parseJson = async (res: Response) => {
-        if (!res.ok) return null;
-        const ct = res.headers.get('content-type') || '';
-        return ct.includes('application/json') ? await res.json() : null;
-      };
-
       const metricsData = await parseJson(metricsRes);
       const vendorsData = await parseJson(vendorsRes);
-      const logsData = await parseJson(logsRes);
-      const webhooksData = await parseJson(webhooksRes);
-      const plansData = await parseJson(plansRes);
-      const couponsData = await parseJson(couponsRes);
-      const paymentsData = await parseJson(paymentsRes);
 
       setMetrics(metricsData?.metrics || null);
       setVendors(vendorsData?.vendors || []);
-      setAuditLogs(logsData?.logs || []);
-      setWebhooks(webhooksData?.events || []);
-      setPlans(plansData?.plans || []);
-      setCoupons(couponsData?.coupons || []);
-      setTotalDiscountGiven(couponsData?.totalDiscountGivenMinor || 0);
-      if (paymentsData) {
-        setPaymentVendors(paymentsData.vendors || []);
-        if (paymentsData.stats) setPaymentStats(paymentsData.stats);
-      }
     } catch (err) {
       console.error('Admin load error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPlans = async () => {
+    try {
+      const res = await fetch('/api/admin/plans');
+      const data = await parseJson(res);
+      if (data?.plans) setPlans(data.plans);
+    } catch (err) {
+      console.error('Failed to load plans:', err);
+    }
+  };
+
+  const loadCoupons = async () => {
+    try {
+      const res = await fetch('/api/admin/coupons');
+      const data = await parseJson(res);
+      if (data?.coupons) {
+        setCoupons(data.coupons);
+        setTotalDiscountGiven(data.totalDiscountGivenMinor || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load coupons:', err);
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/audit-logs');
+      const data = await parseJson(res);
+      if (data?.logs) setAuditLogs(data.logs);
+    } catch (err) {
+      console.error('Failed to load audit logs:', err);
+    }
+  };
+
+  const loadWebhooks = async () => {
+    try {
+      const res = await fetch('/api/admin/webhooks');
+      const data = await parseJson(res);
+      if (data?.events) setWebhooks(data.events);
+    } catch (err) {
+      console.error('Failed to load webhooks:', err);
     }
   };
 
@@ -207,9 +231,18 @@ export default function AdminDashboardPage() {
     }
   }, [vendorFilter]);
 
+  // Lazy-load secondary tabs on demand
   useEffect(() => {
     if (activeNav === 'PAYMENTS') {
       loadPaymentAccounts(paymentFilter);
+    } else if (activeNav === 'PLANS' && plans.length === 0) {
+      loadPlans();
+    } else if (activeNav === 'COUPONS' && coupons.length === 0) {
+      loadCoupons();
+    } else if (activeNav === 'AUDIT' && auditLogs.length === 0) {
+      loadAuditLogs();
+    } else if (activeNav === 'WEBHOOKS' && webhooks.length === 0) {
+      loadWebhooks();
     }
   }, [activeNav, paymentFilter]);
 

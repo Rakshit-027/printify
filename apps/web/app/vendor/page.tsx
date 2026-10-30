@@ -366,6 +366,60 @@ export default function VendorDashboardPage() {
     }
   }, [activeNav, orderStatusFilter]);
 
+  // Real-time automatic background polling & chime for incoming counter orders
+  const prevOrdersCountRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!sessionUser) return;
+    const isLiveQueue = activeNav === 'OVERVIEW' || activeNav === 'ORDERS' || activeNav === 'QUEUE';
+    if (!isLiveQueue) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const [ordersRes, statsRes] = await Promise.all([
+          fetch(`/api/vendor/orders?status=${orderStatusFilter}`),
+          fetch('/api/vendor/stats'),
+        ]);
+
+        if (ordersRes.ok) {
+          const data = await safeJson(ordersRes);
+          const currentOrders = data?.orders || [];
+          if (prevOrdersCountRef.current !== null && currentOrders.length > prevOrdersCountRef.current) {
+            triggerToast('🔔 New incoming print order received at counter!');
+            try {
+              const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+              if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.4);
+              }
+            } catch {}
+          }
+          prevOrdersCountRef.current = currentOrders.length;
+          setOrders(currentOrders);
+        }
+
+        if (statsRes.ok) {
+          const statsData = await safeJson(statsRes);
+          if (statsData?.stats) setStats(statsData.stats);
+        }
+      } catch {
+        // Silent catch for intermittent background fetch
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [sessionUser, activeNav, orderStatusFilter]);
+
   // Order Actions
   const handleStatusAction = async (orderId: string, action: string) => {
     setActionInProgress(orderId);
