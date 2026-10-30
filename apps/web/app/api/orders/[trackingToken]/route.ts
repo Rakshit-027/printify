@@ -54,40 +54,7 @@ export async function GET(
     }
 
     if (!order) {
-      // Demo mock fallback if viewing during test/preview
-      return NextResponse.json({
-        success: true,
-        order: {
-          orderNumber: 'ORD-8921',
-          trackingToken,
-          status: 'AWAITING_PAYMENT',
-          paymentMethod: 'RAZORPAY',
-          paymentStatus: 'PENDING',
-          totalAmountMinor: 1550, // ₹15.50
-          createdAt: new Date().toISOString(),
-          vendor: {
-            name: 'SpeedyPrint Express',
-            slug: 'speedy-express',
-            contactPhone: '+91 98765 00001',
-            address: 'Shop 4, Campus Arcade, Sector 14, Gurugram, Haryana 122001',
-            operatingHours: '09:00 AM - 09:00 PM',
-          },
-          items: [
-            {
-              id: 'item-1',
-              paperSize: 'A4',
-              colorMode: 'BLACK_AND_WHITE',
-              duplexMode: 'DOUBLE_SIDED_LONG_EDGE',
-              copies: 2,
-              totalSides: 8,
-              totalSheets: 4,
-              itemTotalMinor: 1400,
-              document: { originalName: 'Project_Report_Final.pdf', pageCount: 4 },
-            },
-          ],
-          printJob: null,
-        },
-      });
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     return NextResponse.json({

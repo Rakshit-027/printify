@@ -31,27 +31,11 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch {
-      // Offline fallback handling
       vendor = null;
     }
 
-    // Default mock vendor if running offline or unseeded
     if (!vendor) {
-      vendor = {
-        id: 'demo-vendor-id',
-        name: 'SpeedyPrint Express',
-        slug: vendorSlug,
-        isActive: true,
-        isApproved: true,
-        allowCashOnDesk: true,
-        requireApproval: false,
-        pricingConfig: [
-          { paperSize: 'A4', colorMode: 'BLACK_AND_WHITE', isDuplex: false, pricePerSideMinor: 200, sheetChargeMinor: 0, minimumOrderMinor: 500, version: 1 },
-          { paperSize: 'A4', colorMode: 'BLACK_AND_WHITE', isDuplex: true, pricePerSideMinor: 175, sheetChargeMinor: 0, minimumOrderMinor: 500, version: 1 },
-          { paperSize: 'A4', colorMode: 'COLOR', isDuplex: false, pricePerSideMinor: 1000, sheetChargeMinor: 0, minimumOrderMinor: 500, version: 1 },
-          { paperSize: 'A4', colorMode: 'COLOR', isDuplex: true, pricePerSideMinor: 900, sheetChargeMinor: 0, minimumOrderMinor: 500, version: 1 },
-        ],
-      };
+      return NextResponse.json({ error: 'Vendor not found' }, { status: 404 });
     }
 
     if (!vendor.isActive || !vendor.isApproved) {
@@ -85,6 +69,13 @@ export async function POST(request: NextRequest) {
       });
     } catch {
       documents = [];
+    }
+
+    if (documents.length !== documentIds.length) {
+      return NextResponse.json(
+        { error: 'One or more documents could not be found or do not belong to this vendor' },
+        { status: 400 }
+      );
     }
 
     // Build document page map
@@ -216,20 +207,9 @@ export async function POST(request: NextRequest) {
 
         return order;
       });
-    } catch {
-      // In-memory fallback response if database is unavailable
-      createdOrder = {
-        id: crypto.randomUUID(),
-        vendorId: vendor.id,
-        orderNumber,
-        trackingToken,
-        status: initialOrderStatus,
-        paymentMethod,
-        paymentStatus: initialPaymentStatus,
-        subtotalMinor: orderSummary.subtotalMinor,
-        totalAmountMinor: orderSummary.totalAmountMinor,
-        createdAt: new Date(),
-      };
+    } catch (dbErr) {
+      console.error('Order transaction persistence failed:', dbErr);
+      return NextResponse.json({ error: 'Failed to persist order in database' }, { status: 500 });
     }
 
     return NextResponse.json({

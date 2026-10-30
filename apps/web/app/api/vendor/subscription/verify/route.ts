@@ -18,11 +18,6 @@ async function resolveVendorId(request: NextRequest): Promise<string | null> {
     }
   } catch {}
 
-  try {
-    const firstVendor = await prisma.vendor.findFirst({ where: { isActive: true } });
-    if (firstVendor) return firstVendor.id;
-  } catch {}
-
   return null;
 }
 
@@ -30,7 +25,7 @@ export async function POST(request: NextRequest) {
   try {
     const vendorId = await resolveVendorId(request);
     if (!vendorId) {
-      return NextResponse.json({ error: 'Unauthorized or vendor not found' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: Vendor login required' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -41,9 +36,6 @@ export async function POST(request: NextRequest) {
       planCode,
       billingCycle = 'MONTHLY',
       couponCode,
-      originalPriceMinor,
-      discountMinor,
-      finalAmountMinor,
     } = body;
 
     // Verify signature
@@ -61,25 +53,66 @@ export async function POST(request: NextRequest) {
       where: { code: String(planCode).toUpperCase() },
     });
 
+    if (!plan || !plan.isActive) {
+      return NextResponse.json({ error: 'Invalid or inactive subscription plan' }, { status: 400 });
+    }
+
+    // Authoritatively calculate prices server-side (never trust client amounts)
+    const isYearly = billingCycle === 'YEARLY';
+    const serverOriginalPriceMinor = isYearly ? plan.priceYearlyMinor : plan.priceMonthlyMinor;
+    let serverDiscountMinor = 0;
+    let validCoupon: any = null;
+
+    if (couponCode) {
+      const cleanCode = String(couponCode).trim().toUpperCase();
+      validCoupon = await prisma.coupon.findUnique({ where: { code: cleanCode } });
+      if (validCoupon && validCoupon.isActive) {
+        const now = new Date();
+        const isValidDate = (!validCoupon.validFrom || now >= validCoupon.validFrom) &&
+                            (!validCoupon.validTill || now <= validCoupon.validTill);
+        const hasUses = validCoupon.maxUsesTotal === -1 || validCoupon.currentUsesTotal < validCoupon.maxUsesTotal;
+        const vendorUses = await prisma.couponRedemption.count({
+          where: { vendorId, couponId: validCoupon.id },
+        });
+
+        if (isValidDate && hasUses && vendorUses < validCoupon.maxUsesPerVendor) {
+          if (validCoupon.discountType === 'FREE_DAYS') {
+            serverDiscountMinor = serverOriginalPriceMinor;
+          } else if (validCoupon.discountType === 'PERCENTAGE') {
+            serverDiscountMinor = Math.round((serverOriginalPriceMinor * validCoupon.discountValue) / 100);
+            if (validCoupon.maxDiscountMinor && serverDiscountMinor > validCoupon.maxDiscountMinor) {
+              serverDiscountMinor = validCoupon.maxDiscountMinor;
+            }
+          } else if (validCoupon.discountType === 'FLAT_AMOUNT') {
+            serverDiscountMinor = Math.min(validCoupon.discountValue, serverOriginalPriceMinor);
+          }
+        }
+      }
+    }
+
+    const serverFinalAmountMinor = Math.max(0, serverOriginalPriceMinor - serverDiscountMinor);
+
     const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
     const now = new Date();
     const currentExpiry = vendor?.subscriptionExpiresAt;
     const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
 
-    const isYearly = billingCycle === 'YEARLY';
-    const daysToAdd = isYearly ? 365 : 30;
+    let daysToAdd = isYearly ? 365 : 30;
+    if (validCoupon?.freeDays) {
+      daysToAdd = validCoupon.freeDays;
+    }
     const newExpiry = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
 
-    // 1. Record Invoice
+    // 1. Authoritative Invoice Record
     const invoice = await prisma.vendorSubscriptionInvoice.create({
       data: {
         vendorId,
-        planId: plan?.id || null,
+        planId: plan.id,
         billingCycle,
-        originalPriceMinor: Number(originalPriceMinor) || 0,
-        discountMinor: Number(discountMinor) || 0,
-        finalAmountMinor: Number(finalAmountMinor) || 0,
-        couponCode: couponCode || null,
+        originalPriceMinor: serverOriginalPriceMinor,
+        discountMinor: serverDiscountMinor,
+        finalAmountMinor: serverFinalAmountMinor,
+        couponCode: validCoupon?.code || null,
         razorpayOrderId,
         razorpayPaymentId,
         status: 'SUCCESS',
@@ -88,23 +121,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 2. Record Coupon Redemption if coupon was used
-    if (couponCode) {
-      const coupon = await prisma.coupon.findUnique({ where: { code: String(couponCode).toUpperCase() } });
-      if (coupon) {
-        await prisma.couponRedemption.create({
-          data: {
-            couponId: coupon.id,
-            vendorId,
-            invoiceId: invoice.id,
-            discountMinor: Number(discountMinor) || 0,
-          },
-        });
-        await prisma.coupon.update({
-          where: { id: coupon.id },
-          data: { currentUsesTotal: { increment: 1 } },
-        });
-      }
+    // 2. Record Coupon Redemption if valid coupon applied
+    if (validCoupon) {
+      await prisma.couponRedemption.create({
+        data: {
+          couponId: validCoupon.id,
+          vendorId,
+          invoiceId: invoice.id,
+          discountMinor: serverDiscountMinor,
+        },
+      });
+      await prisma.coupon.update({
+        where: { id: validCoupon.id },
+        data: { currentUsesTotal: { increment: 1 } },
+      });
     }
 
     // 3. Update Vendor Status

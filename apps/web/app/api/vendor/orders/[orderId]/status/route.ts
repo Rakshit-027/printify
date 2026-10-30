@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRoles, logAuditEvent } from '@/lib/auth';
-import { UserRole, OrderStatus, PaymentStatus, PrintJobStatus } from '@printflow/shared-types';
+import { UserRole, OrderStatus, PaymentStatus, PaymentMethod, PrintJobStatus } from '@printflow/shared-types';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(
@@ -20,7 +20,22 @@ export async function POST(
     const { orderId } = params;
 
     const body = await request.json();
-    const { action } = body; // APPROVE, REJECT, MARK_CASH_COLLECTED, MARK_READY, MARK_COMPLETED
+    let action = body.action;
+    if (!action) {
+      if (body.paymentStatus === 'CASH_COLLECTED') {
+        action = 'MARK_CASH_COLLECTED';
+      } else if (body.status === 'CONFIRMED' || body.status === 'APPROVED') {
+        action = 'APPROVE';
+      } else if (body.status === 'REJECTED') {
+        action = 'REJECT';
+      } else if (body.status === 'PROCESSING') {
+        action = 'START_PRINTING';
+      } else if (body.status === 'READY_FOR_PICKUP') {
+        action = 'MARK_READY';
+      } else if (body.status === 'COMPLETED') {
+        action = 'MARK_COMPLETED';
+      }
+    }
 
     // Find order with vendor isolation check
     const order = await prisma.order.findUnique({
@@ -75,6 +90,17 @@ export async function POST(
       action === 'COLLECT_CASH_AND_PRINT' ||
       action === 'APPROVE_CASH'
     ) {
+      // Fraud Prevention: Prevent marking online orders as cash collected
+      if (
+        order.paymentMethod !== PaymentMethod.CASH_ON_COLLECTION &&
+        (order.paymentMethod as any) !== 'CASH'
+      ) {
+        return NextResponse.json(
+          { error: 'Fraud Prevention: Cannot mark cash collected on an order configured for online Razorpay payment' },
+          { status: 400 }
+        );
+      }
+
       await prisma.payment.updateMany({
         where: { orderId: order.id },
         data: { status: PaymentStatus.CASH_COLLECTED },

@@ -44,35 +44,9 @@ export async function GET(request: NextRequest) {
         }),
         prisma.vendor.count({ where: whereClause }),
       ]);
-    } catch {
-      // Offline fallback mock vendors
-      vendors = [
-        {
-          id: 'v-demo-1',
-          name: 'SpeedyPrint Express',
-          slug: 'speedy-express',
-          contactPhone: '+91 98765 00001',
-          contactEmail: 'orders@speedyprint.com',
-          address: 'Shop 4, Campus Arcade, Sector 14, Gurugram',
-          isActive: true,
-          isApproved: true,
-          createdAt: new Date(),
-          _count: { orders: 64, devices: 1, printers: 2 },
-        },
-        {
-          id: 'v-demo-2',
-          name: 'Apex Digital Xerox',
-          slug: 'apex-xerox',
-          contactPhone: '+91 98765 00002',
-          contactEmail: 'contact@apexxerox.com',
-          address: 'Gate 2, North Campus, New Delhi',
-          isActive: true,
-          isApproved: false, // Needs approval
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          _count: { orders: 0, devices: 0, printers: 0 },
-        },
-      ];
-      totalCount = vendors.length;
+    } catch (dbErr) {
+      console.error('Failed to query vendors database:', dbErr);
+      return NextResponse.json({ error: 'Failed to retrieve vendors from database' }, { status: 500 });
     }
 
     return NextResponse.json({

@@ -108,6 +108,7 @@ export default function VendorDashboardPage() {
   // Pricing Matrix
   const [pricingList, setPricingList] = useState<any[]>([]);
   const [minOrderRupees, setMinOrderRupees] = useState(5);
+  const [pricingPaperSizeFilter, setPricingPaperSizeFilter] = useState<'ALL' | 'A4' | 'A3' | 'LEGAL' | 'LETTER'>('ALL');
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingSaving, setPricingSaving] = useState(false);
   const [pricingMessage, setPricingMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -251,32 +252,9 @@ export default function VendorDashboardPage() {
             return;
           }
         }
-        // Fallback for seamless local testing
-        setSessionUser({
-          id: '38cf1c64-a681-46b5-8068-d845fd096e09',
-          email: 'rakshitwaghmare27@gmail.com',
-          fullName: 'rakshiit',
-          role: 'VENDOR_OWNER',
-          vendor: {
-            id: '60d47654-7089-48cb-8bab-45e2504ab6ca',
-            name: 'rakshiit ',
-            slug: 'rakshit-prints',
-            subscriptionPlan: 'STARTER',
-          },
-        });
+        router.push('/login');
       } catch {
-        setSessionUser({
-          id: '38cf1c64-a681-46b5-8068-d845fd096e09',
-          email: 'rakshitwaghmare27@gmail.com',
-          fullName: 'rakshiit',
-          role: 'VENDOR_OWNER',
-          vendor: {
-            id: '60d47654-7089-48cb-8bab-45e2504ab6ca',
-            name: 'rakshiit ',
-            slug: 'rakshit-prints',
-            subscriptionPlan: 'STARTER',
-          },
-        });
+        router.push('/login');
       }
     }
     checkAuth();
@@ -339,8 +317,9 @@ export default function VendorDashboardPage() {
         const data = await safeJson(res);
         if (data?.pricing) {
           setPricingList(data.pricing);
-          if (data.pricing.length > 0 && data.pricing[0].minimum_order_minor) {
-            setMinOrderRupees(data.pricing[0].minimum_order_minor / 100);
+          const minMinor = data.minimumOrderMinor ?? data.minimum_order_minor ?? data.pricing[0]?.minimum_order_minor ?? data.pricing[0]?.minimumOrderMinor;
+          if (minMinor !== undefined && minMinor !== null) {
+            setMinOrderRupees(Number(minMinor) / 100);
           }
         }
       }
@@ -486,6 +465,121 @@ export default function VendorDashboardPage() {
     } finally {
       setPricingSaving(false);
     }
+  };
+
+  const PAPER_SIZE_DEFINITIONS = [
+    {
+      key: 'A4',
+      name: 'A4 Standard',
+      dimensions: '210 × 297 mm',
+      desc: 'Standard office & college documents, notes, forms and everyday prints',
+      badge: 'Popular',
+    },
+    {
+      key: 'A3',
+      name: 'A3 Large Format',
+      dimensions: '297 × 420 mm',
+      desc: 'Architectural drawings, CAD sheets, posters, floorplans & charts',
+      badge: 'Large Format',
+    },
+    {
+      key: 'LEGAL',
+      name: 'Legal / Stamp',
+      dimensions: '8.5 × 14 in',
+      desc: 'Court affidavits, notarized agreements, stamp paper & legal deeds',
+      badge: 'Legal',
+    },
+    {
+      key: 'LETTER',
+      name: 'Letterhead',
+      dimensions: '8.5 × 11 in',
+      desc: 'International letterheads, corporate memos & formal correspondence',
+      badge: 'Letterhead',
+    },
+  ];
+
+  const isTierActive = (tier: any): boolean => {
+    if (tier?.isActive !== undefined) return Boolean(tier.isActive);
+    if (tier?.is_active !== undefined) return Boolean(tier.is_active);
+    return true;
+  };
+
+  const isPaperSizeActive = (paperSizeKey: string): boolean => {
+    const matchingTiers = pricingList.filter(
+      (p) => (p.paperSize || p.paper_size || '').toUpperCase() === paperSizeKey.toUpperCase()
+    );
+    if (matchingTiers.length === 0) return false;
+    return matchingTiers.some((t) => isTierActive(t));
+  };
+
+  const getActiveTiersCountForSize = (paperSizeKey: string): { active: number; total: number } => {
+    const matchingTiers = pricingList.filter(
+      (p) => (p.paperSize || p.paper_size || '').toUpperCase() === paperSizeKey.toUpperCase()
+    );
+    const active = matchingTiers.filter((t) => isTierActive(t)).length;
+    return { active, total: matchingTiers.length };
+  };
+
+  const togglePaperSizeActive = (paperSizeKey: string, newActiveState: boolean) => {
+    setPricingList((prev) =>
+      prev.map((t) => {
+        const size = (t.paperSize || t.paper_size || '').toUpperCase();
+        if (size === paperSizeKey.toUpperCase()) {
+          return {
+            ...t,
+            isActive: newActiveState,
+            is_active: newActiveState,
+          };
+        }
+        return t;
+      })
+    );
+  };
+
+  const toggleTierActive = (targetTier: any) => {
+    const currentActive = isTierActive(targetTier);
+    const nextActive = !currentActive;
+    setPricingList((prev) =>
+      prev.map((p) => {
+        const pSize = (p.paperSize || p.paper_size || '').toUpperCase();
+        const tSize = (targetTier.paperSize || targetTier.paper_size || '').toUpperCase();
+        const pColor = (p.colorMode || p.color_mode || '').toUpperCase();
+        const tColor = (targetTier.colorMode || targetTier.color_mode || '').toUpperCase();
+        const pDuplex = Boolean(p.isDuplex ?? p.is_duplex);
+        const tDuplex = Boolean(targetTier.isDuplex ?? targetTier.is_duplex);
+
+        if (pSize === tSize && pColor === tColor && pDuplex === tDuplex) {
+          return {
+            ...p,
+            isActive: nextActive,
+            is_active: nextActive,
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const updateTierRate = (targetTier: any, newRateMinor: number) => {
+    setPricingList((prev) =>
+      prev.map((p) => {
+        const pSize = (p.paperSize || p.paper_size || '').toUpperCase();
+        const tSize = (targetTier.paperSize || targetTier.paper_size || '').toUpperCase();
+        const pColor = (p.colorMode || p.color_mode || '').toUpperCase();
+        const tColor = (targetTier.colorMode || targetTier.color_mode || '').toUpperCase();
+        const pDuplex = Boolean(p.isDuplex ?? p.is_duplex);
+        const tDuplex = Boolean(targetTier.isDuplex ?? targetTier.is_duplex);
+
+        if (pSize === tSize && pColor === tColor && pDuplex === tDuplex) {
+          return {
+            ...p,
+            pricePerSideMinor: newRateMinor,
+            price_per_side_minor: newRateMinor,
+          };
+        }
+        return p;
+      })
+    );
   };
 
   const handleLogout = async () => {
@@ -1635,15 +1729,16 @@ export default function VendorDashboardPage() {
             VIEW 6: PRICING MATRIX & PRINT SETTINGS
         ========================================================================= */}
         {activeNav === 'PRICING' && (
-          <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-6 animate-in fade-in duration-150">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-surface p-6 sm:p-8 rounded-[28px] border border-hairline shadow-ink-soft space-y-8 animate-in fade-in duration-150">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-hairline">
               <div>
-                <h3 className="text-xl font-sora font-bold text-ink">Printing Pricing Matrix</h3>
-                <p className="text-xs text-ink-soft">
-                  Set authoritative per-page rates for paper sizes and color modes. Validated on backend.
+                <h3 className="text-xl font-sora font-bold text-ink">Pricing &amp; Paper Sizes</h3>
+                <p className="text-xs text-ink-soft mt-0.5">
+                  Enable or disable paper sizes for your store, set per-page rates, and define minimum cart order.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-paper px-4 py-2 rounded-pill border border-hairline">
                 <span className="text-xs font-bold text-ink">Min Order: ₹</span>
                 <input
                   type="number"
@@ -1651,7 +1746,7 @@ export default function VendorDashboardPage() {
                   max={500}
                   value={minOrderRupees}
                   onChange={(e) => setMinOrderRupees(Number(e.target.value))}
-                  className="w-20 bg-paper border border-hairline rounded-pill px-3 py-1.5 text-xs font-bold text-ink text-center"
+                  className="w-16 bg-surface border border-hairline rounded-lg px-2 py-1 text-xs font-bold text-ink text-center focus:outline-none focus:border-saffron"
                 />
               </div>
             </div>
@@ -1669,66 +1764,217 @@ export default function VendorDashboardPage() {
             )}
 
             {pricingLoading ? (
-              <div className="py-12 text-center text-xs text-ink-soft animate-pulse">Loading pricing matrix...</div>
+              <div className="py-12 text-center text-xs text-ink-soft animate-pulse">Loading pricing matrix &amp; paper sizes...</div>
             ) : (
-              <form onSubmit={handleSavePricing} className="space-y-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-hairline text-ink-soft font-bold">
-                        <th className="py-3 px-4">Paper Size</th>
-                        <th className="py-3 px-4">Color Mode</th>
-                        <th className="py-3 px-4">Side Setup</th>
-                        <th className="py-3 px-4">Rate per Side (₹)</th>
-                        <th className="py-3 px-4 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-hairline">
-                      {pricingList.map((tier, idx) => (
-                        <tr key={idx} className="hover:bg-paper/50 transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-ink">{tier.paper_size || tier.paperSize}</td>
-                          <td className="py-3.5 px-4 font-medium">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              (tier.color_mode || tier.colorMode) === 'COLOR' ? 'bg-saffron-tint text-saffron' : 'bg-paper text-ink border border-hairline'
-                            }`}>
-                              {(tier.color_mode || tier.colorMode) === 'COLOR' ? 'Color' : 'B&W'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-ink-soft">
-                            {(tier.is_duplex ?? tier.isDuplex) ? 'Double Sided' : 'Single Sided'}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1 font-bold">
-                              <span>₹</span>
-                              <input
-                                type="number"
-                                step="0.25"
-                                min="0.5"
-                                value={((tier.price_per_side_minor || tier.pricePerSideMinor || 200) / 100).toFixed(2)}
-                                onChange={(e) => {
-                                  const newVal = Math.round(parseFloat(e.target.value || '0') * 100);
-                                  setPricingList((prev) =>
-                                    prev.map((p, i) => i === idx ? { ...p, price_per_side_minor: newVal, pricePerSideMinor: newVal } : p)
-                                  );
-                                }}
-                                className="w-24 bg-paper border border-hairline rounded-10 px-2.5 py-1 text-xs font-bold text-ink focus:outline-none focus:border-saffron"
-                              />
+              <form onSubmit={handleSavePricing} className="space-y-8">
+                {/* 1. PAPER SIZES AVAILABILITY CARDS */}
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-ink flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-saffron" />
+                      <span>Supported Paper Sizes</span>
+                    </h4>
+                    <p className="text-[11px] text-ink-soft">
+                      Toggle paper sizes ON or OFF. Disabled sizes are instantly hidden from customer upload and storefronts.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {PAPER_SIZE_DEFINITIONS.map((def) => {
+                      const active = isPaperSizeActive(def.key);
+                      const { active: activeCount, total: totalCount } = getActiveTiersCountForSize(def.key);
+                      return (
+                        <div
+                          key={def.key}
+                          className={`p-4 rounded-20 border transition-all flex flex-col justify-between gap-3 ${
+                            active
+                              ? 'bg-paper/70 border-hairline shadow-xs hover:border-saffron/40'
+                              : 'bg-paper/30 border-hairline/60 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-sora font-extrabold text-sm text-ink">{def.name}</span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${
+                                  active
+                                    ? 'bg-success-tint text-success'
+                                    : 'bg-paper text-ink-soft/60 border border-hairline'
+                                }`}
+                              >
+                                {active ? `${activeCount}/${totalCount} Active` : 'Disabled'}
+                              </span>
                             </div>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success-tint text-success">
-                              Active
+                            <div className="text-[10px] font-mono text-saffron font-semibold">{def.dimensions}</div>
+                            <p className="text-[11px] text-ink-soft leading-snug line-clamp-2">{def.desc}</p>
+                          </div>
+
+                          <div className="pt-2 border-t border-hairline/70 flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-ink-soft">
+                              {active ? 'Store Enabled' : 'Store Disabled'}
                             </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            <button
+                              type="button"
+                              onClick={() => togglePaperSizeActive(def.key, !active)}
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                                active ? 'bg-saffron' : 'bg-ink-soft/30'
+                              }`}
+                              role="switch"
+                              aria-checked={active}
+                              title={active ? `Disable ${def.name}` : `Enable ${def.name}`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                  active ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-hairline">
-                  <Button variant="primary" type="submit" disabled={pricingSaving} className="h-11 px-6 font-bold text-xs">
-                    {pricingSaving ? 'Saving Matrix...' : 'Save Pricing Matrix'}
+                {/* 2. DETAILED RATE MATRIX TABLE */}
+                <div className="space-y-4 pt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-ink">Per-Page Rate Matrix &amp; Tier Status</h4>
+                      <p className="text-[11px] text-ink-soft">
+                        Fine-tune per-side print rates or toggle individual color / duplex modes.
+                      </p>
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex items-center gap-1.5 p-1 bg-paper rounded-pill border border-hairline overflow-x-auto">
+                      {(['ALL', 'A4', 'A3', 'LEGAL', 'LETTER'] as const).map((filter) => {
+                        const isSelected = pricingPaperSizeFilter === filter;
+                        return (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setPricingPaperSizeFilter(filter)}
+                            className={`px-3 py-1 rounded-pill text-[11px] font-bold transition-colors whitespace-nowrap cursor-pointer ${
+                              isSelected
+                                ? 'bg-ink text-white shadow-xs'
+                                : 'text-ink-soft hover:text-ink'
+                            }`}
+                          >
+                            {filter === 'ALL' ? 'All Sizes' : filter}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border border-hairline rounded-20">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-hairline bg-paper/60 text-ink-soft font-bold">
+                          <th className="py-3 px-4">Paper Size</th>
+                          <th className="py-3 px-4">Color Mode</th>
+                          <th className="py-3 px-4">Side Setup</th>
+                          <th className="py-3 px-4">Rate per Side (₹)</th>
+                          <th className="py-3 px-4 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline">
+                        {pricingList
+                          .filter((tier) => {
+                            if (pricingPaperSizeFilter === 'ALL') return true;
+                            const size = (tier.paper_size || tier.paperSize || '').toUpperCase();
+                            return size === pricingPaperSizeFilter;
+                          })
+                          .map((tier, idx) => {
+                            const active = isTierActive(tier);
+                            const currentRateRupees = (
+                              (tier.price_per_side_minor || tier.pricePerSideMinor || 200) / 100
+                            ).toFixed(2);
+
+                            return (
+                              <tr
+                                key={idx}
+                                className={`transition-colors ${
+                                  active ? 'hover:bg-paper/50' : 'bg-paper/25 opacity-60 hover:opacity-90'
+                                }`}
+                              >
+                                <td className="py-3.5 px-4 font-bold text-ink">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono">{tier.paper_size || tier.paperSize}</span>
+                                    {!active && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-paper border border-hairline text-ink-soft/70">
+                                        Off
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 font-medium">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      (tier.color_mode || tier.colorMode) === 'COLOR'
+                                        ? 'bg-saffron-tint text-saffron'
+                                        : 'bg-paper text-ink border border-hairline'
+                                    }`}
+                                  >
+                                    {(tier.color_mode || tier.colorMode) === 'COLOR' ? 'Color' : 'B&W'}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-ink-soft">
+                                  {(tier.is_duplex ?? tier.isDuplex) ? 'Double Sided' : 'Single Sided'}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <span className="text-ink-soft">₹</span>
+                                    <input
+                                      type="number"
+                                      step="0.25"
+                                      min="0.5"
+                                      value={currentRateRupees}
+                                      onChange={(e) => {
+                                        const newValPaise = Math.round(parseFloat(e.target.value || '0') * 100);
+                                        updateTierRate(tier, newValPaise);
+                                      }}
+                                      className={`w-24 bg-paper border border-hairline rounded-10 px-2.5 py-1 text-xs font-bold text-ink focus:outline-none focus:border-saffron ${
+                                        !active ? 'opacity-70' : ''
+                                      }`}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTierActive(tier)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all shadow-xs cursor-pointer ${
+                                      active
+                                        ? 'bg-success-tint text-success border border-success/30 hover:bg-success/20'
+                                        : 'bg-paper text-ink-soft/70 border border-hairline hover:border-ink-soft/40 hover:text-ink'
+                                    }`}
+                                    title={active ? 'Click to disable this option' : 'Click to enable this option'}
+                                  >
+                                    <span
+                                      className={`w-2 h-2 rounded-full transition-colors ${
+                                        active ? 'bg-success shadow-xs shadow-success/50' : 'bg-ink-soft/40'
+                                      }`}
+                                    />
+                                    <span>{active ? 'Enabled' : 'Disabled'}</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-hairline">
+                  <p className="text-[11px] text-ink-soft">
+                    Changes to paper sizes and per-page rates sync immediately with backend validation.
+                  </p>
+                  <Button variant="primary" type="submit" disabled={pricingSaving} className="h-11 px-6 font-bold text-xs shrink-0">
+                    {pricingSaving ? 'Saving Pricing & Sizes...' : 'Save Pricing & Paper Sizes'}
                   </Button>
                 </div>
               </form>

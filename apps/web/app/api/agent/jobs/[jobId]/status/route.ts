@@ -30,13 +30,6 @@ export async function POST(
       job = null;
     }
 
-    if (!job && jobId.startsWith('job-demo-')) {
-      return NextResponse.json({
-        success: true,
-        message: `Status updated to ${status} (simulated)`,
-      });
-    }
-
     if (!job || job.vendorId !== vendor.id) {
       return NextResponse.json({ error: 'Job not found for this vendor' }, { status: 404 });
     }

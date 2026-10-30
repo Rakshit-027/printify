@@ -32,21 +32,6 @@ export async function POST(request: NextRequest) {
       device = null;
     }
 
-    // Demo enrollment simulation fallback if running offline
-    if (!device && enrollmentCode.toUpperCase().startsWith('ENROLL-')) {
-      const simulatedToken = `tok_agent_${crypto.randomBytes(24).toString('hex')}`;
-      return NextResponse.json({
-        success: true,
-        deviceId: 'device_demo_win_01',
-        deviceToken: simulatedToken,
-        vendor: {
-          id: 'demo-vendor-id',
-          name: 'SpeedyPrint Express',
-          slug: 'speedy-express',
-        },
-      });
-    }
-
     if (!device || device.isRevoked) {
       return NextResponse.json(
         { error: 'Invalid or expired enrollment code. Please generate a code from your vendor portal.' },

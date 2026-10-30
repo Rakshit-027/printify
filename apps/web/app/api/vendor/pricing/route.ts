@@ -62,26 +62,30 @@ async function resolveVendorId(request: NextRequest): Promise<string | null> {
     }
   } catch {}
 
-  // 3. Fallback to first vendor in DB
-  try {
-    const firstVendor = await prisma.vendor.findFirst({ where: { isActive: true } });
-    if (firstVendor) return firstVendor.id;
-  } catch {}
-
   return null;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const vendorId = await resolveVendorId(request);
+    let vendorId = await resolveVendorId(request);
+
+    // If unauthenticated, allow read-only lookup via explicit query parameter (e.g., customer ordering flow)
+    if (!vendorId) {
+      const { searchParams } = request.nextUrl;
+      const queryVendorId = searchParams.get('vendorId');
+      const querySlug = searchParams.get('slug');
+
+      if (queryVendorId) {
+        const found = await prisma.vendor.findUnique({ where: { id: queryVendorId } });
+        if (found) vendorId = found.id;
+      } else if (querySlug) {
+        const found = await prisma.vendor.findUnique({ where: { slug: querySlug.toLowerCase().trim() } });
+        if (found) vendorId = found.id;
+      }
+    }
 
     if (!vendorId) {
-      return NextResponse.json({
-        success: true,
-        pricing: getDefaultPricingMatrix('default'),
-        minimumOrderMinor: 500,
-        supportedSizes: [PaperSize.A4, PaperSize.A3, PaperSize.LEGAL, PaperSize.LETTER],
-      });
+      return NextResponse.json({ error: 'Unauthorized or vendor not specified' }, { status: 401 });
     }
 
     let existingRules: any[] = [];
@@ -140,11 +144,12 @@ export async function PUT(request: NextRequest) {
     const vendorId = await resolveVendorId(request);
 
     if (!vendorId) {
-      return NextResponse.json({ error: 'No associated vendor account' }, { status: 400 });
+      return NextResponse.json({ error: 'Unauthorized: Vendor authentication required' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { pricing, minimumOrderMinor = 500 } = body;
+    const pricing = Array.isArray(body) ? body : body?.pricing;
+    const minimumOrderMinor = Array.isArray(body) ? 500 : (body?.minimumOrderMinor ?? body?.minimum_order_minor ?? 500);
 
     if (!pricing || !Array.isArray(pricing)) {
       return NextResponse.json({ error: 'Invalid pricing matrix format' }, { status: 400 });
@@ -155,38 +160,42 @@ export async function PUT(request: NextRequest) {
     // Upsert each pricing tier
     const results = [];
     for (const rule of pricing) {
-      if (!rule.paperSize || !rule.colorMode) continue;
+      const paperSize = rule.paperSize || rule.paper_size;
+      const colorMode = rule.colorMode || rule.color_mode;
+      if (!paperSize || !colorMode) continue;
 
-      const priceMinor = Math.max(10, Math.round(Number(rule.pricePerSideMinor) || 100));
-      const isActive = rule.isActive !== undefined ? Boolean(rule.isActive) : true;
-      const isDuplex = Boolean(rule.isDuplex);
+      const priceMinor = Math.max(10, Math.round(Number(rule.pricePerSideMinor ?? rule.price_per_side_minor) || 100));
+      const isActive = rule.isActive !== undefined ? Boolean(rule.isActive) : (rule.is_active !== undefined ? Boolean(rule.is_active) : true);
+      const isDuplex = Boolean(rule.isDuplex !== undefined ? rule.isDuplex : rule.is_duplex);
+      const sheetCharge = Math.max(0, Math.round(Number(rule.sheetChargeMinor ?? rule.sheet_charge_minor) || 0));
+      const ruleMinOrder = Math.max(0, Math.round(Number(rule.minimumOrderMinor ?? rule.minimum_order_minor) || minOrder));
 
       try {
         const upserted = await prisma.vendorPricing.upsert({
           where: {
             vendorId_paperSize_colorMode_isDuplex_version: {
               vendorId,
-              paperSize: rule.paperSize as PaperSize,
-              colorMode: rule.colorMode as PrintColor,
+              paperSize: paperSize as PaperSize,
+              colorMode: colorMode as PrintColor,
               isDuplex,
               version: 1,
             },
           },
           create: {
             vendorId,
-            paperSize: rule.paperSize as PaperSize,
-            colorMode: rule.colorMode as PrintColor,
+            paperSize: paperSize as PaperSize,
+            colorMode: colorMode as PrintColor,
             isDuplex,
             pricePerSideMinor: priceMinor,
-            sheetChargeMinor: 0,
-            minimumOrderMinor: minOrder,
+            sheetChargeMinor: sheetCharge,
+            minimumOrderMinor: ruleMinOrder,
             isActive,
             version: 1,
           },
           update: {
             pricePerSideMinor: priceMinor,
-            sheetChargeMinor: 0,
-            minimumOrderMinor: minOrder,
+            sheetChargeMinor: sheetCharge,
+            minimumOrderMinor: ruleMinOrder,
             isActive,
           },
         });

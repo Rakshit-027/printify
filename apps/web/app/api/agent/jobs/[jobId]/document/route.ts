@@ -42,19 +42,6 @@ export async function GET(
       job = null;
     }
 
-    // Fallback for mock preview
-    if (!job && jobId.startsWith('job-demo-')) {
-      const sasUrl = await generateDownloadSasUrl('vendors/demo-vendor-id/2026/10/mock.pdf', 15);
-      return NextResponse.json({
-        success: true,
-        document: {
-          filename: 'Quarterly_Report_2026.pdf',
-          mimeType: 'application/pdf',
-          downloadUrl: sasUrl,
-        },
-      });
-    }
-
     if (!job || job.vendorId !== vendor.id) {
       return NextResponse.json({ error: 'Job not found for this vendor' }, { status: 404 });
     }

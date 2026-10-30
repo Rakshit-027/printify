@@ -51,16 +51,9 @@ export async function GET(request: NextRequest) {
       activePrinterCount = printers;
       documentCount = docs;
       purgedDocumentCount = purgedDocs;
-    } catch {
-      // Fallback preview aggregates
-      totalRevenueMinor = 485000; // ₹4,850.00
-      totalOrders = 124;
-      vendorCount = 6;
-      pendingVendorCount = 1;
-      deviceCount = 8;
-      activePrinterCount = 12;
-      documentCount = 88;
-      purgedDocumentCount = 312;
+    } catch (dbErr) {
+      console.error('Failed to query database metrics:', dbErr);
+      return NextResponse.json({ error: 'Failed to query database metrics' }, { status: 500 });
     }
 
     const storageHealth = await checkStorageHealth();

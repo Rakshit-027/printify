@@ -76,31 +76,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (order) {
-      // 3. Atomically confirm order, mark payment success, and enqueue PrintJob
-      await prisma.$transaction(async (tx) => {
-        // Update Order
-        await tx.order.update({
-          where: { id: order.id },
-          data: {
-            status: OrderStatus.CONFIRMED,
-            paymentStatus: PaymentStatus.SUCCESS,
-          },
-        });
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
 
-        // Update Payment Record
-        const paymentRecord = order.payments.find((p: any) => p.razorpayOrderId === razorpayOrderId) || order.payments[0];
-        if (paymentRecord) {
-          await tx.payment.update({
-            where: { id: paymentRecord.id },
-            data: {
-              razorpayPaymentId,
-              razorpaySignature,
-              status: PaymentStatus.SUCCESS,
-              verifiedAt: new Date(),
-            },
-          });
-        }
+    const paymentRecord = order.payments.find((p: any) => p.razorpayOrderId === razorpayOrderId);
+    if (!paymentRecord) {
+      return NextResponse.json(
+        { error: 'Razorpay order ID does not match any initiated payment record for this order' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Atomically confirm order, mark payment success, and enqueue PrintJob
+    await prisma.$transaction(async (tx) => {
+      // Update Order
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: OrderStatus.CONFIRMED,
+          paymentStatus: PaymentStatus.SUCCESS,
+        },
+      });
+
+      // Update Payment Record
+      await tx.payment.update({
+        where: { id: paymentRecord.id },
+        data: {
+          razorpayPaymentId,
+          razorpaySignature,
+          status: PaymentStatus.SUCCESS,
+          verifiedAt: new Date(),
+        },
+      });
 
         // Enqueue PrintJob for Windows Print Agent
         await tx.printJob.create({
@@ -120,13 +128,12 @@ export async function POST(request: NextRequest) {
         });
       });
 
-      await logAuditEvent({
-        action: 'PAYMENT_VERIFIED_SUCCESS',
-        resource: 'Payment',
-        resourceId: razorpayPaymentId,
-        details: { orderId: order.id, razorpayOrderId, razorpayPaymentId },
-      });
-    }
+    await logAuditEvent({
+      action: 'PAYMENT_VERIFIED_SUCCESS',
+      resource: 'Payment',
+      resourceId: razorpayPaymentId,
+      details: { orderId: order.id, razorpayOrderId, razorpayPaymentId },
+    });
 
     return NextResponse.json({
       success: true,

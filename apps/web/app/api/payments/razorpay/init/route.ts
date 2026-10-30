@@ -42,23 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!order) {
-      // Demo fallback mock order
-      const rzpMock = await createPartnerOrder({
-        amountMinor: 1550,
-        receipt: 'ORD-8921',
-        notes: { trackingToken },
-        paymentAccount: null,
-      });
-      return NextResponse.json({
-        success: true,
-        razorpayKeyId: rzpMock.keyId,
-        razorpayOrderId: rzpMock.razorpayOrderId,
-        amountMinor: rzpMock.amountMinor,
-        currency: rzpMock.currency,
-        orderNumber: 'ORD-8921',
-        vendorName: 'SpeedyPrint Express',
-        isMock: rzpMock.isMock,
-      });
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {

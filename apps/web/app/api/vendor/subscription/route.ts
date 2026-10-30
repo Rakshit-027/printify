@@ -25,11 +25,6 @@ async function resolveVendorId(request: NextRequest): Promise<string | null> {
     }
   } catch {}
 
-  try {
-    const firstVendor = await prisma.vendor.findFirst({ where: { isActive: true } });
-    if (firstVendor) return firstVendor.id;
-  } catch {}
-
   return null;
 }
 

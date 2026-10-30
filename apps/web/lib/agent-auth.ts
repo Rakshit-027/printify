@@ -47,24 +47,6 @@ export async function authenticateAgentRequest(
     device = null;
   }
 
-  // Fallback for offline demo simulation
-  if (!device && deviceId.startsWith('device_demo_')) {
-    return {
-      device: {
-        id: deviceId,
-        vendorId: 'demo-vendor-id',
-        deviceName: 'WIN-PRINT-STATION-01',
-        isRevoked: false,
-      },
-      vendor: {
-        id: 'demo-vendor-id',
-        name: 'SpeedyPrint Express',
-        slug: 'speedy-express',
-        isActive: true,
-      },
-    };
-  }
-
   if (!device || device.isRevoked) {
     return NextResponse.json(
       { error: 'Device record is invalid or has been revoked by vendor' },
