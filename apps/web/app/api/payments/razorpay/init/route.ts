@@ -66,6 +66,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If an existing pending Payment record already has a razorpayOrderId, reuse it idempotently!
+    const existingPayment = order.payments?.[0];
+    const resolvedKey =
+      order.vendor?.paymentAccount?.publicToken ||
+      process.env.RAZORPAY_KEY_ID ||
+      'rzp_test_oauth_simulation';
+
+    if (existingPayment?.razorpayOrderId) {
+      return NextResponse.json({
+        success: true,
+        razorpayKeyId: resolvedKey,
+        razorpayOrderId: existingPayment.razorpayOrderId,
+        amountMinor: order.totalAmountMinor,
+        currency: order.currency || 'INR',
+        orderNumber: order.orderNumber,
+        vendorName: order.vendor?.name || 'Print2Me Station',
+        isMock: existingPayment.razorpayOrderId.startsWith('order_sub_'),
+      });
+    }
+
     // Call officially supported Partner Order creation API using sub-merchant OAuth token
     const rzpOrder = await createPartnerOrder({
       amountMinor: order.totalAmountMinor,
@@ -80,7 +100,6 @@ export async function POST(request: NextRequest) {
 
     // Update pending Payment record with razorpayOrderId
     try {
-      const existingPayment = order.payments[0];
       if (existingPayment) {
         await prisma.payment.update({
           where: { id: existingPayment.id },

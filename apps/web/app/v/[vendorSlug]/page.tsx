@@ -1702,7 +1702,7 @@ export default function VendorPublicOrderPage() {
           },
           modal: {
             ondismiss: function () {
-              router.push(`/pay/${data.order.trackingToken}`);
+              setIsPlacingOrder(false);
             },
           },
           prefill: {
@@ -1746,7 +1746,9 @@ export default function VendorPublicOrderPage() {
         const rzp = new (window as any).Razorpay(options);
         rzp.on('payment.failed', function (failureRes: any) {
           console.error('Payment failed', failureRes);
-          router.push(`/pay/${data.order.trackingToken}`);
+          setIsPlacingOrder(false);
+          const failureMsg = failureRes?.error?.description || 'Payment was cancelled or could not be completed.';
+          alert(failureMsg);
         });
         rzp.open();
         setIsPlacingOrder(false);

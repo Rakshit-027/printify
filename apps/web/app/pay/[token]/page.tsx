@@ -36,9 +36,16 @@ export default function PayTokenPage() {
           body: JSON.stringify({ trackingToken: token, token }),
         });
 
-        const data = await res.json();
+        let data: any = null;
+        try {
+          data = await res.json();
+        } catch {
+          const text = await res.text().catch(() => '');
+          throw new Error(text || 'Failed to initialize payment gateway');
+        }
+
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to initialize payment');
+          throw new Error(data?.error || 'Failed to initialize payment');
         }
 
         setPaymentData(data);
