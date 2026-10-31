@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Lock,
   CreditCard,
+  Banknote,
   Sparkles,
   ArrowRight,
   Plus,
@@ -452,7 +453,7 @@ function CameraScanStudioModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2 sm:p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
-      <div className="bg-surface rounded-[24px] sm:rounded-[28px] border border-hairline max-w-lg w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface rounded-3xl sm:rounded-3xl border border-hairline max-w-lg w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-3.5 sm:p-4 border-b border-hairline flex items-center justify-between bg-surface">
           <div className="flex items-center gap-2.5">
@@ -460,10 +461,10 @@ function CameraScanStudioModal({
               <Crop className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-sora font-extrabold text-ink text-sm sm:text-base leading-tight">
+              <h3 className="font-sora font-bold text-ink text-sm sm:text-base leading-tight">
                 Document Scanner &amp; Crop
               </h3>
-              <p className="text-[10px] text-ink-soft">
+              <p className="text-[11px] text-ink-soft">
                 Drag corners by hand to set borders precisely
               </p>
             </div>
@@ -591,7 +592,7 @@ function CameraScanStudioModal({
                   </div>
 
                   {/* Dimension pill badge */}
-                  <span className="pointer-events-none opacity-85 px-2 py-0.5 rounded-pill bg-black/75 text-[10px] text-white font-mono shadow-xs">
+                  <span className="pointer-events-none opacity-85 px-2 py-0.5 rounded-pill bg-black/75 text-[11px] text-white tabular-nums shadow-xs">
                     {cropWPercent}% × {cropHPercent}%
                   </span>
                 </div>
@@ -697,7 +698,7 @@ function CameraScanStudioModal({
                     key={p.id}
                     type="button"
                     onClick={() => applyPreset(p.id as AspectPreset)}
-                    className={`px-2 py-1 rounded-10 text-[11px] font-bold transition-colors ${
+                    className={`px-2 py-1 rounded-10 text-xs font-bold transition-colors ${
                       activePreset === p.id
                         ? 'bg-ink text-white shadow-xs'
                         : 'bg-surface border border-hairline text-ink-soft hover:text-ink'
@@ -710,7 +711,7 @@ function CameraScanStudioModal({
                 <button
                   type="button"
                   onClick={() => applyPreset('FULL')}
-                  className="px-2 py-1 rounded-10 bg-surface border border-hairline text-[11px] font-bold text-ink-soft hover:text-ink transition-colors"
+                  className="px-2 py-1 rounded-10 bg-surface border border-hairline text-xs font-bold text-ink-soft hover:text-ink transition-colors"
                   title="Reset to 100% full frame"
                 >
                   Full Frame
@@ -725,7 +726,7 @@ function CameraScanStudioModal({
                 title="Rotate image 90 degrees"
               >
                 <RotateCw className="w-3 h-3 text-saffron" />
-                <span className="text-[11px]">Rotate 90°</span>
+                <span className="text-xs">Rotate 90°</span>
               </button>
             </>
           ) : (
@@ -736,9 +737,9 @@ function CameraScanStudioModal({
                 className="px-2.5 py-1 rounded-10 bg-surface border border-hairline text-ink font-bold flex items-center gap-1.5 hover:bg-hairline transition-colors"
               >
                 <Crop className="w-3.5 h-3.5 text-saffron" />
-                <span className="text-[11px]">← Re-adjust Crop Edges</span>
+                <span className="text-xs">← Re-adjust Crop Edges</span>
               </button>
-              <span className="text-[11px] text-ink-soft font-medium">
+              <span className="text-xs text-ink-soft font-medium">
                 Live document filter applied
               </span>
             </div>
@@ -747,12 +748,12 @@ function CameraScanStudioModal({
 
         {/* Filter Selection & Action Footer */}
         <div className="p-3 sm:p-4 bg-surface border-t border-hairline space-y-3">
-          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
+          <label className="text-xs font-bold  text-ink-soft flex items-center justify-between">
             <span className="flex items-center gap-1">
               <Wand2 className="w-3.5 h-3.5 text-saffron" />
               <span>Document Filter</span>
             </span>
-            <span className="text-[10px] text-emerald-600 font-semibold">
+            <span className="text-[11px] text-emerald-600 font-semibold">
               High-Res Enhancement
             </span>
           </label>
@@ -777,8 +778,8 @@ function CameraScanStudioModal({
                     : 'text-ink-soft hover:text-ink'
                 }`}
               >
-                <div className="text-[11px] font-bold leading-tight">{f.label}</div>
-                <div className={`text-[9px] ${filter === f.id ? 'text-white/80' : 'text-ink-soft/70'}`}>
+                <div className="text-xs font-bold leading-tight">{f.label}</div>
+                <div className={`text-[11px] ${filter === f.id ? 'text-white/80' : 'text-ink-soft/70'}`}>
                   {f.sub}
                 </div>
               </button>
@@ -937,14 +938,14 @@ function DocumentPreviewModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3 sm:p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
-      <div className="bg-surface rounded-[28px] border border-hairline max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface rounded-3xl border border-hairline max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Top Header */}
         <div className="p-4 border-b border-hairline flex items-center justify-between gap-3 bg-surface">
           <div className="min-w-0 flex-1">
-            <h3 className="font-sora font-extrabold text-ink text-sm sm:text-base truncate">
+            <h3 className="font-sora font-bold text-ink text-sm sm:text-base truncate">
               {doc.originalName}
             </h3>
-            <p className="text-[11px] text-ink-soft flex items-center gap-1.5 mt-0.5">
+            <p className="text-xs text-ink-soft flex items-center gap-1.5 mt-0.5">
               <span>{numPages} {numPages === 1 ? 'page' : 'pages'}</span>
               <span>•</span>
               <span>{(doc.fileSize / (1024 * 1024)).toFixed(1)} MB</span>
@@ -957,7 +958,7 @@ function DocumentPreviewModal({
                 href={doc.blobUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2.5 py-1.5 rounded-12 bg-paper hover:bg-hairline text-ink text-[11px] font-bold border border-hairline flex items-center gap-1 transition-colors"
+                className="px-2.5 py-1.5 rounded-12 bg-paper hover:bg-hairline text-ink text-xs font-bold border border-hairline flex items-center gap-1 transition-colors"
                 title="Open in new window"
               >
                 <span>Full Tab</span>
@@ -1032,7 +1033,7 @@ function DocumentPreviewModal({
               >
                 Previous
               </button>
-              <span className="font-mono text-xs font-bold text-ink px-1">
+              <span className="tabular-nums text-xs font-bold text-ink px-1">
                 {pageNumber} / {numPages}
               </span>
               <button
@@ -1045,7 +1046,7 @@ function DocumentPreviewModal({
               </button>
             </div>
           ) : (
-            <span className="text-[11px] text-ink-soft">Inspect margins, orientation &amp; text clarity.</span>
+            <span className="text-xs text-ink-soft">Inspect margins, orientation &amp; text clarity.</span>
           )}
 
           <button
@@ -1769,7 +1770,7 @@ export default function VendorPublicOrderPage() {
           <RefreshCw className="w-8 h-8 motion-safe:animate-spin" />
         </div>
         <div className="text-center space-y-1">
-          <h2 className="font-sora font-extrabold text-ink text-lg">Connecting to Print Station</h2>
+          <h2 className="font-sora font-bold text-ink text-lg">Connecting to Print Station</h2>
           <p className="text-xs text-ink-soft">Loading shop pricing and counter spooler status...</p>
         </div>
       </div>
@@ -1782,7 +1783,7 @@ export default function VendorPublicOrderPage() {
         <div className="w-16 h-16 rounded-32 bg-danger/10 text-danger flex items-center justify-center mb-4">
           <AlertCircle className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-sora font-extrabold text-ink mb-2">Print Station Offline</h2>
+        <h2 className="text-2xl font-sora font-bold text-ink mb-2">Print Station Offline</h2>
         <p className="text-sm text-ink-soft max-w-sm mb-6">
           This print shop kiosk is currently inactive or the QR link has expired.
         </p>
@@ -1801,7 +1802,7 @@ export default function VendorPublicOrderPage() {
   const activeSizes = Array.from(new Set(vendor.pricingConfig.map((p) => p.paperSize)));
 
   return (
-    <div className="min-h-screen bg-paper pb-40 text-ink selection:bg-saffron selection:text-white">
+    <div className="min-h-screen bg-paper pb-44 text-ink antialiased selection:bg-saffron selection:text-white [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-saffron/60 [&_button:focus-visible]:ring-offset-2">
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -1830,98 +1831,57 @@ export default function VendorPublicOrderPage() {
         </div>
       )}
 
-      {/* 1. APP HEADER WITH BRAND & SHOP INFO */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-hairline/60 shadow-sm">
-        <div className="border-b border-hairline/40 px-4 py-2 bg-paper/60">
-          <div className="max-w-xl mx-auto flex items-center justify-between">
-            <Link href="/" className="inline-flex items-center hover:opacity-90 transition-opacity">
-              <BrandLogo variant="horizontal" height={28} />
-            </Link>
-            <div className="flex items-center gap-1.5 text-[11px] text-ink-soft bg-surface px-2.5 py-1 rounded-pill border border-hairline font-semibold shadow-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-              <span>Instant Kiosk</span>
+      {/* 1. HEADER */}
+      <header className="sticky top-0 z-30 bg-surface/90 backdrop-blur-xl border-b border-hairline/60">
+        <div className="max-w-xl mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="relative shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-saffron text-white font-sora font-bold text-xl flex items-center justify-center">
+              {vendor.name.charAt(0)}
             </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-surface rounded-full" />
           </div>
-        </div>
-
-        <div className="px-4 py-2.5">
-          <div className="max-w-xl mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="relative">
-                <div className="w-10 h-10 rounded-20 bg-gradient-to-tr from-saffron to-amber-500 text-white font-sora font-extrabold text-base flex items-center justify-center shadow-md shadow-saffron/20 shrink-0">
-                  {vendor.name.charAt(0)}
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="font-sora font-extrabold text-ink text-sm sm:text-base tracking-tight truncate">
-                    {vendor.name}
-                  </h1>
-                  <span className="shrink-0 text-[9px] font-bold  px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 motion-safe:animate-pulse" />
-                    Counter Ready
-                  </span>
-                </div>
-                <p className="text-xs text-ink-soft truncate flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-saffron shrink-0" />
-                  <span className="truncate">{vendor.address}</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowQrModal(true)}
-                className="w-8 h-8 rounded-12 bg-paper border border-hairline hover:border-saffron/40 flex items-center justify-center text-ink-soft hover:text-ink transition-colors active:scale-95 shadow-sm"
-                title="View Counter Standee QR"
-                aria-label="View QR"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-sora font-bold text-ink text-lg leading-tight truncate">{vendor.name}</h1>
+            <p className="text-sm text-ink-soft truncate flex items-center gap-1 mt-0.5">
+              <MapPin className="w-3.5 h-3.5 text-saffron shrink-0" />
+              <span className="truncate">{vendor.address}</span>
+            </p>
           </div>
+          <button
+            onClick={() => setShowQrModal(true)}
+            className="w-11 h-11 rounded-2xl bg-paper border border-hairline text-ink flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="View counter QR"
+          >
+            <QrCode className="w-5 h-5" />
+          </button>
         </div>
       </header>
 
-      {/* 2. PROGRESS STEPPER PILL */}
-      <div className="px-4 pt-4 max-w-xl mx-auto">
-        <div className="bg-surface rounded-20 p-1.5 border border-hairline/80 shadow-sm flex items-center gap-1">
-          <button
-            onClick={() => setStep('UPLOAD')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-colors ${
-              step === 'UPLOAD'
-                ? 'bg-ink text-white shadow-sm'
-                : 'text-ink-soft hover:text-ink hover:bg-paper'
-            }`}
-          >
-            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-extrabold ${step === 'UPLOAD' ? 'bg-saffron text-white' : 'bg-hairline text-ink-soft'}`}>
-              1
-            </div>
-            <span>Upload &amp; Options</span>
-            {documents.length > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-pill font-mono ${step === 'UPLOAD' ? 'bg-white/20' : 'bg-paper text-ink-soft'}`}>
-                {documents.length}
-              </span>
-            )}
+      {/* 2. PROGRESS */}
+      <div className="px-4 pt-5 max-w-xl mx-auto">
+        <div className="flex items-center justify-between mb-3">
+          <Link href="/" className="inline-flex items-center">
+            <BrandLogo variant="horizontal" height={22} />
+          </Link>
+          <span className="text-xs font-semibold text-ink-soft">Step {step === 'UPLOAD' ? 1 : 2} of 2</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button type="button" onClick={() => setStep('UPLOAD')} className="text-left">
+            <div className="h-1.5 rounded-pill bg-saffron" />
+            <span className={`mt-2 block text-sm font-bold ${step === 'UPLOAD' ? 'text-ink' : 'text-ink-soft'}`}>
+              Upload{documents.length > 0 ? ` (${documents.length})` : ''}
+            </span>
           </button>
-
           <button
-            onClick={() => documents.length > 0 && setStep('PAYMENT')}
+            type="button"
             disabled={documents.length === 0}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-14 text-xs font-bold transition-colors ${
-              step === 'PAYMENT'
-                ? 'bg-ink text-white shadow-sm'
-                : documents.length > 0
-                ? 'text-ink-soft hover:text-ink hover:bg-paper'
-                : 'text-ink-soft/40 cursor-not-allowed'
-            }`}
+            onClick={() => documents.length > 0 && setStep('PAYMENT')}
+            className="text-left disabled:cursor-not-allowed"
           >
-            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-extrabold ${step === 'PAYMENT' ? 'bg-saffron text-white' : 'bg-hairline text-ink-soft'}`}>
-              2
-            </div>
-            <span>Review &amp; Pay</span>
+            <div className={`h-1.5 rounded-pill ${step === 'PAYMENT' ? 'bg-saffron' : 'bg-hairline'}`} />
+            <span className={`mt-2 block text-sm font-bold ${step === 'PAYMENT' ? 'text-ink' : 'text-ink-soft'}`}>
+              Review &amp; pay
+            </span>
           </button>
         </div>
       </div>
@@ -1930,94 +1890,53 @@ export default function VendorPublicOrderPage() {
       <main className="px-4 pt-4 max-w-xl mx-auto space-y-4">
         {step === 'UPLOAD' ? (
           <>
-            {/* UPLOAD HERO DROPZONE */}
+            {/* UPLOAD HERO */}
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => !isUploading && fileInputRef.current?.click()}
-              className={`relative overflow-hidden rounded-[28px] border-2 border-dashed p-6 text-center cursor-pointer transition-colors active:scale-[0.99] group ${
-                isDragging
-                  ? 'border-saffron bg-saffron-tint/80 shadow-lg scale-[1.01]'
-                  : 'border-saffron/40 bg-surface hover:border-saffron hover:bg-gradient-to-b hover:from-white hover:to-saffron-tint/20 shadow-ink-soft'
+              className={`rounded-3xl border-2 border-dashed px-6 py-10 text-center cursor-pointer transition-colors ${
+                isDragging ? 'border-saffron bg-saffron-tint' : 'border-saffron/40 bg-surface hover:border-saffron'
               }`}
             >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-saffron/15 to-transparent rounded-bl-full pointer-events-none" />
-
               {isUploading ? (
-                <div className="py-4 space-y-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none">
-                  <div className="relative w-16 h-16 mx-auto">
-                    <div className="absolute inset-0 rounded-full border-4 border-hairline" />
-                    <div className="absolute inset-0 rounded-full border-4 border-saffron border-t-transparent motion-safe:animate-spin" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-mono font-extrabold text-ink">{uploadProgress}%</span>
-                    </div>
+                <div className="space-y-4">
+                  <p className="font-sora font-bold text-ink text-lg">Uploading {uploadProgress}%</p>
+                  <div className="max-w-xs mx-auto bg-paper rounded-pill h-2.5 overflow-hidden border border-hairline">
+                    <div className="bg-saffron h-full rounded-pill transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                   </div>
-                  <div>
-                    <h2 className="font-sora font-extrabold text-ink text-base">
-                      Uploading Document...
-                    </h2>
-                    <p className="text-xs text-ink-soft truncate max-w-xs mx-auto mt-0.5 font-medium">
-                      {uploadFileName}
-                    </p>
-                  </div>
-                  <div className="max-w-xs mx-auto bg-paper rounded-pill h-2 overflow-hidden border border-hairline/80">
-                    <div
-                      className="bg-gradient-to-r from-saffron to-amber-500 h-full transition-colors duration-300 rounded-pill"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-ink-soft/80">Securing token &amp; readying preview...</p>
+                  <p className="text-sm text-ink-soft truncate max-w-xs mx-auto">{uploadFileName}</p>
                 </div>
               ) : (
-                <div className="py-2 space-y-3">
-                  <div className="relative w-16 h-16 mx-auto">
-                    <div className="w-16 h-16 rounded-24 bg-gradient-to-br from-saffron-tint to-amber-100 flex items-center justify-center text-saffron shadow-sm group-hover:scale-105 transition-transform duration-300">
-                      <UploadCloud className="w-8 h-8" />
-                    </div>
-                    <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-ink text-white flex items-center justify-center text-xs shadow">
-                      <Plus className="w-3.5 h-3.5" />
-                    </span>
+                <div className="space-y-3">
+                  <div className="w-16 h-16 mx-auto rounded-3xl bg-saffron-tint text-saffron flex items-center justify-center">
+                    <UploadCloud className="w-8 h-8" />
                   </div>
-
-                  <div>
-                    <h2 className="font-sora font-extrabold text-ink text-lg sm:text-xl">
-                      {documents.length > 0 ? 'Add another document' : 'Tap to upload files or PDF'}
-                    </h2>
-                    <p className="text-xs text-ink-soft mt-1 leading-relaxed">
-                      PDF, JPG, or PNG · Up to 50MB per file
-                    </p>
-                  </div>
-
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-paper border border-hairline text-[11px] font-semibold text-ink-soft">
-                    <Sparkles className="w-3 h-3 text-saffron" />
-                    <span>Instant preview &amp; camera auto-enhance</span>
-                  </div>
+                  <h2 className="font-sora font-bold text-ink text-xl tracking-tight">
+                    {documents.length > 0 ? 'Add another file' : 'Upload your files'}
+                  </h2>
+                  <p className="text-sm text-ink-soft">PDF, JPG or PNG, up to 50MB each</p>
                 </div>
               )}
             </div>
 
-            {/* INSTANT ACTION BUTTONS: BROWSE FILES & SCAN WITH CAMERA */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => !isUploading && fileInputRef.current?.click()}
-                className="py-3 px-4 rounded-20 bg-surface border border-hairline/80 hover:border-saffron/60 text-ink text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:shadow-sm transition-colors active:scale-[0.98]"
+                className="min-h-[56px] rounded-2xl bg-ink text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                <UploadCloud className="w-4 h-4 text-saffron shrink-0" />
-                <span>Browse Files / PDF</span>
+                <FileText className="w-5 h-5" />
+                <span>Browse files</span>
               </button>
-
               <button
                 type="button"
                 onClick={() => !isUploading && cameraInputRef.current?.click()}
-                className="py-3 px-4 rounded-20 bg-gradient-to-r from-saffron to-amber-500 hover:from-saffron/90 hover:to-amber-500/90 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-saffron/20 transition-colors active:scale-[0.98]"
+                className="min-h-[56px] rounded-2xl bg-saffron-tint border border-saffron/40 text-ink text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                <Camera className="w-4 h-4 text-white shrink-0" />
-                <span>Scan with Camera</span>
+                <Camera className="w-5 h-5 text-saffron" />
+                <span>Scan with camera</span>
               </button>
             </div>
 
@@ -2034,40 +1953,28 @@ export default function VendorPublicOrderPage() {
               </div>
             )}
 
-            {/* TRUST BADGES BAR */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2.5 rounded-16 bg-surface border border-hairline/80 shadow-xs flex flex-col items-center justify-center">
-                <Lock className="w-3.5 h-3.5 text-saffron mb-1" />
-                <span className="text-[10px] font-bold text-ink">Zero Pen Drive</span>
-                <span className="text-[9px] text-ink-soft">Encrypted direct SAS</span>
-              </div>
-              <div className="p-2.5 rounded-16 bg-surface border border-hairline/80 shadow-xs flex flex-col items-center justify-center">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 mb-1" />
-                <span className="text-[10px] font-bold text-ink">Auto-Purged</span>
-                <span className="text-[9px] text-ink-soft">Deleted after printing</span>
-              </div>
-              <div className="p-2.5 rounded-16 bg-surface border border-hairline/80 shadow-xs flex flex-col items-center justify-center">
-                <CreditCard className="w-3.5 h-3.5 text-blue-600 mb-1" />
-                <span className="text-[10px] font-bold text-ink">UPI &amp; Cash</span>
-                <span className="text-[9px] text-ink-soft">Pay online or on desk</span>
-              </div>
-            </div>
+            {/* TRUST */}
+            <ul className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-xs font-semibold text-ink-soft">
+              <li className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-saffron" />Encrypted upload</li>
+              <li className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />Deleted after printing</li>
+              <li className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-blue-600" />UPI or cash</li>
+            </ul>
 
             {/* RICH EMPTY STATE: LIVE RATE CARD & STEP-BY-STEP KIOSK GUIDE */}
             {documents.length === 0 && vendor && (
               <div className="space-y-4 pt-1 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-300">
                 {/* 1. VENDOR PRINTING RATE CARD */}
-                <div className="bg-surface rounded-[24px] border border-hairline/80 p-4 shadow-sm space-y-3">
+                <div className="bg-surface rounded-3xl border border-hairline/80 p-4 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-10 bg-saffron-tint text-saffron flex items-center justify-center">
                         <Tag className="w-3.5 h-3.5" />
                       </div>
-                      <span className="font-sora font-extrabold text-xs text-ink">
-                        Printing Rates at this Counter
+                      <span className="font-sora font-bold text-xs text-ink">
+                        Printing rates
                       </span>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
                       Live Prices
                     </span>
                   </div>
@@ -2075,96 +1982,62 @@ export default function VendorPublicOrderPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {/* B&W Single */}
                     <div className="p-3 rounded-16 bg-paper border border-hairline flex flex-col justify-between">
-                      <div className="text-[11px] font-bold text-ink">A4 B&amp;W Single</div>
-                      <div className="text-[10px] text-ink-soft">Standard 1-sided</div>
-                      <div className="mt-2 text-base font-extrabold font-sora text-ink">
+                      <div className="text-xs font-bold text-ink">A4 B&amp;W Single</div>
+                      <div className="text-[11px] text-ink-soft">Standard 1-sided</div>
+                      <div className="mt-2 text-base font-bold font-sora text-ink">
                         ₹{(((vendor.pricingConfig.find((t) => t.colorMode === 'BLACK_AND_WHITE' && !t.isDuplex)?.pricePerSideMinor || 200)) / 100).toFixed(2)}
-                        <span className="text-[10px] font-normal text-ink-soft">/page</span>
+                        <span className="text-[11px] font-normal text-ink-soft">/page</span>
                       </div>
                     </div>
 
                     {/* B&W Duplex */}
                     <div className="p-3 rounded-16 bg-paper border border-hairline flex flex-col justify-between">
-                      <div className="text-[11px] font-bold text-ink flex items-center gap-1">
+                      <div className="text-xs font-bold text-ink flex items-center gap-1">
                         <span>A4 B&amp;W Both Sides</span>
                         <Leaf className="w-3 h-3 text-emerald-600" />
                       </div>
-                      <div className="text-[10px] text-ink-soft">Back-to-back eco</div>
-                      <div className="mt-2 text-base font-extrabold font-sora text-emerald-700">
+                      <div className="text-[11px] text-ink-soft">Back-to-back eco</div>
+                      <div className="mt-2 text-base font-bold font-sora text-emerald-700">
                         ₹{(((vendor.pricingConfig.find((t) => t.colorMode === 'BLACK_AND_WHITE' && t.isDuplex)?.pricePerSideMinor || 175)) / 100).toFixed(2)}
-                        <span className="text-[10px] font-normal text-ink-soft">/side</span>
+                        <span className="text-[11px] font-normal text-ink-soft">/side</span>
                       </div>
                     </div>
 
                     {/* Color Single */}
                     <div className="p-3 rounded-16 bg-paper border border-hairline flex flex-col justify-between">
-                      <div className="text-[11px] font-bold text-ink">A4 Color Single</div>
-                      <div className="text-[10px] text-ink-soft">Vibrant graphics</div>
-                      <div className="mt-2 text-base font-extrabold font-sora text-ink">
+                      <div className="text-xs font-bold text-ink">A4 Color Single</div>
+                      <div className="text-[11px] text-ink-soft">Vibrant graphics</div>
+                      <div className="mt-2 text-base font-bold font-sora text-ink">
                         ₹{(((vendor.pricingConfig.find((t) => t.colorMode === 'COLOR' && !t.isDuplex)?.pricePerSideMinor || 1000)) / 100).toFixed(2)}
-                        <span className="text-[10px] font-normal text-ink-soft">/page</span>
+                        <span className="text-[11px] font-normal text-ink-soft">/page</span>
                       </div>
                     </div>
 
                     {/* Color Duplex */}
                     <div className="p-3 rounded-16 bg-paper border border-hairline flex flex-col justify-between">
-                      <div className="text-[11px] font-bold text-ink flex items-center gap-1">
+                      <div className="text-xs font-bold text-ink flex items-center gap-1">
                         <span>A4 Color Both Sides</span>
                         <Leaf className="w-3 h-3 text-emerald-600" />
                       </div>
-                      <div className="text-[10px] text-ink-soft">Full color back-to-back</div>
-                      <div className="mt-2 text-base font-extrabold font-sora text-emerald-700">
+                      <div className="text-[11px] text-ink-soft">Full color back-to-back</div>
+                      <div className="mt-2 text-base font-bold font-sora text-emerald-700">
                         ₹{(((vendor.pricingConfig.find((t) => t.colorMode === 'COLOR' && t.isDuplex)?.pricePerSideMinor || 900)) / 100).toFixed(2)}
-                        <span className="text-[10px] font-normal text-ink-soft">/side</span>
+                        <span className="text-[11px] font-normal text-ink-soft">/side</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. HOW TO PRINT IN 3 STEPS */}
-                <div className="bg-surface rounded-[24px] border border-hairline/80 p-4 shadow-sm space-y-3">
-                  <span className="font-sora font-extrabold text-xs text-ink">
-                    How Print2Me Works at Counter
-                  </span>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-start gap-3 p-2.5 rounded-16 bg-paper/60 border border-hairline">
-                      <div className="w-6 h-6 rounded-full bg-saffron text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                        1
-                      </div>
-                      <div>
-                        <div className="font-bold text-ink">Upload or Snap Photo</div>
-                        <p className="text-[11px] text-ink-soft mt-0.5">
-                          Tap Browse Files for PDF/Doc or Scan with Camera for books, notes, ID cards with hand crop &amp; enhancement.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-2.5 rounded-16 bg-paper/60 border border-hairline">
-                      <div className="w-6 h-6 rounded-full bg-ink text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                        2
-                      </div>
-                      <div>
-                        <div className="font-bold text-ink">Customize Copies &amp; Color</div>
-                        <p className="text-[11px] text-ink-soft mt-0.5">
-                          Choose B&amp;W or Color, single or double-sided, custom page range, and see instant price calculation.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-2.5 rounded-16 bg-paper/60 border border-hairline">
-                      <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                        3
-                      </div>
-                      <div>
-                        <div className="font-bold text-ink">Collect from Counter in Minutes</div>
-                        <p className="text-[11px] text-ink-soft mt-0.5">
-                          Pay online via UPI or pay cash on desk when collecting your printed sheets.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* 2. HOW IT WORKS */}
+                <ol className="grid grid-cols-3 gap-2 text-center">
+                  {[['Upload', 'Add a PDF or scan a page'], ['Choose', 'Colour, sides and copies'], ['Collect', 'Pay online or at the desk']].map(([t, d], i) => (
+                    <li key={t} className="px-1 py-2">
+                      <div className="mx-auto w-8 h-8 rounded-full bg-ink text-white text-sm font-bold flex items-center justify-center">{i + 1}</div>
+                      <div className="mt-2 text-sm font-bold text-ink">{t}</div>
+                      <p className="text-xs text-ink-soft mt-0.5 leading-snug">{d}</p>
+                    </li>
+                  ))}
+                </ol>
 
                 {/* 3. COUNTER HOURS & LOCATION */}
                 <div className="p-3.5 rounded-20 bg-paper border border-hairline flex items-center justify-between gap-3 text-xs">
@@ -2172,11 +2045,11 @@ export default function VendorPublicOrderPage() {
                     <Clock className="w-4 h-4 text-saffron shrink-0" />
                     <div className="truncate">
                       <div className="font-bold text-ink truncate">{vendor.operatingHours || 'Counter Open Today'}</div>
-                      <div className="text-[10px] text-ink-soft truncate">{vendor.address}</div>
+                      <div className="text-[11px] text-ink-soft truncate">{vendor.address}</div>
                     </div>
                   </div>
                   <div className="shrink-0">
-                    <span className="text-[10px] font-bold text-ink bg-surface px-2 py-1 rounded-full border border-hairline">
+                    <span className="text-[11px] font-bold text-ink bg-surface px-2 py-1 rounded-full border border-hairline">
                       {vendor.allowCashOnDesk ? 'Cash & UPI OK' : 'UPI Only'}
                     </span>
                   </div>
@@ -2188,7 +2061,7 @@ export default function VendorPublicOrderPage() {
             {documents.length > 0 && (
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="font-sora font-extrabold text-ink text-sm sm:text-base flex items-center gap-2">
+                  <h3 className="font-sora font-bold text-ink text-base flex items-center gap-2">
                     <Layers className="w-4 h-4 text-saffron" />
                     <span>Selected Documents ({documents.length})</span>
                   </h3>
@@ -2243,7 +2116,7 @@ export default function VendorPublicOrderPage() {
                   return (
                     <div
                       key={doc.id}
-                      className={`bg-surface rounded-[24px] border transition-colors overflow-hidden shadow-sm ${
+                      className={`bg-surface rounded-3xl border transition-colors overflow-hidden shadow-sm ${
                         isActive
                           ? 'border-ink shadow-ink-soft ring-2 ring-ink/5'
                           : 'border-hairline hover:border-hairline/80'
@@ -2254,7 +2127,7 @@ export default function VendorPublicOrderPage() {
                         onClick={() => setActiveDocIndex(idx)}
                         className="p-4 flex items-center gap-3.5 cursor-pointer select-none"
                       >
-                        <div className="w-11 h-11 rounded-16 bg-paper border border-hairline flex items-center justify-center shrink-0">
+                        <div className="w-12 h-12 rounded-16 bg-paper border border-hairline flex items-center justify-center shrink-0">
                           {doc.mimeType === 'application/pdf' ? (
                             <FileText className="w-6 h-6 text-danger" />
                           ) : (
@@ -2263,12 +2136,12 @@ export default function VendorPublicOrderPage() {
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="font-bold text-ink text-sm truncate flex items-center gap-2">
+                          <div className="font-bold text-ink text-[15px] truncate flex items-center gap-2">
                             <span className="truncate">{doc.originalName}</span>
                           </div>
-                          <div className="text-[11px] text-ink-soft flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <div className="text-xs text-ink-soft flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className="font-semibold text-ink">
-                              <span className="font-mono">{effectivePages}</span> of <span className="font-mono">{doc.pageCount}</span>p
+                              <span className="tabular-nums">{effectivePages}</span> of <span className="tabular-nums">{doc.pageCount}</span>p
                             </span>
                             <span aria-hidden="true" className="text-hairline">/</span>
                             <span>{doc.copies} {doc.copies === 1 ? 'copy' : 'copies'}</span>
@@ -2286,11 +2159,11 @@ export default function VendorPublicOrderPage() {
                               e.stopPropagation();
                               setPreviewDoc(doc);
                             }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-ink hover:text-saffron hover:bg-saffron-tint transition-colors"
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-ink hover:text-saffron hover:bg-saffron-tint transition-colors"
                             title="Preview document pages"
                             aria-label="Preview document"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-5 h-5" />
                           </button>
 
                           {/* Reorder Up/Down */}
@@ -2303,7 +2176,7 @@ export default function VendorPublicOrderPage() {
                                   e.stopPropagation();
                                   moveDoc(idx, 'UP');
                                 }}
-                                className="w-6 h-4 text-ink-soft hover:text-ink disabled:opacity-20 flex items-center justify-center"
+                                className="w-8 h-5 text-ink-soft hover:text-ink disabled:opacity-20 flex items-center justify-center"
                                 title="Move up"
                               >
                                 <ChevronUp className="w-3.5 h-3.5" />
@@ -2315,7 +2188,7 @@ export default function VendorPublicOrderPage() {
                                   e.stopPropagation();
                                   moveDoc(idx, 'DOWN');
                                 }}
-                                className="w-6 h-4 text-ink-soft hover:text-ink disabled:opacity-20 flex items-center justify-center"
+                                className="w-8 h-5 text-ink-soft hover:text-ink disabled:opacity-20 flex items-center justify-center"
                                 title="Move down"
                               >
                                 <ChevronDown className="w-3.5 h-3.5" />
@@ -2337,10 +2210,10 @@ export default function VendorPublicOrderPage() {
                                 setActiveDocIndex(Math.max(0, documents.length - 2));
                               }
                             }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-ink-soft hover:text-danger hover:bg-rose-50 transition-colors"
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-ink-soft hover:text-danger hover:bg-rose-50 transition-colors"
                             title="Remove file"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
@@ -2349,9 +2222,9 @@ export default function VendorPublicOrderPage() {
                       <div className="bg-surface p-4 border-t border-hairline/60 space-y-4">
                         {/* 1. Color vs B&W (Visual Toggle) */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
+                          <label className="text-xs font-bold  text-ink-soft flex items-center justify-between">
                             <span>Color Mode</span>
-                            <span className="text-[10px] text-ink-soft font-normal">
+                            <span className="text-[11px] text-ink-soft font-normal">
                               {doc.colorMode === 'COLOR' ? '₹10.00 / side' : '₹2.00 / side'}
                             </span>
                           </label>
@@ -2371,7 +2244,7 @@ export default function VendorPublicOrderPage() {
                               </div>
                               <div className="text-left min-w-0">
                                 <div className="text-xs font-bold leading-tight">Black &amp; White</div>
-                                <div className="text-[10px] text-ink-soft">Economical Xerox</div>
+                                <div className="text-[11px] text-ink-soft">Economical Xerox</div>
                               </div>
                             </button>
 
@@ -2389,7 +2262,7 @@ export default function VendorPublicOrderPage() {
                               </div>
                               <div className="text-left min-w-0">
                                 <div className="text-xs font-bold leading-tight">Full Color</div>
-                                <div className="text-[10px] text-saffron font-semibold">Crisp Graphics</div>
+                                <div className="text-[11px] text-saffron font-semibold">Crisp Graphics</div>
                               </div>
                             </button>
                           </div>
@@ -2397,9 +2270,9 @@ export default function VendorPublicOrderPage() {
 
                         {/* 2. Sides (Single vs Double Duplex) */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
+                          <label className="text-xs font-bold  text-ink-soft flex items-center justify-between">
                             <span>Sides</span>
-                            <span className="text-[10px] text-emerald-600 font-semibold">
+                            <span className="text-[11px] text-emerald-600 font-semibold">
                               {doc.isDuplex ? 'Saves paper & 20% discount' : 'Standard 1-sided'}
                             </span>
                           </label>
@@ -2408,7 +2281,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { isDuplex: false })}
-                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-colors ${
+                              className={`min-h-[48px] p-3 rounded-16 border-2 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${
                                 !doc.isDuplex
                                   ? 'border-ink bg-surface shadow-xs text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2421,7 +2294,7 @@ export default function VendorPublicOrderPage() {
                             <button
                               type="button"
                               onClick={() => updateDocConfig(idx, { isDuplex: true })}
-                              className={`p-2.5 rounded-16 border-2 flex items-center justify-center gap-2 text-xs font-bold transition-colors ${
+                              className={`min-h-[48px] p-3 rounded-16 border-2 flex items-center justify-center gap-2 text-sm font-bold transition-colors ${
                                 doc.isDuplex
                                   ? 'border-ink bg-surface shadow-xs text-ink'
                                   : 'border-hairline bg-surface/60 text-ink-soft hover:bg-surface'
@@ -2436,7 +2309,7 @@ export default function VendorPublicOrderPage() {
                         {/* 3. Paper Size & Copies in compact row */}
                         <div className="grid grid-cols-2 gap-3 pt-1">
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold  text-ink-soft">
+                            <label className="text-xs font-bold  text-ink-soft">
                               Paper Size
                             </label>
                             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
@@ -2449,7 +2322,7 @@ export default function VendorPublicOrderPage() {
                                     type="button"
                                     disabled={!isAvailable}
                                     onClick={() => updateDocConfig(idx, { paperSize: size.toUpperCase() })}
-                                    className={`flex-1 py-2 rounded-12 text-xs font-bold border transition-colors ${
+                                    className={`flex-1 min-h-[44px] py-2 rounded-14 text-sm font-bold border transition-colors ${
                                       isSelected
                                         ? 'bg-ink text-white border-ink shadow-xs'
                                         : isAvailable
@@ -2465,28 +2338,28 @@ export default function VendorPublicOrderPage() {
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold  text-ink-soft flex justify-between">
+                            <label className="text-xs font-bold  text-ink-soft flex justify-between">
                               <span>Copies</span>
-                              <span className="text-ink font-bold"><span className="font-mono">{doc.copies}</span> {doc.copies === 1 ? 'set' : 'sets'}</span>
+                              <span className="text-ink font-bold"><span className="tabular-nums">{doc.copies}</span> {doc.copies === 1 ? 'set' : 'sets'}</span>
                             </label>
 
-                            <div className="flex items-center justify-between bg-surface border border-hairline rounded-14 p-1 h-[42px] shadow-2xs">
+                            <div className="flex items-center justify-between bg-surface border border-hairline rounded-14 p-1 h-[48px] shadow-2xs">
                               <button
                                 type="button"
                                 onClick={() => updateDocConfig(idx, { copies: Math.max(1, doc.copies - 1) })}
                                 disabled={doc.copies <= 1}
-                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
+                                className="w-11 h-10 rounded-12 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
                               >
                                 -
                               </button>
-                              <span className="font-sora font-extrabold text-sm text-ink font-mono tabular-nums">
+                              <span className="font-sora font-bold text-sm text-ink tabular-nums">
                                 {doc.copies}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => updateDocConfig(idx, { copies: Math.min(50, doc.copies + 1) })}
                                 disabled={doc.copies >= 50}
-                                className="w-9 h-8 rounded-10 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
+                                className="w-11 h-10 rounded-12 bg-paper hover:bg-hairline/60 active:scale-95 disabled:opacity-40 flex items-center justify-center font-bold text-ink text-sm transition-colors"
                               >
                                 +
                               </button>
@@ -2516,14 +2389,14 @@ export default function VendorPublicOrderPage() {
                               <SlidersHorizontal className={`w-3.5 h-3.5 ${isAdvancedOpen ? 'text-saffron' : 'text-ink-soft'}`} />
                               <span>Advanced Options</span>
                               {hasAdvancedConfigured && (
-                                <span className={`text-[9px] px-2 py-0.5 rounded-pill font-bold ${
+                                <span className={`text-[11px] px-2 py-0.5 rounded-pill font-bold ${
                                   isAdvancedOpen ? 'bg-saffron text-white' : 'bg-saffron-tint text-saffron'
                                 }`}>
                                   Customized
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] font-normal">
+                            <div className="flex items-center gap-1 text-xs font-normal">
                               <span>{isAdvancedOpen ? 'Hide' : 'Page range, N-up & orientation'}</span>
                               <ChevronDown
                                 className={`w-4 h-4 transition-transform duration-200 ${
@@ -2539,11 +2412,11 @@ export default function VendorPublicOrderPage() {
                               {/* A. Custom Page Range Selection */}
                               <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                  <label className="text-[11px] font-bold  text-ink-soft">
+                                  <label className="text-xs font-bold  text-ink-soft">
                                     Pages to Print
                                   </label>
-                                  <span className="text-[11px] text-saffron font-bold">
-                                    <span className="font-mono">{effectivePages}</span> of <span className="font-mono">{doc.pageCount}</span> pages selected
+                                  <span className="text-xs text-saffron font-bold">
+                                    <span className="tabular-nums">{effectivePages}</span> of <span className="tabular-nums">{doc.pageCount}</span> pages selected
                                   </span>
                                 </div>
 
@@ -2553,7 +2426,7 @@ export default function VendorPublicOrderPage() {
                                       key={mode}
                                       type="button"
                                       onClick={() => updateDocConfig(idx, { pageRangeMode: mode })}
-                                      className={`py-1.5 rounded-10 text-[11px] font-bold transition-colors ${
+                                      className={`py-1.5 rounded-10 text-xs font-bold transition-colors ${
                                         doc.pageRangeMode === mode
                                           ? 'bg-ink text-white shadow-xs'
                                           : 'text-ink-soft hover:text-ink'
@@ -2577,9 +2450,9 @@ export default function VendorPublicOrderPage() {
                                       value={doc.customPageSelection || ''}
                                       onChange={(e) => updateDocConfig(idx, { customPageSelection: e.target.value })}
                                       placeholder="e.g. 1-4, 7, 9-12"
-                                      className="w-full bg-surface border border-hairline rounded-12 px-3 py-2 text-xs font-mono text-ink focus:outline-none focus:border-ink focus:ring-1 focus:ring-ink"
+                                      className="w-full bg-surface border border-hairline rounded-12 px-3 py-2 text-xs tabular-nums text-ink focus:outline-none focus:border-ink focus:ring-1 focus:ring-ink"
                                     />
-                                    <p className="text-[10px] text-ink-soft">
+                                    <p className="text-[11px] text-ink-soft">
                                       Enter comma-separated page numbers or ranges (e.g. 1-3, 5, 8).
                                     </p>
                                   </div>
@@ -2589,10 +2462,10 @@ export default function VendorPublicOrderPage() {
                               {/* B. Pages Per Sheet (N-Up Printing) & Orientation */}
                               <div className="grid grid-cols-2 gap-3 pt-1">
                                 <div className="space-y-1.5">
-                                  <label className="text-[11px] font-bold  text-ink-soft flex items-center justify-between">
+                                  <label className="text-xs font-bold  text-ink-soft flex items-center justify-between">
                                     <span>Pages Per Sheet</span>
                                     {doc.pagesPerSheet > 1 && (
-                                      <span className="text-[10px] text-emerald-600 font-bold">
+                                      <span className="text-[11px] text-emerald-600 font-bold">
                                         {doc.pagesPerSheet === 2 ? '50% cut' : '75% cut'}
                                       </span>
                                     )}
@@ -2616,7 +2489,7 @@ export default function VendorPublicOrderPage() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                  <label className="text-[11px] font-bold  text-ink-soft">
+                                  <label className="text-xs font-bold  text-ink-soft">
                                     Orientation
                                   </label>
                                   <div className="flex gap-1.5 bg-surface p-1 rounded-14 border border-hairline">
@@ -2625,7 +2498,7 @@ export default function VendorPublicOrderPage() {
                                         key={ori}
                                         type="button"
                                         onClick={() => updateDocConfig(idx, { orientation: ori })}
-                                        className={`flex-1 py-1.5 rounded-10 text-[10px] font-bold transition-colors ${
+                                        className={`flex-1 py-1.5 rounded-10 text-[11px] font-bold transition-colors ${
                                           doc.orientation === ori
                                             ? 'bg-ink text-white shadow-xs'
                                             : 'text-ink-soft hover:text-ink'
@@ -2641,13 +2514,13 @@ export default function VendorPublicOrderPage() {
                               {/* C. Apply to All Documents */}
                               {documents.length > 1 && (
                                 <div className="pt-2 border-t border-hairline/80 flex items-center justify-between">
-                                  <span className="text-[11px] text-ink-soft">
+                                  <span className="text-xs text-ink-soft">
                                     Copy these settings to other files?
                                   </span>
                                   <button
                                     type="button"
                                     onClick={() => applyToAllDocs(idx)}
-                                    className="px-3 py-1.5 rounded-pill bg-surface border border-hairline text-ink text-[11px] font-bold hover:bg-hairline transition-colors flex items-center gap-1.5"
+                                    className="px-3 py-1.5 rounded-pill bg-surface border border-hairline text-ink text-xs font-bold hover:bg-hairline transition-colors flex items-center gap-1.5"
                                   >
                                     <Copy className="w-3.5 h-3.5 text-saffron" />
                                     <span>Apply to all files</span>
@@ -2668,254 +2541,266 @@ export default function VendorPublicOrderPage() {
           /* ========================================================= */
           /* STEP 2: CHECKOUT & PAYMENT METHOD */
           /* ========================================================= */
-          <div className="space-y-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-reduce:animate-none duration-300">
-            {/* Header summary banner */}
-            <div className="bg-surface rounded-[24px] p-5 border border-hairline shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-sora font-extrabold text-xl text-ink">
-                    {documents.length} {documents.length === 1 ? 'Document' : 'Documents'}
-                  </h2>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-ink-soft">Total Amount</div>
-                  <div className="font-sora font-extrabold text-2xl text-ink font-mono text-saffron">
-                    ₹{totalRupees}
-                  </div>
-                </div>
+          <div className="space-y-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-300">
+            {/* 1. ORDER SUMMARY */}
+            <section className="bg-surface rounded-3xl border border-hairline p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-sora font-bold text-lg text-ink">Your order</h2>
+                <button type="button" onClick={() => setStep('UPLOAD')} className="text-sm font-bold text-saffron px-2 py-1 -mr-2 rounded-lg">
+                  Edit
+                </button>
               </div>
 
-              <div className="pt-2 border-t border-hairline/80 flex items-center justify-between text-xs text-ink-soft">
-                <span>Calculated Sheets: <strong>{totalSheets} sheets</strong></span>
-                <span>Sides Printed: <strong>{totalSides} sides</strong></span>
-              </div>
+              <ul className="divide-y divide-hairline/70">
+                {documents.map((doc) => {
+                  const tier = vendor.pricingConfig.find(
+                    (t) => t.paperSize === doc.paperSize && t.colorMode === doc.colorMode && t.isDuplex === doc.isDuplex
+                  );
+                  const rate = tier ? tier.pricePerSideMinor : doc.colorMode === 'COLOR' ? 1000 : 200;
+                  const pages = getEffectiveDocPages(doc);
+                  const sides = Math.ceil(pages / (doc.pagesPerSheet || 1)) * doc.copies;
+                  return (
+                    <li key={doc.id} className="py-3 flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-paper border border-hairline flex items-center justify-center shrink-0">
+                        {doc.mimeType === 'application/pdf' ? <FileText className="w-5 h-5 text-danger" /> : <ImageIcon className="w-5 h-5 text-saffron" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-ink truncate">{doc.originalName}</p>
+                        <p className="text-xs text-ink-soft mt-0.5">
+                          {pages} {pages === 1 ? 'page' : 'pages'}, {doc.copies} {doc.copies === 1 ? 'copy' : 'copies'}, {doc.colorMode === 'COLOR' ? 'colour' : 'B&W'}, {doc.isDuplex ? 'both sides' : 'one side'}, {doc.paperSize}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-ink tabular-nums">₹{((sides * rate) / 100).toFixed(2)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <dl className="mt-3 pt-3 border-t border-dashed border-hairline space-y-1.5 text-sm">
+                {discountPaise > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <dt>Promo ({appliedCoupon})</dt>
+                    <dd className="tabular-nums">-₹{(discountPaise / 100).toFixed(2)}</dd>
+                  </div>
+                )}
+                {topUp > 0 && (
+                  <div className="flex justify-between text-ink-soft">
+                    <dt>Minimum order top-up</dt>
+                    <dd className="tabular-nums">+₹{(topUp / 100).toFixed(2)}</dd>
+                  </div>
+                )}
+                {gatewayFeePaise > 0 && (
+                  <div className="flex justify-between text-ink-soft">
+                    <dt>Online payment fee</dt>
+                    <dd className="tabular-nums">+₹{(gatewayFeePaise / 100).toFixed(2)}</dd>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between pt-1">
+                  <dt className="font-bold text-ink">Total</dt>
+                  <dd className="font-sora font-bold text-2xl text-ink tabular-nums">
+                    <span className="text-saffron">₹</span>{totalRupees}
+                  </dd>
+                </div>
+                <p className="text-xs text-ink-soft">{totalSheets} sheets, {totalSides} sides printed</p>
+              </dl>
 
               {sheetsSaved > 0 && (
-                <div className="p-2.5 rounded-14 bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-medium flex items-center gap-2">
+                <div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-sm flex items-center gap-2">
                   <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    <strong>Eco impact:</strong> You saved <strong>{sheetsSaved} sheets of paper</strong> on this order!
-                  </span>
+                  <span>You&apos;re saving <strong>{sheetsSaved} sheets</strong> of paper.</span>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Pickup Details & Scheduling */}
-            <div className="bg-surface rounded-[24px] p-5 border border-hairline shadow-sm space-y-4">
-              <h3 className="font-sora font-bold text-sm text-ink flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-saffron" />
-                <span>Pickup Scheduling &amp; Contact</span>
-              </h3>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-ink-soft">When will you collect?</label>
+            {/* 2. PICKUP & DETAILS */}
+            <section className="bg-surface rounded-3xl border border-hairline p-5 space-y-4">
+              <div className="space-y-2">
+                <h3 className="font-sora font-bold text-base text-ink">When will you collect?</h3>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { key: 'IMMEDIATE', label: 'At Counter', sub: 'Instant' },
-                    { key: 'IN_15_MINS', label: 'In 15-30m', sub: 'Skip line' },
-                    { key: 'LATER_TODAY', label: 'Later Today', sub: 'Flexible' },
+                    { key: 'IMMEDIATE', label: 'Now', sub: 'At the counter' },
+                    { key: 'IN_15_MINS', label: '15-30 min', sub: 'Skip the line' },
+                    { key: 'LATER_TODAY', label: 'Later today', sub: 'Flexible' },
                   ].map((t) => (
                     <button
                       key={t.key}
                       type="button"
                       onClick={() => setPickupTiming(t.key as any)}
-                      className={`p-2.5 rounded-16 border text-center transition-colors ${
-                        pickupTiming === t.key
-                          ? 'border-ink bg-ink text-white font-bold shadow-xs'
-                          : 'border-hairline bg-paper text-ink-soft hover:text-ink'
+                      aria-pressed={pickupTiming === t.key}
+                      className={`min-h-[56px] px-2 py-2 rounded-2xl border-2 text-center transition-colors ${
+                        pickupTiming === t.key ? 'border-ink bg-ink text-white' : 'border-hairline bg-paper text-ink hover:border-ink/30'
                       }`}
                     >
-                      <div className="text-xs font-bold leading-tight">{t.label}</div>
-                      <div className={`text-[10px] ${pickupTiming === t.key ? 'text-white/80' : 'text-ink-soft'}`}>
-                        {t.sub}
-                      </div>
+                      <div className="text-sm font-bold leading-tight">{t.label}</div>
+                      <div className={`text-xs mt-0.5 ${pickupTiming === t.key ? 'text-white/75' : 'text-ink-soft'}`}>{t.sub}</div>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-ink-soft">Your Name</label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="e.g. Rahul S."
-                    className="w-full bg-paper border border-hairline rounded-14 px-3.5 py-2.5 text-xs font-medium text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-ink-soft">Mobile Number</label>
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full bg-paper border border-hairline rounded-14 px-3.5 py-2.5 text-xs font-medium text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10"
-                  />
-                </div>
-              </div>
-
-              {/* Special Instructions for Operator */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-ink-soft flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-saffron" />
-                  <span>Special Notes for Shopkeeper (Optional)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  value={customerNotes}
-                  onChange={(e) => setCustomerNotes(e.target.value)}
-                  placeholder="e.g. Please staple top-left corner, print page 1 separately, need urgently..."
-                  className="w-full bg-paper border border-hairline rounded-14 p-3 text-xs font-medium text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Promo / Coupon Code Section */}
-            <div className="bg-surface rounded-[24px] p-5 border border-hairline shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-sora font-bold text-sm text-ink flex items-center gap-1.5">
-                  <Tag className="w-4 h-4 text-saffron" />
-                  <span>Student Promo / Coupon Code</span>
-                </h3>
-                {appliedCoupon && (
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-pill">
-                    Applied
+              {/* COLLAPSIBLE YOUR DETAILS */}
+              <details
+                open={Boolean(customerName || customerPhone || customerNotes)}
+                className="group pt-3.5 border-t border-hairline/80"
+              >
+                <summary className="flex items-center justify-between cursor-pointer list-none select-none text-ink hover:text-ink/80 transition-colors">
+                  <span className="flex items-center gap-2 font-sora font-bold text-sm text-ink">
+                    <span>Your details</span>
+                    <span className="text-xs font-normal text-ink-soft">(optional)</span>
+                    {(customerName || customerPhone) && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700">
+                        Added
+                      </span>
+                    )}
                   </span>
-                )}
-              </div>
+                  <div className="w-7 h-7 rounded-full bg-paper border border-hairline flex items-center justify-center text-ink-soft group-hover:text-ink transition-colors">
+                    <ChevronDown className="w-4 h-4 transition-transform duration-200 group-open:rotate-180" />
+                  </div>
+                </summary>
 
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. STUDENT10 or CAMPUS5"
-                  className="flex-1 bg-paper border border-hairline rounded-14 px-3.5 py-2 text-xs font-mono font-bold text-ink focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/10"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  className="px-4 py-2 rounded-14 bg-ink text-white font-bold text-xs hover:bg-ink/90 transition-colors active:scale-95"
-                >
-                  Apply
-                </button>
-              </div>
-
-              {couponError && <p className="text-xs text-rose-600 font-medium">{couponError}</p>}
-
-              {appliedCoupon && (
-                <div className="flex items-center justify-between text-xs text-emerald-700 font-semibold pt-1">
-                  <span>Discount: {appliedCoupon}</span>
-                  <span>-₹{(discountPaise / 100).toFixed(2)}</span>
+                <div className="pt-3.5 space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="cust-name" className="text-xs font-bold text-ink-soft">Name</label>
+                    <input
+                      id="cust-name"
+                      type="text"
+                      autoComplete="name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Rahul S."
+                      className="w-full h-11 bg-paper border border-hairline rounded-xl px-3.5 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/15"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="cust-phone" className="text-xs font-bold text-ink-soft">Mobile number</label>
+                    <input
+                      id="cust-phone"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="9876543210"
+                      className="w-full h-11 bg-paper border border-hairline rounded-xl px-3.5 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/15"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="cust-notes" className="text-xs font-bold text-ink-soft">
+                      Note for shopkeeper <span className="font-normal">(optional)</span>
+                    </label>
+                    <textarea
+                      id="cust-notes"
+                      rows={2}
+                      value={customerNotes}
+                      onChange={(e) => setCustomerNotes(e.target.value)}
+                      placeholder="Staple top-left, need it urgently"
+                      className="w-full bg-paper border border-hairline rounded-xl p-3 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus:border-saffron focus:ring-2 focus:ring-saffron/15 resize-none"
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
+              </details>
+            </section>
 
-            {/* Payment Method Selection */}
-            <div className="space-y-2.5">
-              <h3 className="font-sora font-bold text-sm text-ink px-1">
-                Select Payment Mode
-              </h3>
+            {/* 3. PAYMENT METHOD (MINIMALISTIC & ACCESSIBLE) */}
+            <section className="bg-surface rounded-3xl border border-hairline p-5 space-y-3">
+              <h3 className="font-sora font-bold text-base text-ink">How do you want to pay?</h3>
 
-              {vendor.allowOnlinePayment && (
-                <label
-                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-colors ${
-                    paymentMethod === 'RAZORPAY'
-                      ? 'border-ink bg-surface shadow-md'
-                      : 'border-hairline bg-surface/60 hover:bg-surface'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    className="hidden"
-                    checked={paymentMethod === 'RAZORPAY'}
-                    onChange={() => setPaymentMethod('RAZORPAY')}
-                  />
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
-                        paymentMethod === 'RAZORPAY' ? 'border-ink bg-ink' : 'border-ink-soft/40'
-                      }`}
-                    >
-                      {paymentMethod === 'RAZORPAY' && <div className="w-2 h-2 rounded-full bg-white" />}
+              <div className="space-y-2.5">
+                {vendor.allowOnlinePayment && (
+                  <label
+                    className={`flex items-center gap-3.5 p-3.5 rounded-2xl border-2 cursor-pointer transition-all active:scale-[0.99] select-none ${
+                      paymentMethod === 'RAZORPAY'
+                        ? 'border-ink bg-paper/60 shadow-xs'
+                        : 'border-hairline bg-paper/20 hover:border-hairline/80 hover:bg-paper/40'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      className="sr-only"
+                      checked={paymentMethod === 'RAZORPAY'}
+                      onChange={() => setPaymentMethod('RAZORPAY')}
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-surface border border-hairline flex items-center justify-center shrink-0">
+                      <CreditCard className="w-5 h-5 text-ink" />
                     </div>
-
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-sora font-bold text-ink text-base">Pay Online (UPI / Cards)</span>
-                        <span className="bg-saffron-tint text-saffron text-[10px] font-bold px-2 py-0.5 rounded-pill">
-                          Instant Print
+                        <span className="font-bold text-ink text-sm">Pay online</span>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-pill bg-saffron-tint text-saffron">
+                          Instant
                         </span>
                       </div>
-                      <p className="text-xs text-ink-soft mt-0.5 leading-relaxed">
-                        Google Pay, PhonePe, Paytm, Debit/Credit Card or NetBanking. Order releases to print spooler immediately.
+                      <p className="text-xs text-ink-soft truncate mt-0.5">
+                        UPI, Cards, NetBanking
+                        {gatewayFeePaise > 0 && <span className="tabular-nums"> · +₹{(gatewayFeePaise / 100).toFixed(2)} fee</span>}
                       </p>
-                      {basePrintPaise > 0 && (
-                        <p className="text-[11px] text-ink-soft mt-1 font-mono">
-                          Gateway convenience fee: <span className="font-bold text-ink">+₹{((Math.round(basePrintPaise / (1 - 0.0236)) - basePrintPaise) / 100).toFixed(2)}</span> (2% + 18% GST)
-                        </p>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        paymentMethod === 'RAZORPAY' ? 'border-ink bg-ink' : 'border-hairline bg-surface'
+                      }`}
+                    >
+                      {paymentMethod === 'RAZORPAY' && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                  </label>
+                )}
+
+                {vendor.allowCashOnDesk && (
+                  <label
+                    className={`flex items-center gap-3.5 p-3.5 rounded-2xl border-2 cursor-pointer transition-all active:scale-[0.99] select-none ${
+                      paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment
+                        ? 'border-ink bg-paper/60 shadow-xs'
+                        : 'border-hairline bg-paper/20 hover:border-hairline/80 hover:bg-paper/40'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      className="sr-only"
+                      checked={paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment}
+                      onChange={() => setPaymentMethod('CASH_ON_COLLECTION')}
+                    />
+                    <div className="w-10 h-10 rounded-xl bg-surface border border-hairline flex items-center justify-center shrink-0">
+                      <Banknote className="w-5 h-5 text-ink" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-ink text-sm">Pay at counter</span>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-pill bg-emerald-50 text-emerald-700">
+                          Zero fee
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-soft truncate mt-0.5">
+                        Cash or shop QR on pickup
+                      </p>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment ? 'border-ink bg-ink' : 'border-hairline bg-surface'
+                      }`}
+                    >
+                      {(paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment) && (
+                        <Check className="w-3 h-3 text-white" />
                       )}
                     </div>
-                  </div>
-                </label>
-              )}
-
-              {vendor.allowCashOnDesk && (
-                <label
-                  className={`block relative p-4 rounded-[22px] border-2 cursor-pointer transition-colors ${
-                    paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment
-                      ? 'border-ink bg-surface shadow-md'
-                      : 'border-hairline bg-surface/60 hover:bg-surface'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payment"
-                    className="hidden"
-                    checked={paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment}
-                    onChange={() => setPaymentMethod('CASH_ON_COLLECTION')}
-                  />
-                  <div className="flex items-start gap-3.5">
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
-                        paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment ? 'border-ink bg-ink' : 'border-ink-soft/40'
-                      }`}
-                    >
-                      {(paymentMethod === 'CASH_ON_COLLECTION' || !vendor.allowOnlinePayment) && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-sora font-bold text-ink text-base">Pay at Counter (Cash on Pickup)</span>
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-pill">
-                          ₹0 Gateway Fee
-                        </span>
-                      </div>
-                      <p className="text-xs text-ink-soft mt-0.5 leading-relaxed">
-                        Pay cash or scan shopkeeper&apos;s physical QR at the counter. Printing starts after vendor verifies payment.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-              )}
+                  </label>
+                )}
+              </div>
 
               {!vendor.allowOnlinePayment && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2.5 text-xs text-amber-800">
                   <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                  <span>Online payments are disabled by this vendor. Please pay at counter upon collection.</span>
+                  <span>This shop only accepts payment at the counter.</span>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         )}
 
         {/* Kiosk Trust & Privacy Protection Footer */}
         <div className="pt-8 pb-4 text-center space-y-2 max-w-md mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-paper border border-hairline text-ink-soft text-[11px] font-medium shadow-xs">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-paper border border-hairline text-ink-soft text-xs font-medium shadow-xs">
             <ShieldCheck className="w-3.5 h-3.5 text-success shrink-0" />
             <span>Ephemeral Privacy: Files encrypted &amp; auto-purged within 30 days</span>
           </div>
@@ -2930,14 +2815,14 @@ export default function VendorPublicOrderPage() {
       {/* 4. MODERN STICKY BOTTOM CHECKOUT TRAY */}
       {documents.length > 0 && (
         <aside aria-label="Order Checkout Bar" className="fixed bottom-0 inset-x-0 p-3 sm:p-4 z-40 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pointer-events-none">
-          <div className="max-w-xl mx-auto bg-surface/95 backdrop-blur-2xl border border-hairline/80 rounded-[26px] shadow-ink-soft p-3.5 pointer-events-auto transition-colors">
+          <div className="max-w-xl mx-auto bg-surface/95 backdrop-blur-2xl border border-hairline/80 rounded-3xl shadow-ink-soft p-3.5 pointer-events-auto transition-colors">
             {expandedReceipt && (
               <div className="pb-3.5 mb-3 border-b border-dashed border-hairline motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-reduce:animate-none text-xs">
                 <div className="flex items-center justify-between font-sora font-bold text-ink mb-2.5">
-                  <span>Price Calculation Matrix</span>
+                  <span>Price breakdown</span>
                   <button
                     onClick={() => setExpandedReceipt(false)}
-                    className="text-ink-soft hover:text-ink text-[11px]"
+                    className="text-ink-soft hover:text-ink text-xs px-2 py-1.5 -mr-2 rounded-lg"
                   >
                     Close
                   </button>
@@ -2960,7 +2845,7 @@ export default function VendorPublicOrderPage() {
                         <span className="truncate pr-3 flex-1 font-medium">
                           {doc.originalName} ({effectivePages}p {doc.pagesPerSheet > 1 ? `[${doc.pagesPerSheet}-up]` : ''} × {doc.copies}c @ ₹{(rate / 100).toFixed(2)})
                         </span>
-                        <span className="font-mono text-ink font-bold">₹{docTotal}</span>
+                        <span className="tabular-nums text-ink font-bold">₹{docTotal}</span>
                       </div>
                     );
                   })}
@@ -2968,14 +2853,14 @@ export default function VendorPublicOrderPage() {
                   {discountPaise > 0 && (
                     <div className="flex justify-between text-emerald-600 font-medium pt-1">
                       <span>Promo Discount ({appliedCoupon})</span>
-                      <span className="font-mono">-₹{(discountPaise / 100).toFixed(2)}</span>
+                      <span className="tabular-nums">-₹{(discountPaise / 100).toFixed(2)}</span>
                     </div>
                   )}
 
                   {topUp > 0 && (
                     <div className="flex justify-between text-amber-700 pt-1 font-medium">
                       <span>Minimum store top-up charge</span>
-                      <span className="font-mono">₹{(topUp / 100).toFixed(2)}</span>
+                      <span className="tabular-nums">₹{(topUp / 100).toFixed(2)}</span>
                     </div>
                   )}
 
@@ -2983,11 +2868,11 @@ export default function VendorPublicOrderPage() {
                     <div className="flex justify-between text-ink-soft pt-1.5 border-t border-hairline/60">
                       <div className="flex items-center gap-1.5">
                         <span>Online Gateway Fee</span>
-                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-medium">
+                        <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded tabular-nums font-medium">
                           2% + 18% GST
                         </span>
                       </div>
-                      <span className="font-mono text-ink font-bold">+₹{(gatewayFeePaise / 100).toFixed(2)}</span>
+                      <span className="tabular-nums text-ink font-bold">+₹{(gatewayFeePaise / 100).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -3001,7 +2886,7 @@ export default function VendorPublicOrderPage() {
                 className="flex items-center gap-2 text-left group min-w-0"
               >
                 <div>
-                  <div className="text-[10px] font-bold text-ink-soft  flex items-center gap-1">
+                  <div className="text-[11px] font-bold text-ink-soft  flex items-center gap-1">
                     <span>{documents.length} {documents.length === 1 ? 'file' : 'files'}</span>
                     <span>•</span>
                     <span>{totalSheets} {totalSheets === 1 ? 'sheet' : 'sheets'}</span>
@@ -3011,7 +2896,7 @@ export default function VendorPublicOrderPage() {
                       }`}
                     />
                   </div>
-                  <div className="font-sora font-extrabold text-ink text-2xl sm:text-3xl font-mono tabular-nums flex items-baseline gap-1">
+                  <div className="font-sora font-bold text-ink text-2xl sm:text-3xl tabular-nums tracking-tight flex items-baseline gap-1">
                     <span className="text-saffron">₹</span>
                     <span>{totalRupees}</span>
                   </div>
@@ -3023,7 +2908,7 @@ export default function VendorPublicOrderPage() {
                   <button
                     type="button"
                     onClick={() => setStep('UPLOAD')}
-                    className="px-3 py-3 rounded-pill bg-paper border border-hairline text-ink text-xs font-bold hover:bg-hairline/40 transition-colors active:scale-95"
+                    className="px-4 py-4 min-h-[52px] rounded-pill bg-paper border border-hairline text-ink text-sm font-bold hover:bg-hairline/40 transition-colors active:scale-95"
                   >
                     Back
                   </button>
@@ -3040,7 +2925,7 @@ export default function VendorPublicOrderPage() {
                       handleProceedToPayment();
                     }
                   }}
-                  className="px-6 py-3.5 rounded-pill bg-ink hover:bg-ink/90 active:scale-95 text-white font-sora font-bold text-xs sm:text-sm shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  className="px-6 py-4 min-h-[52px] rounded-pill bg-ink hover:bg-ink/90 active:scale-95 text-white font-sora font-bold text-sm shadow-md shadow-ink/20 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   {isPlacingOrder ? (
                     <>
@@ -3094,12 +2979,12 @@ export default function VendorPublicOrderPage() {
       {/* 7. PASSWORD-PROTECTED PDF PROMPT MODAL */}
       {pendingPasswordFile && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 motion-safe:animate-in motion-safe:fade-in motion-reduce:animate-none duration-200">
-          <div className="bg-surface rounded-[28px] border border-hairline p-6 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-surface rounded-3xl border border-hairline p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-20 bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs">
               <Lock className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-sora font-extrabold text-ink text-base sm:text-lg">
+              <h3 className="font-sora font-bold text-ink text-base sm:text-lg">
                 Password-Protected Document
               </h3>
               <p className="text-xs text-ink-soft mt-1 leading-relaxed">
@@ -3112,7 +2997,7 @@ export default function VendorPublicOrderPage() {
                 <Sparkles className="w-3.5 h-3.5 text-saffron" />
                 <span>How to print this file:</span>
               </div>
-              <ol className="list-decimal list-inside space-y-1 text-ink-soft leading-relaxed text-[11px]">
+              <ol className="list-decimal list-inside space-y-1 text-ink-soft leading-relaxed text-xs">
                 <li>Open this PDF on your device and enter the password.</li>
                 <li>Tap <strong>Share / Print</strong> and choose <strong>"Save as PDF"</strong>.</li>
                 <li>Upload the new unlocked PDF here to print instantly!</li>
