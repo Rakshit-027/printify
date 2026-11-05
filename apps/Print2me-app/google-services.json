@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "581954954578",
+    "project_id": "print2me-abd04",
+    "storage_bucket": "print2me-abd04.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:581954954578:android:39f32a5651f13b5299068b",
+        "android_client_info": {
+          "package_name": "com.print2me"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTJVOCpNnJIIKkOSgBaNQwBLKNkt-DMlQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

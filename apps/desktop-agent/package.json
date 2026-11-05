@@ -2,11 +2,61 @@
   "name": "@printflow/desktop-agent",
   "version": "1.0.0",
   "description": "Secure Windows Desktop Print Agent for PrintFlow Vendors",
+  "author": "Print2Me Team <support@print2me.in>",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "tsc && cp -r src/renderer dist/ && env GTK_IM_MODULE=xim electron . --disable-gpu",
-    "build": "tsc && cp -r src/renderer dist/",
-    "package:win": "npm run build && electron-builder --win"
+    "dev": "npm run build && env GTK_IM_MODULE=xim electron . --disable-gpu",
+    "copy-renderer": "node scripts/copy-assets.js",
+    "build": "tsc && npm run copy-renderer && node scripts/generate-installer-art.js",
+    "test": "npm run build && node --test dist/test/real-printer-system.test.js",
+    "package:win": "npm run build && node ../../scripts/fix-7zip-perms.js && electron-builder --win"
+  },
+  "build": {
+    "appId": "in.print2me.desktopagent",
+    "productName": "Print2Me Desktop Agent",
+    "copyright": "Copyright © 2026 Print2Me Technologies Pvt. Ltd.",
+    "electronVersion": "30.5.1",
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "legalTrademarks": "Print2Me is a registered trademark of Print2Me Technologies Pvt. Ltd.",
+      "signingHashAlgorithms": null,
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Print2Me Desktop Agent",
+      "runAfterFinish": true,
+      "license": "assets/LICENSE.txt",
+      "installerSidebar": "assets/installerSidebar.bmp",
+      "uninstallerSidebar": "assets/installerSidebar.bmp",
+      "installerHeader": "assets/installerHeader.bmp",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "displayLanguageSelector": false
+    }
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -18,7 +68,8 @@
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.2",
     "@types/react-dom": "^18.3.0",
-    "electron": "^30.0.9",
+
+    "electron": "30.5.1",
     "electron-builder": "^24.13.3",
     "typescript": "^5.4.5"
   }

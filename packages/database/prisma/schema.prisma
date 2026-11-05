@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -78,28 +78,40 @@ enum DuplexMode {
 // ---------------------------------------------------------
 model User {
   id           String   @id @default(uuid())
-  email        String   @unique
+  email        String   @unique @db.VarChar(320)
   passwordHash String
   fullName     String
   phoneNumber  String?
   role         UserRole @default(VENDOR_STAFF)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isActive        Boolean  @default(true)
+  isEmailVerified Boolean  @default(false)
+  createdAt       DateTime @default(now()) @db.DateTime(6)
+  updatedAt       DateTime @updatedAt @db.DateTime(6)
 
   vendorMemberships VendorMembership[]
   auditLogs         AuditLog[]
+
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  email     String   @db.VarChar(320)
+  otp       String
+  expiresAt DateTime @db.DateTime(6)
+  verified  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @db.DateTime(6)
 
   @@index([email])
 }
 
 model Vendor {
   id              String   @id @default(uuid())
-  name            String
+  name            String   @db.Text
   slug            String   @unique
   contactPhone    String
-  contactEmail    String
-  address         String
+  contactEmail    String   @db.VarChar(320)
+  address         String   @db.Text
   operatingHours  String?
   isActive        Boolean  @default(true)
   isApproved      Boolean  @default(false)
@@ -107,7 +119,7 @@ model Vendor {
   allowOnlinePayment Boolean @default(true)
   requireApproval Boolean  @default(false)
   retentionDays   Int      @default(30)
-  
+
   // Vendor-Owned Payment Gateway (Direct to Vendor Bank)
   razorpayKeyId         String?
   razorpayKeySecret     String?
@@ -116,21 +128,24 @@ model Vendor {
 
   // Platform SaaS Subscription
   subscriptionPlan      String    @default("TRIAL") // TRIAL, STARTER, PRO, ENTERPRISE
-  subscriptionExpiresAt DateTime?
+  subscriptionExpiresAt DateTime? @db.DateTime(6)
   isSubscriptionActive  Boolean   @default(true)
+  adminSubNotes         String?   @db.Text
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.DateTime(6)
+  updatedAt       DateTime @updatedAt @db.DateTime(6)
 
-  memberships   VendorMembership[]
-  pricingConfig VendorPricing[]
-  devices       Device[]
-  printers      Printer[]
-  orders        Order[]
-  documents     Document[]
-  qrConfig      VendorQrConfig?
+  memberships       VendorMembership[]
+  pricingConfig     VendorPricing[]
+  devices           Device[]
+  printers          Printer[]
+  orders            Order[]
+  documents         Document[]
+  qrConfig          VendorQrConfig?
+  paymentAccount    VendorPaymentAccount?
+  invoices          VendorSubscriptionInvoice[]
+  couponRedemptions CouponRedemption[]
 
-  @@index([slug])
 }
 
 model VendorMembership {
@@ -138,7 +153,7 @@ model VendorMembership {
   userId    String
   vendorId  String
   role      UserRole @default(VENDOR_STAFF)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.DateTime(6)
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -152,9 +167,37 @@ model VendorQrConfig {
   customColor  String?  @default("#000000")
   logoBlobKey  String?
   instructions String?
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime @updatedAt @db.DateTime(6)
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// RAZORPAY TECHNOLOGY PARTNER ONBOARDING & PAYMENT ACCOUNT
+// ---------------------------------------------------------
+model VendorPaymentAccount {
+  id                 String    @id @default(uuid())
+  vendorId           String    @unique
+  vendor             Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  partnerApp         String?   @default("Print2me")
+  razorpayAccountId  String?   @unique // Sub-merchant Account ID (e.g., acc_...)
+  publicToken        String?   @db.Text // Public Token for client checkout
+  accessToken        String?   @db.Text // Partner OAuth Access Token
+  refreshToken       String?   @db.Text // Partner OAuth Refresh Token
+  tokenExpiresAt     DateTime? @db.DateTime(6) // Access token expiry timestamp
+
+  authStatus         String    @default("NOT_CONNECTED") // NOT_CONNECTED, AUTHORIZED, DISCONNECTED
+  onboardingStatus   String    @default("NOT_STARTED")   // NOT_STARTED, IN_PROGRESS, PENDING_VERIFICATION, COMPLETED
+  activationStatus   String    @default("NOT_ACTIVATED") // NOT_ACTIVATED, UNDER_REVIEW, NEEDS_CLARIFICATION, ACTIVATED, SUSPENDED, REJECTED
+  requirements       Json?     // Razorpay KYC / onboarding requirements & pending actions
+  lastError          String?   @db.Text // Provider non-sensitive status or error description
+  lastSyncedAt       DateTime? @db.DateTime(6) // Last successful sync timestamp with Razorpay
+
+  createdAt          DateTime  @default(now()) @db.DateTime(6)
+  updatedAt          DateTime  @updatedAt @db.DateTime(6)
+
+  @@index([authStatus])
+  @@index([activationStatus])
 }
 
 // ---------------------------------------------------------
@@ -171,8 +214,8 @@ model VendorPricing {
   minimumOrderMinor Int        @default(500)
   isActive          Boolean    @default(true)
   version           Int        @default(1)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  createdAt         DateTime   @default(now()) @db.DateTime(6)
+  updatedAt         DateTime   @updatedAt @db.DateTime(6)
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
@@ -186,16 +229,16 @@ model VendorPricing {
 model Device {
   id             String    @id @default(uuid())
   vendorId       String
-  deviceName     String
+  deviceName     String    @db.Text
   enrollmentCode String?   @unique
   deviceKeyHash  String    @unique
   osVersion      String?
   agentVersion   String?
-  lastHeartbeat  DateTime?
+  lastHeartbeat  DateTime? @db.DateTime(6)
   isEnrolled     Boolean   @default(true)
   isRevoked      Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime  @default(now()) @db.DateTime(6)
+  updatedAt      DateTime  @updatedAt @db.DateTime(6)
 
   vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   printers  Printer[]
@@ -208,15 +251,16 @@ model Printer {
   id             String      @id @default(uuid())
   vendorId       String
   deviceId       String
-  systemName     String
+  systemName     String      @db.VarChar(512)
   displayName    String
-  supportedSizes PaperSize[]
+  // MySQL has no native enum-array type; the API continues to expose an array.
+  supportedSizes Json         @default("[]")
   supportsColor  Boolean     @default(false)
   supportsDuplex Boolean     @default(false)
   isDefault      Boolean     @default(false)
   isOnline       Boolean     @default(true)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime    @default(now()) @db.DateTime(6)
+  updatedAt      DateTime    @updatedAt @db.DateTime(6)
 
   vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   device    Device     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
@@ -231,17 +275,17 @@ model Printer {
 model Document {
   id             String   @id @default(uuid())
   vendorId       String
-  originalName   String
-  sanitizedName  String
-  blobKey        String   @unique
+  originalName   String   @db.Text
+  sanitizedName  String   @db.Text
+  blobKey        String   @unique @db.VarChar(512)
   mimeType       String
   sizeBytes      BigInt
   pageCount      Int
   sha256Hash     String?
   isVerified     Boolean  @default(false)
   isPurged       Boolean  @default(false)
-  retentionUntil DateTime
-  createdAt      DateTime @default(now())
+  retentionUntil DateTime @db.DateTime(6)
+  createdAt      DateTime @default(now()) @db.DateTime(6)
 
   vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
@@ -256,12 +300,11 @@ model DocumentUploadSession {
   sessionToken String   @unique
   expectedSize BigInt
   mimeType     String
-  blobKey      String   @unique
-  expiresAt    DateTime
+  blobKey      String   @unique @db.VarChar(512)
+  expiresAt    DateTime @db.DateTime(6)
   isCompleted  Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @db.DateTime(6)
 
-  @@index([sessionToken])
 }
 
 // ---------------------------------------------------------
@@ -273,8 +316,8 @@ model Order {
   orderNumber      String
   trackingToken    String        @unique
   customerPhone    String?
-  customerName     String?
-  customerNotes    String?
+  customerName     String?       @db.Text
+  customerNotes    String?       @db.Text
   status           OrderStatus   @default(DRAFT)
   paymentMethod    PaymentMethod @default(RAZORPAY)
   paymentStatus    PaymentStatus @default(PENDING)
@@ -282,8 +325,8 @@ model Order {
   taxMinor         Int           @default(0)
   totalAmountMinor Int
   currency         String        @default("INR")
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime      @default(now()) @db.DateTime(6)
+  updatedAt        DateTime      @updatedAt @db.DateTime(6)
 
   vendor    Vendor      @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   items     OrderItem[]
@@ -291,8 +334,9 @@ model Order {
   printJobs PrintJob[]
 
   @@unique([vendorId, orderNumber])
-  @@index([trackingToken])
   @@index([vendorId, status])
+  @@index([vendorId, createdAt])
+  @@index([vendorId, paymentStatus])
 }
 
 model OrderItem {
@@ -324,10 +368,10 @@ model Payment {
   amountMinor       Int
   currency          String        @default("INR")
   status            PaymentStatus @default(PENDING)
-  failureReason     String?
+  failureReason     String?       @db.Text
   rawPayload        Json?
-  verifiedAt        DateTime?
-  createdAt         DateTime      @default(now())
+  verifiedAt        DateTime? @db.DateTime(6)
+  createdAt         DateTime      @default(now()) @db.DateTime(6)
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   refunds Refund[]
@@ -342,7 +386,7 @@ model Refund {
   amountMinor      Int
   reason           String?
   status           String   @default("PROCESSED")
-  createdAt        DateTime @default(now())
+  createdAt        DateTime @default(now()) @db.DateTime(6)
 
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
@@ -358,14 +402,14 @@ model PrintJob {
   printerId    String?
   status       PrintJobStatus @default(CREATED)
   claimToken   String?
-  claimExpires DateTime?
+  claimExpires DateTime? @db.DateTime(6)
   attempts     Int            @default(0)
   maxAttempts  Int            @default(3)
-  lastError    String?
-  spooledAt    DateTime?
-  completedAt  DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  lastError    String?        @db.Text
+  spooledAt    DateTime? @db.DateTime(6)
+  completedAt  DateTime? @db.DateTime(6)
+  createdAt    DateTime       @default(now()) @db.DateTime(6)
+  updatedAt    DateTime       @updatedAt @db.DateTime(6)
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   device  Device?         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
@@ -381,9 +425,9 @@ model PrintJobEvent {
   id         String         @id @default(uuid())
   printJobId String
   status     PrintJobStatus
-  message    String?
+  message    String?        @db.Text
   metadata   Json?
-  createdAt  DateTime       @default(now())
+  createdAt  DateTime       @default(now()) @db.DateTime(6)
 
   printJob PrintJob @relation(fields: [printJobId], references: [id], onDelete: Cascade)
 
@@ -401,9 +445,8 @@ model WebhookEvent {
   payload    Json
   processed  Boolean  @default(false)
   error      String?
-  receivedAt DateTime @default(now())
+  receivedAt DateTime @default(now()) @db.DateTime(6)
 
-  @@index([eventId])
   @@index([processed])
 }
 
@@ -414,9 +457,9 @@ model AuditLog {
   resource   String
   resourceId String?
   ipAddress  String?
-  userAgent  String?
+  userAgent  String?  @db.Text
   details    Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.DateTime(6)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -430,8 +473,121 @@ model RetentionTask {
   status         String    @default("PENDING")
   blobsEvaluated Int       @default(0)
   blobsPurged    Int       @default(0)
-  errors         String?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime  @default(now())
+  errors         String?   @db.Text
+  startedAt      DateTime? @db.DateTime(6)
+  completedAt    DateTime? @db.DateTime(6)
+  createdAt      DateTime  @default(now()) @db.DateTime(6)
+}
+
+model VendorFcmToken {
+  id        String   @id @default(uuid())
+  vendorId  String
+  userId    String
+  token     String   @db.VarChar(512)
+  createdAt DateTime @default(now()) @db.DateTime(6)
+  updatedAt DateTime @updatedAt @db.DateTime(6)
+
+  @@unique([vendorId, token])
+}
+
+// -------------------------------------------------------------
+// DYNAMIC SUBSCRIPTION PLANS (Admin Controlled)
+// -------------------------------------------------------------
+model SubscriptionPlan {
+  id                  String   @id @default(uuid())
+  code                String   @unique
+  name                String
+  description         String?  @db.Text
+  priceMonthlyMinor   Int      @default(49900)
+  priceYearlyMinor    Int      @default(499900)
+
+  maxDevices          Int      @default(1)
+  maxOrdersPerMonth   Int      @default(500)
+  hasAutoPrint        Boolean  @default(true)
+  hasColorRouting     Boolean  @default(false)
+  hasPrioritySupport  Boolean  @default(false)
+
+  isActive            Boolean  @default(true)
+  displayOrder        Int      @default(0)
+  createdAt           DateTime @default(now()) @db.DateTime(6)
+  updatedAt           DateTime @updatedAt @db.DateTime(6)
+
+  invoices            VendorSubscriptionInvoice[]
+}
+
+// -------------------------------------------------------------
+// COUPONS & PROMO CODE ENGINE
+// -------------------------------------------------------------
+enum CouponDiscountType {
+  PERCENTAGE
+  FLAT_AMOUNT
+  FREE_DAYS
+}
+
+model Coupon {
+  id                  String             @id @default(uuid())
+  code                String             @unique
+  description         String?            @db.Text
+  discountType        CouponDiscountType
+  discountValue       Int                @default(0)
+  freeDays            Int?
+
+  minOrderMinor       Int                @default(0)
+  maxDiscountMinor    Int?
+  maxUsesTotal        Int                @default(100)
+  currentUsesTotal    Int                @default(0)
+  maxUsesPerVendor    Int                @default(1)
+
+  validFrom           DateTime           @default(now()) @db.DateTime(6)
+  validTill           DateTime? @db.DateTime(6)
+  isActive            Boolean            @default(true)
+  // MySQL has no native array type. Keep the public API as an array and
+  // persist the value losslessly as a JSON array.
+  applicablePlanCodes Json                @default("[]")
+
+  createdAt           DateTime           @default(now()) @db.DateTime(6)
+  updatedAt           DateTime           @updatedAt @db.DateTime(6)
+
+  redemptions         CouponRedemption[]
+
+}
+
+model CouponRedemption {
+  id                  String   @id @default(uuid())
+  couponId            String
+  coupon              Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  vendorId            String
+  vendor              Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  invoiceId           String?
+  discountMinor       Int      @default(0)
+  redeemedAt          DateTime @default(now()) @db.DateTime(6)
+
+  @@index([vendorId, couponId])
+}
+
+// -------------------------------------------------------------
+// VENDOR SUBSCRIPTION INVOICES & PAYMENTS
+// -------------------------------------------------------------
+model VendorSubscriptionInvoice {
+  id                 String            @id @default(uuid())
+  vendorId           String
+  vendor             Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  planId             String?
+  plan               SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  billingCycle       String            @default("MONTHLY")
+  originalPriceMinor Int               @default(0)
+  discountMinor      Int               @default(0)
+  finalAmountMinor   Int               @default(0)
+  couponCode         String?
+
+  razorpayOrderId    String?
+  razorpayPaymentId  String?
+  status             String            @default("SUCCESS")
+
+  startsAt           DateTime @db.DateTime(6)
+  expiresAt          DateTime @db.DateTime(6)
+  createdAt          DateTime          @default(now()) @db.DateTime(6)
+
+  @@index([vendorId])
 }

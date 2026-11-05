@@ -1,0 +1,38 @@
+PRINT2ME WORKSTATION DESKTOP AGENT
+END USER LICENSE AGREEMENT (EULA) AND TERMS OF SERVICE
+
+PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING THIS SOFTWARE.
+
+1. ACCEPTANCE OF TERMS
+By installing, copying, or otherwise using the Print2Me Workstation Desktop Agent ("Software"), you agree to be bound by the terms and conditions of this Agreement. If you do not agree to the terms of this Agreement, do not install or use the Software.
+
+2. GRANT OF LICENSE
+Print2Me Technologies Pvt. Ltd. grants you a revocable, non-exclusive, non-transferable, limited license to download, install, and use the Software solely on workstation computers connected to authorized Print2Me print vendor stores for processing local and online print orders.
+
+3. WORKSTATION USAGE & SECURITY
+The Software interacts with local print spoolers, printer drivers, and the secure Print2Me cloud platform. You agree that:
+(a) The Software will be installed on secure hardware with authorized access.
+(b) You will maintain the confidentiality of workstation enrollment credentials.
+(c) You will process customer print documents in accordance with applicable privacy regulations.
+(d) All customer files downloaded for local printing are automatically removed after spool completion.
+
+4. RESTRICTIONS
+You agree not to:
+(a) Modify, reverse engineer, decompile, or disassemble the Software.
+(b) Rent, lease, lend, sell, redistribute, or sublicense the Software.
+(c) Bypass, disable, or circumvent any security mechanisms or authorization checks.
+
+5. HARDWARE COMPATIBILITY & SPOOLING
+The Software provides zero-touch document routing to connected printer hardware (laser, inkjet, and virtual PDF spoolers). Print2Me is not responsible for physical printer hardware malfunctions, paper jams, or third-party manufacturer driver errors.
+
+6. UPDATES & TELEMETRY
+The Software may automatically communicate with Print2Me cloud servers to check for updates, verify workstation health, and synchronize live print queue telemetry.
+
+7. TERMINATION
+This Agreement is effective until terminated. Your rights under this Agreement will terminate automatically without notice if you fail to comply with any of its terms.
+
+8. DISCLAIMER OF WARRANTIES
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+Copyright (c) 2026 Print2Me Technologies Pvt. Ltd. All rights reserved.
+Support: support@print2me.in | Website: https://www.print2me.in

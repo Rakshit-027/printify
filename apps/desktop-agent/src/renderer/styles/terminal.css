@@ -1,0 +1,91 @@
+/* ==============================================================
+   PAGE 6: SPOOLER TERMINAL & DIAGNOSTICS
+   PAGE 7: ACTIVITY & HISTORY
+   PAGE 8: AGENT SETTINGS
+   ============================================================== */
+.terminal-card-wrap {
+  background: #0B132B;
+  border-radius: var(--radius-lg);
+  border: 1px solid #1C2B54;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: calc(100vh - 160px);
+}
+.term-header-bar {
+  background: #111C3D;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1C2B54;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  letter-spacing: 0.5px;
+}
+.term-body-scroll {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #E2E8F0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.log-line {
+  display: flex;
+  gap: 8px;
+  word-break: break-all;
+}
+.log-time { color: #64748B; font-size: 11px; }
+.log-tag-info { color: #38BDF8; font-weight: bold; }
+.log-tag-warn { color: #FBBF24; font-weight: bold; }
+.log-tag-error { color: #F87171; font-weight: bold; }
+.log-tag-sys { color: #34D399; font-weight: bold; }
+
+/* Activity & History Table */
+.history-table-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.history-table th {
+  background: var(--bg-app);
+  padding: 12px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border-color);
+}
+.history-table td {
+  padding: 14px 18px;
+  font-size: 12px;
+  color: var(--brand-navy);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+.history-table tr:hover td {
+  background: var(--bg-card-subtle);
+}
+
+/* Agent Settings Layout */
+.settings-grid-layout {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

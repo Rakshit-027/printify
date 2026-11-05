@@ -1373,9 +1373,15 @@ export default function VendorPublicOrderPage() {
       if (!initRes.ok) throw new Error(initData.error || 'Server upload session initiation failed');
 
       setUploadProgress(65);
+      const uploadHeaders: Record<string, string> = {
+        'Content-Type': finalFile.type || 'application/octet-stream',
+      };
+      if (initData.uploadUrl.includes('windows.net')) {
+        uploadHeaders['x-ms-blob-type'] = 'BlockBlob';
+      }
       const putRes = await fetch(initData.uploadUrl, {
         method: 'PUT',
-        headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': finalFile.type },
+        headers: uploadHeaders,
         body: finalFile,
       });
       if (!putRes.ok && putRes.status !== 201) throw new Error('Could not upload file payload');

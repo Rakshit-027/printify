@@ -41,6 +41,31 @@ export const PaymentStatus = {
 } as const;
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 
+export const PartnerAuthStatus = {
+  NOT_CONNECTED: 'NOT_CONNECTED',
+  AUTHORIZED: 'AUTHORIZED',
+  DISCONNECTED: 'DISCONNECTED',
+} as const;
+export type PartnerAuthStatus = (typeof PartnerAuthStatus)[keyof typeof PartnerAuthStatus];
+
+export const PartnerOnboardingStatus = {
+  NOT_STARTED: 'NOT_STARTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  COMPLETED: 'COMPLETED',
+} as const;
+export type PartnerOnboardingStatus = (typeof PartnerOnboardingStatus)[keyof typeof PartnerOnboardingStatus];
+
+export const PartnerActivationStatus = {
+  NOT_ACTIVATED: 'NOT_ACTIVATED',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  NEEDS_CLARIFICATION: 'NEEDS_CLARIFICATION',
+  ACTIVATED: 'ACTIVATED',
+  SUSPENDED: 'SUSPENDED',
+  REJECTED: 'REJECTED',
+} as const;
+export type PartnerActivationStatus = (typeof PartnerActivationStatus)[keyof typeof PartnerActivationStatus];
+
 export const PrintJobStatus = {
   CREATED: 'CREATED',
   QUEUED: 'QUEUED',
@@ -98,8 +123,22 @@ export const RegisterVendorInputSchema = z.object({
     .regex(/^[a-zA-Z0-9_-]+$/, 'Slug may only contain letters, numbers, hyphens, and underscores'),
   contactPhone: z.string().min(10, 'A valid contact phone is required'),
   address: z.string().min(5, 'Physical business address is required'),
+  otp: z.string().length(6, 'Verification code must be exactly 6 digits').optional(),
 });
 export type RegisterVendorInput = z.infer<typeof RegisterVendorInputSchema>;
+
+export const SendOtpInputSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  purpose: z.enum(['SIGNUP', 'PASSWORD_RESET']).default('SIGNUP'),
+});
+export type SendOtpInput = z.infer<typeof SendOtpInputSchema>;
+
+export const VerifyOtpInputSchema = z.object({
+  email: z.string().email('Please provide a valid email address'),
+  otp: z.string().length(6, 'Verification code must be 6 digits'),
+  purpose: z.enum(['SIGNUP', 'PASSWORD_RESET']).default('SIGNUP'),
+});
+export type VerifyOtpInput = z.infer<typeof VerifyOtpInputSchema>;
 
 // Vendor Settings Update
 export const UpdateVendorSettingsSchema = z.object({

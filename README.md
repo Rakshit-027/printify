@@ -2,7 +2,7 @@
 
 [![Node.js LTS](https://img.shields.io/badge/Node.js-v20%20LTS-green.svg)](https://nodejs.org/)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14%20App%20Router-black.svg)](https://nextjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20Normalized-blue.svg)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.4%20Migration-blue.svg)](https://www.mysql.com/)
 [![Azure Blob Storage](https://img.shields.io/badge/Azure%20Storage-Central%20India-0078d4.svg)](https://azure.microsoft.com/)
 [![Razorpay](https://img.shields.io/badge/Payments-Razorpay%20Checkout-0c2340.svg)](https://razorpay.com/)
 [![Electron](https://img.shields.io/badge/Desktop-Electron%20Windows-47848F.svg)](https://www.electronjs.org/)
@@ -59,14 +59,14 @@ print-platform/
 │       └── src/retention-cleanup.ts   # Standalone CLI script for cron or systemd timers
 │
 ├── packages/
-│   ├── database/                      # Prisma schema (18+ normalized PostgreSQL models), seed script
+│   ├── database/                      # Prisma schema (25 MySQL models), baseline migration, seed script
 │   └── shared-types/                  # Shared Zod schemas, domain enums, and DTOs
 │
 ├── deploy/                            # Production Ubuntu 24.04 LTS deployment configs
 │   ├── nginx/printflow.conf           # Reverse proxy with TLS 1.3, rate limits, and 4GB buffer tuning
 │   ├── pm2/ecosystem.config.js        # PM2 cluster configuration (2 workers, 900M memory limit)
 │   ├── systemd/                       # Systemd web service and retention timer definitions
-│   └── backup/backup-db.sh            # Automated daily compressed PostgreSQL backup script
+│   └── backup/                      # Original PostgreSQL and post-cutover MySQL backup scripts
 │
 ├── DEPLOYMENT.md                      # Comprehensive Ubuntu 24.04 LTS production runbook
 └── package.json                       # Root workspaces configuration
@@ -87,9 +87,12 @@ npm install
 ```
 
 ### Step 2: Configure Environment Variables
+Set distinct `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD` environment variables for the
+local Compose database, then run `docker compose up -d db`. These are development-only
+secrets; keep them out of Git and use the application password below.
 Inside `apps/web/.env`:
 ```ini
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/printflow_db?schema=public&connection_limit=10"
+DATABASE_URL="mysql://printify_user:YOUR_LOCAL_PASSWORD@localhost:3306/printify_db?connection_limit=10"
 NODE_ENV="development"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 JWT_SECRET="printflow-development-secret-key-at-least-32-chars-long!"
@@ -107,13 +110,12 @@ RAZORPAY_KEY_SECRET="yourRazorpayTestKeySecret"
 RAZORPAY_WEBHOOK_SECRET="yourRazorpayWebhookSecret"
 ```
 
-### Step 3: Initialize Database & Seed
+### Step 3: Initialize a new empty local database & seed
 ```bash
 cd packages/database
 npx prisma generate
-# When connected to a live PostgreSQL instance:
-# npx prisma db push
-# npx tsx prisma/seed.ts
+npx prisma migrate deploy
+npx tsx prisma/seed.ts # only in disposable development databases
 cd ../..
 ```
 
@@ -130,24 +132,20 @@ npm run dev
 
 ---
 
-## 4. Running the Complete Automated Test Suite
+## 4. Running repository checks
 
-All critical modules have automated test suites runnable via `npx tsx`:
+Export `DATABASE_URL` for a disposable MySQL test database before running these
+commands; never use production data:
 
 ```bash
-cd apps/web
-
-# Run all 6 test suites:
-npx tsx __tests__/auth-and-rbac.test.ts
-npx tsx __tests__/storage-and-upload.test.ts
-npx tsx __tests__/pricing-and-orders.test.ts
-npx tsx __tests__/razorpay-and-webhooks.test.ts
-npx tsx __tests__/agent-protocol.test.ts
-npx tsx __tests__/admin-and-retention.test.ts
-npx tsx __tests__/e2e-workflow.test.ts
+npm test
+cargo test --manifest-path apps/server/Cargo.toml
+RUN_MYSQL_SMOKE=1 npm --workspace=packages/database run smoke:mysql
+python3 -m unittest discover -s migration -p 'test_*.py'
 ```
 
-Total Coverage: **110 Automated Tests, 0 Failures**.
+See [migration/README.md](migration/README.md) for actual checks run and outstanding
+database-backed, client and performance verification.
 
 ---
 
@@ -174,4 +172,4 @@ Total Coverage: **110 Automated Tests, 0 Failures**.
 
 ## 6. Production Deployment
 
-Refer to the complete production runbook in [DEPLOYMENT.md](file:///home/raksh/projects/Physiophy/print-platform/DEPLOYMENT.md) for step-by-step instructions for Ubuntu Server 24.04 LTS (Nginx, PM2, systemd, PostgreSQL, SSL, and backup scripts).
+For MySQL staging, data verification, cutover and rollback, follow [migration/README.md](migration/README.md). The previous PostgreSQL instructions remain in [DEPLOYMENT.md](DEPLOYMENT.md) for rollback only; do not switch production traffic until the staged checks have passed.

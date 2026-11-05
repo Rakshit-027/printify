@@ -7,6 +7,7 @@
     "push": "prisma db push",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "smoke:mysql": "tsx src/mysql-smoke.ts",
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {

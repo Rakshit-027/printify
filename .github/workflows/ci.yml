@@ -1,0 +1,83 @@
+name: Print2Me Monorepo CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-and-test:
+    name: Build & Test Validation
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: printify_ci
+          MYSQL_USER: printify_ci
+          MYSQL_PASSWORD: ci-password-only
+          MYSQL_ROOT_PASSWORD: ci-root-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -pci-root-only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: mysql://printify_ci:ci-password-only@127.0.0.1:3306/printify_ci?connection_limit=10
+      JWT_SECRET: printflow-ci-build-verification-secret-32-chars-min!
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js v20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Setup Python for migration validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate migration code and SQL compatibility
+        run: |
+          python -m pip install -r migration/requirements.txt
+          python -m unittest discover -s migration -p 'test_*.py'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Apply MySQL baseline migration
+        run: npm --workspace=packages/database run migrate:deploy
+
+      - name: MySQL relationship and transaction smoke test
+        run: npm --workspace=packages/database run smoke:mysql
+        env:
+          RUN_MYSQL_SMOKE: '1'
+
+      - name: Run Core & Security Tests (Web & Shared)
+        run: npm test
+
+      - name: Test Windows Desktop Agent (Real Spooler & Parser Tests)
+        run: npm --workspace=apps/desktop-agent run test
+
+      - name: Run Rust Backend Tests
+        run: cargo test --manifest-path apps/server/Cargo.toml
+
+      - name: Build Web Application
+        run: npm --workspace=apps/web run build
+        env:
+          NEXT_PUBLIC_APP_URL: "https://www.print2me.in"
+          NEXT_PUBLIC_API_URL: "https://api.print2me.in"
+
+      - name: Typecheck React Native Mobile App
+        run: npm --workspace=apps/Print2me-app run lint || npx --workspace=apps/Print2me-app tsc --noEmit

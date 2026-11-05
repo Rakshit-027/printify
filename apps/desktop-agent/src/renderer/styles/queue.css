@@ -1,0 +1,352 @@
+/* ==============================================================
+   PAGE 2: LIVE PRINT QUEUE
+   ============================================================== */
+.queue-toolbar {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-pills-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.queue-pill {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.queue-pill:hover {
+  background: var(--bg-card-subtle);
+  color: var(--brand-navy);
+}
+.queue-pill.active {
+  background: var(--brand-navy);
+  color: #FFFFFF;
+  border-color: var(--brand-navy);
+}
+.queue-pill.active .pill-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+}
+.pill-count {
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.search-box-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 240px;
+}
+.search-box-wrap svg {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.search-input {
+  width: 100%;
+  padding: 7px 12px 7px 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-app);
+  font-size: 12px;
+  color: var(--brand-navy);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.search-input:focus {
+  border-color: var(--brand-orange);
+  background: #FFFFFF;
+}
+
+/* Queue Orders Container */
+.queue-orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Individual Order Card */
+.order-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+.order-card:hover {
+  border-color: var(--border-dark);
+  box-shadow: var(--shadow-md);
+}
+.order-card.printing-active {
+  border-color: var(--info);
+  background: #F8FAFC;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15), var(--shadow-md);
+}
+.order-card.error-active {
+  border-color: var(--danger);
+  background: #FFFBFB;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15), var(--shadow-md);
+}
+
+.order-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+.order-id-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.order-id-text {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--brand-navy);
+  letter-spacing: -0.2px;
+}
+.order-time-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-printing {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-text);
+}
+.badge-completed {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+.badge-danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+.badge-amber {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+}
+.badge-neutral {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+.order-body-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr 0.9fr 1.3fr;
+  align-items: center;
+  gap: 16px;
+}
+@media (max-width: 1080px) {
+  .order-body-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+}
+
+.doc-preview-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.doc-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  color: var(--info);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.doc-icon-box svg {
+  width: 18px;
+  height: 18px;
+}
+.doc-meta-wrap {
+  min-width: 0;
+}
+.doc-name-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-spec-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.spec-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg-app);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.customer-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.customer-name-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.customer-phone-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.payment-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.price-amount-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+.payment-status-tag {
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.payment-status-tag.paid { color: #059669; }
+.payment-status-tag.pending { color: #D97706; }
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Animated Printing State inside card */
+.printing-live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #E0F2FE;
+  border: 1px solid #BAE6FD;
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.pulsing-dots {
+  display: flex;
+  gap: 4px;
+}
+.pulsing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--info);
+  animation: dotPulse 1.2s infinite ease-in-out;
+}
+.pulsing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.pulsing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Paper out / Error Banner inside card */
+.error-alert-banner {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+/* Empty state */
+.empty-state-box {
+  text-align: center;
+  padding: 60px 20px;
+  background: #FFFFFF;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+}
+.empty-state-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-navy);
+  margin-bottom: 4px;
+}
+.empty-state-desc {
+  font-size: 12px;
+  max-width: 400px;
+  margin: 0 auto;
+}

@@ -5,17 +5,27 @@
   "description": "Production Online Printing & Vendor Management Platform",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "background-worker"
   ],
   "scripts": {
+    "dev:server": "cargo run --manifest-path apps/server/Cargo.toml",
+    "build:server": "cargo build --release --manifest-path apps/server/Cargo.toml",
+    "test:server": "cargo test --manifest-path apps/server/Cargo.toml",
     "dev:web": "npm --workspace=apps/web run dev",
+    "dev:mobile": "npm --workspace=apps/Print2me-app run start",
     "dev:agent": "npm --workspace=apps/desktop-agent run dev",
     "build:web": "npm --workspace=apps/web run build",
+    "build:agent": "npm --workspace=apps/desktop-agent run package:win",
+    "run:retention": "npm --workspace=background-worker run run:retention",
     "db:generate": "npm --workspace=packages/database run generate",
     "db:push": "npm --workspace=packages/database run push",
     "db:seed": "npm --workspace=packages/database run seed",
     "test": "npm --workspace=apps/web run test",
-    "postinstall": "npm run db:generate"
+    "postinstall": "npm run db:generate && node scripts/fix-7zip-perms.js"
+  },
+  "devDependencies": {
+    "7zip-bin": "^5.2.0"
   },
   "keywords": [
     "cloudprint",
@@ -25,6 +35,14 @@
     "razorpay",
     "azure-blob-storage"
   ],
-  "author": "PrintFlow Team",
-  "license": "UNLICENSED"
+  "author": "Print2Me Team <support@print2me.in>",
+  "license": "UNLICENSED",
+  "allowScripts": {
+    "electron@30.5.1": true,
+    "esbuild@0.28.2": true,
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "prisma@5.22.0": true,
+    "7zip-bin@5.2.0": true
+  }
 }

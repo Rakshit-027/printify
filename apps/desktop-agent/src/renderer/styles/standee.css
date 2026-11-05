@@ -1,0 +1,48 @@
+/* ==============================================================
+   PAGE 5: QR KIOSK & STORE QR STANDEE
+   ============================================================== */
+.standee-view-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+}
+.standee-card-preview {
+  background: #FFFFFF;
+  border: 2px solid var(--brand-navy);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  padding: 40px 36px;
+  width: 420px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.standee-logo-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--brand-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(16, 27, 59, 0.2);
+}
+.standee-logo-wrap img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+.standee-qr-frame {
+  background: #FFFFFF;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 210px;
+  height: 210px;
+}

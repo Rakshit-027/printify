@@ -2,16 +2,17 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: mysql:8.4
     restart: always
     environment:
-      POSTGRES_USER: printify_user
-      POSTGRES_PASSWORD: printify_password
-      POSTGRES_DB: printify_db
+      MYSQL_DATABASE: printify_db
+      MYSQL_USER: printify_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set a local application password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set a local root password}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
 
 volumes:
-  postgres_data:
+  mysql_data:

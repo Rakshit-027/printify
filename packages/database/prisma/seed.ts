@@ -12,10 +12,10 @@ async function main() {
 
   // 2. Super Administrator
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@printflow.io' },
+    where: { email: 'admin@print2me.in' },
     update: {},
     create: {
-      email: 'admin@printflow.io',
+      email: 'admin@print2me.in',
       fullName: 'Platform Administrator',
       passwordHash: defaultPasswordHash,
       role: UserRole.SUPER_ADMIN,

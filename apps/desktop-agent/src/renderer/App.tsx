@@ -1,3 +1,10 @@
+/**
+ * NOTE: Active Workstation Desktop Agent Renderer
+ * The desktop workstation UI is modularized in src/renderer/:
+ *  - index.html (Clean HTML layout)
+ *  - styles/    (base, sidebar, header, overview, queue, printers, pricing, standee, terminal, modals)
+ *  - scripts/   (state, navigation, app, and views/ [overview, orders, printers, pricing, terminal])
+ */
 import React, { useState, useEffect, useRef } from "react";
 import {
   Printer,
@@ -20,7 +27,8 @@ import {
   Sparkles,
   ShieldCheck,
   Smartphone,
-  HardDrive
+  HardDrive,
+  CreditCard,
 } from "lucide-react";
 
 declare global {
@@ -45,20 +53,69 @@ export function App() {
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
 
   // Auth / Login State
-  const [authMode, setAuthMode] = useState<"login" | "code">("login");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "code">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [backendUrl, setBackendUrl] = useState("http://localhost:3000");
+  const [backendUrl, setBackendUrl] = useState("https://api.print2me.in");
   const [deviceName, setDeviceName] = useState("Counter-Station-1");
   const [enrollmentCode, setEnrollmentCode] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
+  // Signup Specific State
+  const [signupStoreName, setSignupStoreName] = useState("");
+  const [signupOwnerName, setSignupOwnerName] = useState("");
+  const [signupPhone, setSignupPhone] = useState("");
+  const [signupAddress, setSignupAddress] = useState("");
+  const [signupOtp, setSignupOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
+
   // Printer Preferences
   const [bwPrinter, setBwPrinter] = useState("");
   const [colorPrinter, setColorPrinter] = useState("");
+  const [subscription, setSubscription] = useState<any>(null);
 
   const logEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchSubscription = async (currentStatus?: any) => {
+    const activeCfg = currentStatus?.config || status?.config;
+    if (!activeCfg?.backendUrl) return;
+    try {
+      const res = await fetch(`${activeCfg.backendUrl}/api/vendor/subscription`, {
+        headers: {
+          'x-device-id': activeCfg.deviceId || '',
+          'x-device-token': activeCfg.deviceToken || '',
+          ...(activeCfg.sessionToken ? { Authorization: `Bearer ${activeCfg.sessionToken}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.subscription) {
+          setSubscription(json.subscription);
+        }
+      }
+    } catch {}
+  };
+
+  const handleOpenSubscriptionPortal = () => {
+    const url = `${status?.config?.backendUrl || "https://www.print2me.in"}/vendor/subscription`;
+    if (window.printAgentApi?.openExternalUrl) {
+      window.printAgentApi.openExternalUrl(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
 
   const refreshStatus = async () => {
     if (!window.printAgentApi) return;
@@ -69,9 +126,19 @@ export function App() {
       setIsPolling(res.config?.isPollingActive ?? true);
       if (res.config?.defaultBwPrinter) setBwPrinter(res.config.defaultBwPrinter);
       if (res.config?.defaultColorPrinter) setColorPrinter(res.config.defaultColorPrinter);
+      fetchSubscription(res);
     } catch (err) {
       console.error("Error refreshing status:", err);
     }
+  };
+
+  const prevOrderCountRef = useRef<number>(-1);
+
+  const playOrderChime = () => {
+    try {
+      const audio = new Audio("./assets/sounds/order_bell.wav");
+      audio.play().catch(() => {});
+    } catch {}
   };
 
   const fetchOrders = async () => {
@@ -80,7 +147,12 @@ export function App() {
     try {
       const res = await window.printAgentApi.getOrders(orderFilter);
       if (res.success) {
-        setOrders(res.orders || []);
+        const newOrders = res.orders || [];
+        if (prevOrderCountRef.current !== -1 && newOrders.length > prevOrderCountRef.current) {
+          playOrderChime();
+        }
+        prevOrderCountRef.current = newOrders.length;
+        setOrders(newOrders);
       }
     } catch (err) {
       console.error("Error fetching orders:", err);
@@ -92,12 +164,26 @@ export function App() {
   useEffect(() => {
     refreshStatus();
 
+    let unsubLog: (() => void) | undefined;
     if (window.printAgentApi?.onLog) {
-      const unsubscribe = window.printAgentApi.onLog((log: any) => {
+      unsubLog = window.printAgentApi.onLog((log: any) => {
         setLogs((prev) => [...prev.slice(-150), log]);
       });
-      return () => unsubscribe();
     }
+
+    let unsubJob: (() => void) | undefined;
+    if (window.printAgentApi?.onNewJob) {
+      unsubJob = window.printAgentApi.onNewJob((job: any) => {
+        playOrderChime();
+        setBannerNotice(`🔔 New Print Order: #${job.orderNumber || ''} claimed`);
+        fetchOrders();
+      });
+    }
+
+    return () => {
+      if (unsubLog) unsubLog();
+      if (unsubJob) unsubJob();
+    };
   }, []);
 
   useEffect(() => {
@@ -156,6 +242,85 @@ export function App() {
       }
     } catch (err: any) {
       setAuthError(err.message || "Enrollment failed");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!email || !email.includes("@")) {
+      setAuthError("Please enter a valid email address first.");
+      return;
+    }
+    setOtpLoading(true);
+    setAuthError("");
+    try {
+      const res = await window.printAgentApi.sendOtp({ backendUrl, email });
+      if (res.success) {
+        setOtpSent(true);
+        setResendCooldown(60);
+        setBannerNotice(res.message || "Verification code sent to your email.");
+      } else {
+        setAuthError(res.error || "Failed to send verification code.");
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to send OTP.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (signupOtp.trim().length !== 6) {
+      setAuthError("Please enter the 6-digit verification code.");
+      return;
+    }
+    setOtpLoading(true);
+    setAuthError("");
+    try {
+      const res = await window.printAgentApi.verifyOtp({ backendUrl, email, otp: signupOtp.trim() });
+      if (res.success) {
+        setOtpVerified(true);
+        setBannerNotice("Email verified successfully! You can now finish registration.");
+      } else {
+        setAuthError(res.error || "Incorrect or expired code.");
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to verify code.");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleRegisterVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpVerified && !signupOtp) {
+      setAuthError("Please verify your email address before registering.");
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const res = await window.printAgentApi.registerVendor({
+        backendUrl,
+        email,
+        password,
+        fullName: signupOwnerName,
+        vendorName: signupStoreName,
+        contactPhone: signupPhone,
+        address: signupAddress,
+        otp: signupOtp.trim() || undefined,
+        deviceName,
+      });
+      if (res.success) {
+        setBannerNotice(`Welcome, ${signupStoreName}! Station successfully paired.`);
+        await refreshStatus();
+        await fetchOrders();
+      } else {
+        setAuthError(res.error || "Registration failed");
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to contact backend server");
     } finally {
       setAuthLoading(false);
     }
@@ -240,7 +405,7 @@ export function App() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FAF7F2", color: "#0E1A3A", display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div style={{ height: "100vh", overflow: "hidden", background: "#FAF7F2", color: "#0E1A3A", display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       {/* Top Banner Notice */}
       {bannerNotice && (
         <div style={{ background: "#10B981", padding: "8px 24px", fontSize: 13, fontWeight: "bold", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff" }}>
@@ -252,12 +417,12 @@ export function App() {
       {/* Main Top Header */}
       <header style={{ borderBottom: "1px solid #E2E8F0", background: "#FFFFFF", padding: "16px 28px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 16, background: "#FAF7F2", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Printer size={22} color="#0E1A3A" />
+          <div style={{ width: 44, height: 44, borderRadius: 16, background: "#FAF7F2", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", padding: 4 }}>
+            <img src="brand/print2me-icon.png" alt="Print2Me" style={{ width: 34, height: "auto", objectFit: "contain" }} />
           </div>
           <div>
             <div style={{ fontSize: 18, fontWeight: "800", display: "flex", alignItems: "center", gap: 8, color: "#0E1A3A" }}>
-              <span>PrintFlow Station</span>
+              <span>Print2Me Station</span>
               <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "#10B98115", color: "#10B981", border: "1px solid #10B98130", textTransform: "uppercase" }}>v1.0 Agent</span>
             </div>
             <div style={{ fontSize: 12, color: "#64748B", display: "flex", alignItems: "center", gap: 6, marginTop: 2, fontWeight: "500" }}>
@@ -311,6 +476,35 @@ export function App() {
               <span>Virtual Prints</span>
             </button>
 
+            {/* SaaS Subscription Plan Badge */}
+            <button
+              onClick={handleOpenSubscriptionPortal}
+              title={subscription ? `Plan: ${subscription.plan?.name || subscription.planCode} (${subscription.daysRemaining} days left)` : "Manage Subscription"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                borderRadius: 12,
+                background: subscription?.isExpired ? "#EF444415" : "#6366F115",
+                border: subscription?.isExpired ? "1px solid #EF444440" : "1px solid #6366F130",
+                color: subscription?.isExpired ? "#DC2626" : "#4F46E5",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: 12,
+                transition: "all 0.2s",
+              }}
+            >
+              <CreditCard size={14} />
+              <span>
+                {subscription
+                  ? subscription.isExpired
+                    ? "Subscription Expired"
+                    : `${subscription.plan?.name || subscription.planCode} • ${subscription.daysRemaining}d`
+                  : "Subscription"}
+              </span>
+            </button>
+
             {/* Refresh */}
             <button
               onClick={() => { refreshStatus(); fetchOrders(); }}
@@ -353,12 +547,73 @@ export function App() {
       </header>
 
       {/* Main Content Body */}
-      <main style={{ flex: 1, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
+      <main style={{ flex: 1, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, overflowY: "auto", minHeight: 0 }}>
+        {/* Subscription Expired Warning Banner */}
+        {isEnrolled && subscription?.isExpired && (
+          <div
+            style={{
+              background: "linear-gradient(135deg, #FEF2F2, #FEE2E2)",
+              border: "1px solid #FCA5A5",
+              borderRadius: 16,
+              padding: "14px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              boxShadow: "0 2px 10px rgba(239, 68, 68, 0.08)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "#EF4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#FFFFFF",
+                  flexShrink: 0,
+                }}
+              >
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14, color: "#991B1B" }}>
+                  Vendor SaaS Subscription Expired
+                </div>
+                <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 2 }}>
+                  Your subscription ended on {subscription.expiresAt ? new Date(subscription.expiresAt).toLocaleDateString() : 'recently'}. Customer orders are currently paused by the server.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleOpenSubscriptionPortal}
+              style={{
+                background: "#DC2626",
+                color: "#FFFFFF",
+                fontWeight: 700,
+                fontSize: 12,
+                padding: "8px 16px",
+                borderRadius: 10,
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                boxShadow: "0 2px 6px rgba(220, 38, 38, 0.3)",
+              }}
+            >
+              <span>Renew Subscription</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
         {!isEnrolled ? (
           /* ========================================================= */
           /* AUTHENTICATION & PAIRING VIEW */
           /* ========================================================= */
-          <div style={{ maxWidth: 480, margin: "60px auto", width: "100%", background: "#FFFFFF", borderRadius: 32, border: "1px solid #E2E8F0", padding: 40, boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)" }}>
+          <div style={{ maxWidth: 480, margin: "40px auto", width: "100%", background: "#FFFFFF", borderRadius: 32, border: "1px solid #E2E8F0", padding: 40, boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)", maxHeight: "calc(100vh - 120px)", overflowY: "auto" }}>
             <div style={{ textAlign: "center", marginBottom: 32 }}>
               <div style={{ width: 64, height: 64, margin: "0 auto 16px", borderRadius: 20, background: "#FAF7F2", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Printer size={32} color="#0E1A3A" />
@@ -370,42 +625,60 @@ export function App() {
             </div>
 
             {/* Auth Mode Toggle */}
-            <div style={{ display: "flex", background: "#FAF7F2", padding: 6, borderRadius: 16, border: "1px solid #E2E8F0", marginBottom: 24 }}>
+            <div style={{ display: "flex", background: "#FAF7F2", padding: 6, borderRadius: 16, border: "1px solid #E2E8F0", marginBottom: 24, gap: 4 }}>
               <button
                 type="button"
                 onClick={() => setAuthMode("login")}
                 style={{
                   flex: 1,
-                  padding: "10px",
+                  padding: "9px 6px",
                   borderRadius: 12,
                   border: "none",
                   background: authMode === "login" ? "#FFFFFF" : "transparent",
                   color: authMode === "login" ? "#0E1A3A" : "#64748B",
                   fontWeight: "700",
-                  fontSize: 13,
+                  fontSize: 12,
                   cursor: "pointer",
                   boxShadow: authMode === "login" ? "0 2px 8px rgba(14, 26, 58, 0.05)" : "none"
                 }}
               >
-                Vendor Login
+                Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode("signup")}
+                style={{
+                  flex: 1,
+                  padding: "9px 6px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: authMode === "signup" ? "#FFFFFF" : "transparent",
+                  color: authMode === "signup" ? "#0E1A3A" : "#64748B",
+                  fontWeight: "700",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  boxShadow: authMode === "signup" ? "0 2px 8px rgba(14, 26, 58, 0.05)" : "none"
+                }}
+              >
+                Sign Up
               </button>
               <button
                 type="button"
                 onClick={() => setAuthMode("code")}
                 style={{
                   flex: 1,
-                  padding: "10px",
+                  padding: "9px 6px",
                   borderRadius: 12,
                   border: "none",
                   background: authMode === "code" ? "#FFFFFF" : "transparent",
                   color: authMode === "code" ? "#0E1A3A" : "#64748B",
                   fontWeight: "700",
-                  fontSize: 13,
+                  fontSize: 12,
                   cursor: "pointer",
                   boxShadow: authMode === "code" ? "0 2px 8px rgba(14, 26, 58, 0.05)" : "none"
                 }}
               >
-                Enrollment Code
+                Enroll Code
               </button>
             </div>
 
@@ -415,14 +688,176 @@ export function App() {
               </div>
             )}
 
-            {authMode === "login" ? (
+            {authMode === "signup" ? (
+              <form onSubmit={handleRegisterVendor} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Store Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Apex Print Studio"
+                      value={signupStoreName}
+                      onChange={(e) => setSignupStoreName(e.target.value)}
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Owner Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rajesh Kumar"
+                      value={signupOwnerName}
+                      onChange={(e) => setSignupOwnerName(e.target.value)}
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Phone Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="9876543210"
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Store Address *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Counter #1, Campus Market"
+                      value={signupAddress}
+                      onChange={(e) => setSignupAddress(e.target.value)}
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Work Email *</label>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <input
+                      type="email"
+                      required
+                      disabled={otpVerified}
+                      placeholder="vendor@print2me.in"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      style={{ flex: 1, background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, outline: "none", fontWeight: "500" }}
+                    />
+                    <button
+                      type="button"
+                      disabled={otpLoading || resendCooldown > 0 || otpVerified}
+                      onClick={handleSendOtp}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 14,
+                        border: "none",
+                        background: otpVerified ? "#10B981" : "#0E1A3A",
+                        color: "#FFFFFF",
+                        fontSize: 12,
+                        fontWeight: "700",
+                        cursor: otpVerified || resendCooldown > 0 ? "default" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {otpVerified ? "✓ Verified" : resendCooldown > 0 ? `Resend (${resendCooldown}s)` : otpSent ? "Resend OTP" : "Send OTP"}
+                    </button>
+                  </div>
+                </div>
+
+                {otpSent && !otpVerified && (
+                  <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 16, padding: "14px" }}>
+                    <label style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>Enter 6-Digit Email OTP *</label>
+                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="123456"
+                        value={signupOtp}
+                        onChange={(e) => setSignupOtp(e.target.value)}
+                        style={{ flex: 1, background: "#FFFFFF", border: "1px solid #86EFAC", padding: "10px 14px", borderRadius: 12, fontSize: 16, fontWeight: "800", letterSpacing: 4, textAlign: "center", outline: "none" }}
+                      />
+                      <button
+                        type="button"
+                        disabled={otpLoading}
+                        onClick={handleVerifyOtp}
+                        style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: "#16A34A", color: "#FFFFFF", fontWeight: "700", fontSize: 12, cursor: "pointer" }}
+                      >
+                        {otpLoading ? "Verifying..." : "Verify Code"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Account Password (Min 8 chars) *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: "700", color: "#0E1A3A" }}>Station Name</label>
+                  <input
+                    type="text"
+                    value={deviceName}
+                    onChange={(e) => setDeviceName(e.target.value)}
+                    style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "12px 14px", borderRadius: 14, color: "#0E1A3A", fontSize: 13, marginTop: 6, outline: "none", fontWeight: "500" }}
+                  />
+                </div>
+
+                <details style={{ marginTop: 2, marginBottom: 4, fontSize: 11, color: "#64748B" }}>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <div style={{ marginTop: 6 }}>
+                    <input
+                      type="text"
+                      value={backendUrl}
+                      onChange={(e) => setBackendUrl(e.target.value)}
+                      placeholder="https://www.print2me.in"
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "10px 14px", borderRadius: 12, color: "#0E1A3A", fontSize: 12, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                </details>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  style={{
+                    marginTop: 6,
+                    padding: "16px",
+                    borderRadius: 16,
+                    background: "#0E1A3A",
+                    color: "#FFFFFF",
+                    border: "none",
+                    fontWeight: "800",
+                    fontSize: 14,
+                    cursor: "pointer",
+                  }}
+                >
+                  {authLoading ? "Creating Account & Pairing..." : "Register & Pair Station"}
+                </button>
+              </form>
+            ) : authMode === "login" ? (
               <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Vendor Email</label>
                   <input
                     type="email"
                     required
-                    placeholder="vendor@printflow.in"
+                    placeholder="vendor@print2me.in"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "14px 16px", borderRadius: 16, color: "#0E1A3A", fontSize: 14, marginTop: 8, outline: "none", fontWeight: "500" }}
@@ -451,15 +886,18 @@ export function App() {
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Server URL</label>
-                  <input
-                    type="text"
-                    value={backendUrl}
-                    onChange={(e) => setBackendUrl(e.target.value)}
-                    style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "14px 16px", borderRadius: 16, color: "#0E1A3A", fontSize: 14, marginTop: 8, outline: "none", fontWeight: "500" }}
-                  />
-                </div>
+                <details style={{ marginTop: 4, marginBottom: 8, fontSize: 12, color: "#64748B" }}>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="text"
+                      value={backendUrl}
+                      onChange={(e) => setBackendUrl(e.target.value)}
+                      placeholder="https://www.print2me.in"
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "10px 14px", borderRadius: 12, color: "#0E1A3A", fontSize: 13, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                </details>
 
                 <button
                   type="submit"
@@ -506,15 +944,18 @@ export function App() {
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Server URL</label>
-                  <input
-                    type="text"
-                    value={backendUrl}
-                    onChange={(e) => setBackendUrl(e.target.value)}
-                    style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "14px 16px", borderRadius: 16, color: "#0E1A3A", fontSize: 14, marginTop: 8, outline: "none", fontWeight: "500" }}
-                  />
-                </div>
+                <details style={{ marginTop: 4, marginBottom: 8, fontSize: 12, color: "#64748B" }}>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <div style={{ marginTop: 8 }}>
+                    <input
+                      type="text"
+                      value={backendUrl}
+                      onChange={(e) => setBackendUrl(e.target.value)}
+                      placeholder="https://www.print2me.in"
+                      style={{ width: "100%", background: "#FAF7F2", border: "1px solid #E2E8F0", padding: "10px 14px", borderRadius: 12, color: "#0E1A3A", fontSize: 13, outline: "none", fontWeight: "500" }}
+                    />
+                  </div>
+                </details>
 
                 <button
                   type="submit"
@@ -621,7 +1062,7 @@ export function App() {
                 </button>
 
                 <button
-                  onClick={() => setActiveTab("printers")}
+                  onClick={() => { setActiveTab("printers"); handleSyncPrinters(); }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -882,7 +1323,7 @@ export function App() {
                   </div>
 
                   <p style={{ fontSize: 14, color: "#64748B", margin: 0, fontWeight: "500", lineHeight: "1.5" }}>
-                    Automatically route jobs based on customer color settings. PrintFlow will send B&amp;W jobs to your high-speed laser printer and color jobs to your color printer.
+                    Automatically route jobs based on customer color settings. Print2Me will send B&amp;W jobs to your high-speed laser printer and color jobs to your color printer.
                   </p>
 
                   <div>
@@ -928,39 +1369,81 @@ export function App() {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 380, overflowY: "auto", paddingRight: 8 }}>
-                    {printers.map((p, idx) => (
-                      <div key={idx} style={{ background: "#FAF7F2", padding: "16px 20px", borderRadius: 16, border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontSize: 15, fontWeight: "800", color: "#0E1A3A", display: "flex", alignItems: "center", gap: 10 }}>
-                            <span>{p.displayName || p.systemName}</span>
-                            {p.isDefault && (
-                              <span style={{ fontSize: 10, padding: "4px 8px", borderRadius: 8, background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", textTransform: "uppercase" }}>Default</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 12, color: "#64748B", marginTop: 6, fontWeight: "500" }}>
-                            {p.supportsColor ? "Color" : "B&W Laser"} • {p.supportsDuplex ? "Duplex Supported" : "Single-Sided"} • {p.supportedSizes?.join(", ")}
-                          </div>
+                    {printers.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "32px 20px", background: "#FAF7F2", borderRadius: 16, border: "1px dashed #E2E8F0" }}>
+                        <div style={{ width: 52, height: 52, borderRadius: 16, background: "#FFFFFF", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                          <Printer size={26} color="#CBD5E1" />
                         </div>
-
+                        <div style={{ fontSize: 15, fontWeight: "800", color: "#0E1A3A", marginBottom: 6 }}>No Printers Detected</div>
+                        <div style={{ fontSize: 12, color: "#64748B", fontWeight: "500", lineHeight: 1.6, marginBottom: 16 }}>
+                          Make sure your printer is <strong>turned on</strong> and connected to this PC via USB or the same WiFi network.<br />
+                          On Windows, open <em>Settings → Bluetooth &amp; devices → Printers &amp; scanners</em> to install a printer first.
+                        </div>
                         <button
-                          onClick={() => handleTestPrint(p.systemName)}
-                          disabled={testPrintLoading === p.systemName}
+                          onClick={handleSyncPrinters}
                           style={{
-                            padding: "8px 16px",
+                            padding: "10px 20px",
                             borderRadius: 12,
-                            background: "#FFFFFF",
-                            border: "1px solid #E2E8F0",
-                            color: "#0E1A3A",
-                            fontSize: 12,
+                            background: "#0E1A3A",
+                            border: "none",
+                            color: "#FFFFFF",
+                            fontSize: 13,
                             fontWeight: "700",
                             cursor: "pointer",
-                            boxShadow: "0 2px 4px rgba(14, 26, 58, 0.05)"
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {testPrintLoading === p.systemName ? "Printing..." : "Test Print"}
+                          <RefreshCw size={14} />
+                          Refresh Printer List
                         </button>
                       </div>
-                    ))}
+                    ) : (
+                      printers.map((p, idx) => (
+                        <div key={idx} style={{ background: "#FAF7F2", padding: "16px 20px", borderRadius: 16, border: `1px solid ${p.isOnline === false ? '#FCA5A5' : '#E2E8F0'}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: "800", color: "#0E1A3A", display: "flex", alignItems: "center", gap: 10 }}>
+                              <span
+                                style={{
+                                  width: 8, height: 8, borderRadius: "50%",
+                                  background: p.isOnline === false ? "#EF4444" : p.status === "PRINTING" ? "#FF8A1F" : "#10B981",
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span>{p.displayName || p.systemName}</span>
+                              {p.isDefault && (
+                                <span style={{ fontSize: 10, padding: "4px 8px", borderRadius: 8, background: "#10B98115", border: "1px solid #10B98130", color: "#10B981", textTransform: "uppercase" }}>Default</span>
+                              )}
+                              {p.isOnline === false && (
+                                <span style={{ fontSize: 10, padding: "4px 8px", borderRadius: 8, background: "#EF444415", border: "1px solid #EF444430", color: "#EF4444", textTransform: "uppercase" }}>Offline</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#64748B", marginTop: 6, fontWeight: "500" }}>
+                              {p.status || "Ready"} • {p.supportsColor ? "Color" : "B&W Laser"} • {p.supportsDuplex ? "Duplex" : "Single-Sided"} • {p.portName || "Network"}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleTestPrint(p.systemName)}
+                            disabled={testPrintLoading === p.systemName || p.isOnline === false}
+                            style={{
+                              padding: "8px 16px",
+                              borderRadius: 12,
+                              background: "#FFFFFF",
+                              border: "1px solid #E2E8F0",
+                              color: p.isOnline === false ? "#CBD5E1" : "#0E1A3A",
+                              fontSize: 12,
+                              fontWeight: "700",
+                              cursor: p.isOnline === false ? "not-allowed" : "pointer",
+                              boxShadow: "0 2px 4px rgba(14, 26, 58, 0.05)"
+                            }}
+                          >
+                            {testPrintLoading === p.systemName ? "Printing..." : "Test Print"}
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>

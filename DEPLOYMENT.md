@@ -1,4 +1,7 @@
 # PrintFlow - Production Deployment Runbook
+> **MySQL migration:** This document describes the previous PostgreSQL deployment and is
+> retained for rollback. For an approved MySQL cutover, use [migration/README.md](migration/README.md)
+> instead. Do not apply the commands below to the live service during migration.
 ## Target Environment: Ubuntu Server 24.04 LTS (2 vCPUs, 4 GB RAM, 50 GB NVMe)
 
 This guide documents the end-to-end production deployment process for the PrintFlow Online Printing & Vendor Management Platform. It is specifically calibrated for a resource-constrained 4 GB RAM / 2-core VPS.

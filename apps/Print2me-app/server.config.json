@@ -1,0 +1,10 @@
+{
+  "serverUrl": "https://api.print2me.in",
+  "description": "Print2Me Mobile App Backend Server Configuration. Change 'serverUrl' below anytime to update the backend server address. The app automatically reads this file on launch and applies the new URL.",
+  "examples": {
+    "localWifi": "http://192.168.1.100:8080",
+    "androidEmulator": "http://10.0.2.2:8080",
+    "usbAdbReverse": "http://localhost:8080",
+    "ngrokOrCloudTunnel": "https://your-tunnel.ngrok-free.app"
+  }
+}

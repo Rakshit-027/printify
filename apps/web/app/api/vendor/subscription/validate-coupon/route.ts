@@ -87,11 +87,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan restriction
-    if (coupon.applicablePlanCodes && coupon.applicablePlanCodes.length > 0) {
-      if (!plan || !coupon.applicablePlanCodes.includes(plan.code)) {
+    const applicablePlanCodes = Array.isArray(coupon.applicablePlanCodes)
+      ? coupon.applicablePlanCodes.filter((code): code is string => typeof code === 'string')
+      : [];
+    if (applicablePlanCodes.length > 0) {
+      if (!plan || !applicablePlanCodes.includes(plan.code)) {
         return NextResponse.json({
           valid: false,
-          error: `This coupon is only valid for plans: ${coupon.applicablePlanCodes.join(', ')}`,
+          error: `This coupon is only valid for plans: ${applicablePlanCodes.join(', ')}`,
         }, { status: 400 });
       }
     }

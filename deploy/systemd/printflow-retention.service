@@ -1,6 +1,6 @@
 [Unit]
 Description=PrintFlow Document Retention and Stale Job Reaper Worker
-After=network.target postgresql.service
+After=network-online.target
 
 [Service]
 Type=oneshot
