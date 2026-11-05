@@ -407,6 +407,42 @@ export async function createPartnerOrder(params: {
     isPartnerConfigured();
 
   if (!hasLiveOAuth) {
+    if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET && !RAZORPAY_KEY_ID.includes('placeholder')) {
+      try {
+        const authHeader = `Basic ${Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64')}`;
+        const response = await fetch('https://api.razorpay.com/v1/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            amount: amountMinor,
+            currency: 'INR',
+            receipt,
+            notes: notes || {},
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error?.description || data?.error || 'Failed to create platform Razorpay order');
+        }
+
+        return {
+          razorpayOrderId: data.id,
+          amountMinor,
+          currency: 'INR',
+          keyId: RAZORPAY_KEY_ID,
+          isMock: false,
+          subMerchantAccountId: accountId || undefined,
+        };
+      } catch (err: any) {
+        console.error('[RazorpayPartner] Platform order creation error:', err);
+        throw err;
+      }
+    }
+
     // Sandbox or Simulation mode
     const mockOrderId = `order_sub_${crypto.randomBytes(8).toString('hex')}`;
     const resolvedKey =

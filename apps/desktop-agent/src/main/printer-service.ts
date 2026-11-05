@@ -3,7 +3,7 @@ import util from 'util';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, app, shell } from 'electron';
 
 const execAsync = util.promisify(exec);
 
@@ -109,23 +109,82 @@ export class WindowsPrinterService {
   }
 
   /**
-   * Enumerate real Windows printers via PowerShell CIM Win32_Printer
+   * Enumerate real Windows printers via Native Electron API, CIM, and .NET fallback
    */
   private async getWindowsPrinters(): Promise<RealPrinterInfo[]> {
+    // 1. First attempt: Native Electron Chromium API (instant, no WMI permission issues)
     try {
-      // Query CIM Win32_Printer for deep driver, port, and hardware status
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win && win.webContents && typeof win.webContents.getPrintersAsync === 'function') {
+        const electronPrinters = await win.webContents.getPrintersAsync();
+        if (electronPrinters && electronPrinters.length > 0) {
+          return electronPrinters.map((p) => {
+            const name = p.name;
+            const isDefault = Boolean(p.isDefault);
+            const options = (p.options || {}) as Record<string, any>;
+            const driverName = options['printer-make-and-model'] || options['system_driverinfo'] || 'Windows Print Driver';
+            const portName = options['printer-location'] || 'Local Port';
+            const isColor = name.toLowerCase().includes('color') || true;
+            return {
+              systemName: name,
+              displayName: p.displayName || name,
+              driverName,
+              portName,
+              isDefault,
+              status: 'READY' as PrinterOnlineStatus,
+              statusCode: p.status || 0,
+              statusDetails: 'Ready to print',
+              isOnline: true,
+              isReachable: true,
+              isPaused: false,
+              hasError: false,
+              supportsColor: isColor,
+              supportsDuplex: true,
+              supportedSizes: ['A4', 'A3', 'LETTER', 'LEGAL'],
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[PRINTER-SERVICE] Native Electron getPrintersAsync fallback notice:', e);
+    }
+
+    // 2. Second attempt: PowerShell with CIM and .NET InstalledPrinters fallback
+    try {
       const psCommand = `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
         $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         try {
-          $printers = Get-CimInstance -ClassName Win32_Printer | Select-Object Name, DeviceID, DriverName, PortName, Default, PrinterStatus, PrinterState, WorkOffline, SpoolEnabled, CapabilityDescriptions, Capabilities, HorizontalResolution, VerticalResolution
+          $printers = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop | Select-Object Name, DeviceID, DriverName, PortName, Default, PrinterStatus, PrinterState, WorkOffline, SpoolEnabled, CapabilityDescriptions, Capabilities, HorizontalResolution, VerticalResolution
           if ($printers) {
             $printers | ConvertTo-Json -Depth 3 -Compress
-          } else {
-            '[]'
+            exit 0
           }
-        } catch {
-          '[]'
-        }
+        } catch {}
+        try {
+          Add-Type -AssemblyName System.Drawing
+          $default = (Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows').Device
+          $defaultName = if ($default) { $default.Split(',')[0] } else { '' }
+          $list = [System.Drawing.Printing.PrinterSettings]::InstalledPrinters | ForEach-Object {
+            [PSCustomObject]@{
+              Name = $_
+              DeviceID = $_
+              DriverName = 'Standard Windows Printer Driver'
+              PortName = 'Local'
+              Default = ($_ -eq $defaultName)
+              PrinterStatus = 3
+              PrinterState = 0
+              WorkOffline = $false
+              SpoolEnabled = $true
+              CapabilityDescriptions = @('Color', 'Duplex', 'A4', 'Letter')
+              Capabilities = @(3, 4)
+            }
+          }
+          if ($list) {
+            $list | ConvertTo-Json -Depth 3 -Compress
+            exit 0
+          }
+        } catch {}
+        '[]'
       "`;
 
       const { stdout } = await execAsync(psCommand, { timeout: 10000 });
@@ -321,6 +380,7 @@ export class WindowsPrinterService {
     );
 
     if (!targetPrinter) {
+    
       throw new Error(
         `Selected printer '${printerName}' is not installed on this computer. Please refresh printer settings.`
       );
@@ -370,7 +430,7 @@ export class WindowsPrinterService {
         reject(new Error(`Print submission timed out after 60 seconds on '${printerName}'`));
       }, 60000);
 
-      const doPrint = () => {
+      const doPrint = async () => {
         if (!printWindow || printWindow.isDestroyed()) return;
 
         const copies = Math.max(1, Math.min(100, options.copies || 1));
@@ -386,6 +446,64 @@ export class WindowsPrinterService {
         const pageSize = options.paperSize || 'A4';
         const pageRanges = this.parsePageRange(options.pageRange);
         const landscape = Boolean(options.landscape);
+
+        const isVirtualPdfPrinter =
+          targetPrinter.systemName.toLowerCase().includes('pdf') ||
+          (targetPrinter.portName && targetPrinter.portName.toUpperCase().includes('PORTPROMPT'));
+
+        // Handle virtual/PDF printers (e.g., 'Microsoft Print to PDF')
+        // In silent mode, Windows Spooler rejects PORTPROMPT: printers because there is no GUI to choose a save path.
+        // We export the print directly to a PDF file in the user's Desktop/Print2Me_Printed_Documents folder.
+        if (isVirtualPdfPrinter) {
+          console.log(
+            `[PRINTER-SERVICE] Target printer '${targetPrinter.systemName}' is a virtual PDF printer (PORTPROMPT:). Exporting print output via printToPDF...`
+          );
+          try {
+            const pdfData = await printWindow.webContents.printToPDF({
+              landscape,
+              preferCSSPageSize: true,
+              printBackground: true,
+            });
+
+            let desktopDir: string;
+            try {
+              desktopDir = app.getPath('desktop');
+            } catch {
+              desktopDir = path.join(os.homedir(), 'Desktop');
+            }
+            const outputDir = path.join(desktopDir, 'Print2Me_Printed_Documents');
+            if (!fs.existsSync(outputDir)) {
+              fs.mkdirSync(outputDir, { recursive: true });
+            }
+
+            const cleanBase = path.basename(filePath, path.extname(filePath));
+            const fileName = `Printed_${cleanBase}_${Date.now()}.pdf`;
+            const destPath = path.join(outputDir, fileName);
+            fs.writeFileSync(destPath, pdfData);
+
+            clearTimeout(timeoutTimer);
+            cleanupWindow();
+
+            console.log(`[PRINTER-SERVICE] Successfully exported virtual print to: ${destPath}`);
+
+            // Automatically open File Explorer and highlight the printed PDF
+            try {
+              shell.showItemInFolder(destPath);
+            } catch (openErr) {
+              console.warn('[PRINTER-SERVICE] Could not reveal file in explorer:', openErr);
+            }
+
+            resolve({
+              success: true,
+              message: `Printed to PDF successfully: ${destPath}`,
+              printerName: targetPrinter.systemName,
+              spoolStatus: 'PRINTED_TO_FILE',
+            });
+            return;
+          } catch (pdfErr: any) {
+            console.error(`[PRINTER-SERVICE] printToPDF failed, attempting fallback to spooler:`, pdfErr);
+          }
+        }
 
         const electronPrintOptions: any = {
           silent: true,
@@ -451,18 +569,176 @@ export class WindowsPrinterService {
       };
 
       if (isPdf) {
-        // Load PDF directly into Chromium PDFium viewer
-        const fileUrl = `file://${path.resolve(filePath).replace(/\\/g, '/')}`;
-        printWindow.loadURL(fileUrl).catch((err) => {
+        // Read PDF file as base64 to avoid file:// security blocks or path escaping issues
+        const pdfBuffer = fs.readFileSync(filePath);
+        const base64Pdf = pdfBuffer.toString('base64');
+
+        // Locate local offline pdf.min.js and pdf.worker.min.js
+        let pdfJsContent = '';
+        let workerJsContent = '';
+        const possiblePdfJsPaths = [
+          path.join(__dirname, '../assets/pdfjs/pdf.min.js'),
+          path.join(__dirname, '../../assets/pdfjs/pdf.min.js'),
+          path.join(process.cwd(), 'assets/pdfjs/pdf.min.js'),
+        ];
+        const possibleWorkerPaths = [
+          path.join(__dirname, '../assets/pdfjs/pdf.worker.min.js'),
+          path.join(__dirname, '../../assets/pdfjs/pdf.worker.min.js'),
+          path.join(process.cwd(), 'assets/pdfjs/pdf.worker.min.js'),
+        ];
+
+        for (const p of possiblePdfJsPaths) {
+          if (fs.existsSync(p)) {
+            pdfJsContent = fs.readFileSync(p, 'utf-8');
+            break;
+          }
+        }
+        for (const p of possibleWorkerPaths) {
+          if (fs.existsSync(p)) {
+            workerJsContent = fs.readFileSync(p, 'utf-8');
+            break;
+          }
+        }
+
+        const orientationCss = options.landscape ? 'landscape' : 'portrait';
+        const pageCssSize = options.paperSize || 'A4';
+
+        const pdfHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              @page {
+                size: ${pageCssSize} ${orientationCss};
+                margin: 0;
+              }
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              html, body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+                width: 100%;
+              }
+              .pdf-page-wrapper {
+                width: 100vw;
+                height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                page-break-after: always;
+                page-break-inside: avoid;
+                overflow: hidden;
+              }
+              .pdf-page-wrapper:last-child {
+                page-break-after: auto;
+              }
+              canvas {
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+                display: block;
+              }
+            </style>
+          </head>
+          <body>
+            <div id="pdf-container"></div>
+            <script>
+              ${workerJsContent}
+            </script>
+            <script>
+              ${pdfJsContent}
+            </script>
+            <script>
+              (async () => {
+                try {
+                  const rawData = atob("${base64Pdf}");
+                  const bytes = new Uint8Array(rawData.length);
+                  for (let i = 0; i < rawData.length; i++) {
+                    bytes[i] = rawData.charCodeAt(i);
+                  }
+
+                  const loadingTask = pdfjsLib.getDocument({ data: bytes });
+                  const pdf = await loadingTask.promise;
+                  const container = document.getElementById('pdf-container');
+
+                  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    const page = await pdf.getPage(pageNum);
+                    // Scale 2.5 delivers crisp 200-300 DPI high-res printing
+                    const viewport = page.getViewport({ scale: 2.5 });
+
+                    const pageWrapper = document.createElement('div');
+                    pageWrapper.className = 'pdf-page-wrapper';
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+
+                    pageWrapper.appendChild(canvas);
+                    container.appendChild(pageWrapper);
+                  }
+                  window.__PDF_PRINT_READY__ = true;
+                } catch (err) {
+                  window.__PDF_PRINT_ERROR__ = (err && err.message) || String(err);
+                }
+              })();
+            </script>
+          </body>
+          </html>
+        `;
+
+        const tempHtmlPath = path.join(os.tmpdir(), `p2m-render-${Date.now()}.html`);
+        fs.writeFileSync(tempHtmlPath, pdfHtml, 'utf-8');
+
+        printWindow.loadFile(tempHtmlPath).catch((err) => {
           clearTimeout(timeoutTimer);
           cleanupWindow();
-          reject(new Error(`Failed to load PDF in rendering engine: ${err.message}`));
+          try { fs.unlinkSync(tempHtmlPath); } catch {}
+          reject(new Error(`Failed to load PDF renderer HTML: ${err.message}`));
         });
 
-        printWindow.webContents.on('did-finish-load', () => {
-          // Allow PDFium a short stabilization tick
-          setTimeout(doPrint, 800);
-        });
+        let isHandled = false;
+        const renderCheckInterval = setInterval(async () => {
+          if (isHandled) {
+            clearInterval(renderCheckInterval);
+            return;
+          }
+          if (!printWindow || printWindow.isDestroyed()) {
+            clearInterval(renderCheckInterval);
+            try { fs.unlinkSync(tempHtmlPath); } catch {}
+            return;
+          }
+          try {
+            const isReady = await printWindow.webContents.executeJavaScript('Boolean(window.__PDF_PRINT_READY__)');
+            if (isHandled) return;
+            const renderError = await printWindow.webContents.executeJavaScript('window.__PDF_PRINT_ERROR__');
+            if (isHandled) return;
+
+            if (renderError) {
+              isHandled = true;
+              clearInterval(renderCheckInterval);
+              clearTimeout(timeoutTimer);
+              cleanupWindow();
+              try { fs.unlinkSync(tempHtmlPath); } catch {}
+              reject(new Error(`PDF Canvas rendering failed: ${renderError}`));
+              return;
+            }
+
+            if (isReady) {
+              isHandled = true;
+              clearInterval(renderCheckInterval);
+              setTimeout(() => {
+                try { if (fs.existsSync(tempHtmlPath)) fs.unlinkSync(tempHtmlPath); } catch {}
+              }, 5000);
+              setTimeout(doPrint, 250);
+            }
+          } catch {
+            // Window might be transitioning
+          }
+        }, 150);
       } else if (isImage) {
         // Load HTML wrapper with strict CSS page sizing to preserve aspect ratio and avoid clipping
         const fileUrl = `file://${path.resolve(filePath).replace(/\\/g, '/')}`;

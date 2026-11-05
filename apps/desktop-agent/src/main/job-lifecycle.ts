@@ -125,8 +125,9 @@ export class JobLifecycleManager {
   /**
    * Generates a stable, canonical idempotency key
    */
-  public generateIdempotencyKey(orderId: string, jobId?: string, docId?: string): string {
-    return `${orderId}_${jobId || 'direct'}_${docId || 'doc1'}`;
+  public generateIdempotencyKey(orderId: string, param2?: string, param3?: string): string {
+    const resolvedDocId = param3 || param2 || 'default';
+    return `order_${orderId}_doc_${resolvedDocId}`;
   }
 
   /**

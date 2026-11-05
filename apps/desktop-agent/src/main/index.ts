@@ -521,7 +521,12 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
     }
 
     const docData = await docRes.json();
-    const documents = docData.documents || [];
+    const documents =
+      Array.isArray(docData.documents) && docData.documents.length > 0
+        ? docData.documents
+        : docData.document
+        ? [docData.document]
+        : [];
 
     if (documents.length === 0) {
       throw new Error("No printable document items found attached to this order.");
@@ -537,7 +542,7 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
 
     let finalPrinter = printerName;
     if (!finalPrinter) {
-      const isColor = documents.some((d: any) => d.colorMode === "COLOR");
+      const isColor = documents.some((d: any) => (d.colorMode || d.color_mode) === "COLOR");
       if (isColor && config.defaultColorPrinter) {
         finalPrinter = config.defaultColorPrinter;
       } else if (!isColor && config.defaultBwPrinter) {
@@ -569,15 +574,24 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
     let lastSpoolResult: any = null;
 
     for (const doc of documents) {
+      const docId = doc.documentId || doc.id || doc.doc_id || "direct";
+      const docFilename = doc.filename || doc.originalName || doc.original_name || "customer_document.pdf";
+      const docMime = doc.mimeType || doc.mime_type || "application/pdf";
+      const docCopies = doc.copies || params.copies || 1;
+      const docColorMode = doc.colorMode || doc.color_mode || "BLACK_AND_WHITE";
+      const docPaperSize = doc.paperSize || doc.paper_size || "A4";
+      const docDuplexMode = doc.duplexMode || doc.duplex_mode || "SINGLE_SIDED";
+      const docPageRange = doc.pageRange || doc.page_range || "ALL";
+
       const idempotencyKey = jobLifecycleManager.generateIdempotencyKey(
         orderId,
         doc.itemId || "direct",
-        doc.documentId
+        docId
       );
 
       // Guard against accidental duplicate prints
       if (jobLifecycleManager.isAlreadyDispatched(idempotencyKey) && !params.forceRetry) {
-        console.warn(`[DIRECT-PRINT] Document ${doc.filename} for order ${orderNumber} already spooled. Skipping.`);
+        console.warn(`[DIRECT-PRINT] Document ${docFilename} for order ${orderNumber} already spooled. Skipping.`);
         continue;
       }
 
@@ -587,17 +601,21 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
         orderNumber: orderNumber || orderId,
         idempotencyKey,
         printerName: matchedPrinter.systemName,
-        totalCopies: doc.copies || 1,
-        colorMode: doc.colorMode || "BLACK_AND_WHITE",
-        paperSize: doc.paperSize || "A4",
-        duplexMode: doc.duplexMode || "SINGLE_SIDED",
-        pageRange: doc.pageRange || "ALL",
-        documentName: doc.filename,
+        totalCopies: docCopies,
+        colorMode: docColorMode,
+        paperSize: docPaperSize,
+        duplexMode: docDuplexMode,
+        pageRange: docPageRange,
+        documentName: docFilename,
       });
 
       jobLifecycleManager.transition(idempotencyKey, "DOWNLOADING");
 
-      const downloadUrl: string = doc.downloadUrl;
+      const downloadUrl: string = doc.downloadUrl || doc.download_url;
+      if (!downloadUrl) {
+        throw new Error(`Order document ${docFilename} has no valid download URL from server.`);
+      }
+
       const fullUrl = downloadUrl.startsWith("http")
         ? downloadUrl
         : `${config.backendUrl}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
@@ -609,7 +627,7 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
 
       const fileResp = await fetch(fullUrl, { headers: dlHeaders });
       if (!fileResp.ok) {
-        throw new Error(`Failed to download '${doc.filename}' (HTTP ${fileResp.status})`);
+        throw new Error(`Failed to download '${docFilename}' (HTTP ${fileResp.status})`);
       }
 
       const arrayBuf = await fileResp.arrayBuffer();
@@ -618,8 +636,8 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
       // Validate magic bytes and enforce security limits
       const validated = await tempFileManager.writeAndValidateBuffer(
         fileBuffer,
-        doc.filename,
-        doc.mimeType
+        docFilename,
+        docMime
       );
       tempDownloadedFiles.push(validated.filePath);
 
@@ -633,11 +651,11 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
 
       const printResult = await printerService.printDocument(validated.filePath, {
         printerName: matchedPrinter.systemName,
-        copies: doc.copies || 1,
-        colorMode: doc.colorMode || "BLACK_AND_WHITE",
-        duplexMode: doc.duplexMode || "SINGLE_SIDED",
-        paperSize: doc.paperSize || "A4",
-        pageRange: doc.pageRange,
+        copies: docCopies,
+        colorMode: docColorMode,
+        duplexMode: docDuplexMode,
+        paperSize: docPaperSize,
+        pageRange: docPageRange,
       });
 
       if (!printResult.success) {

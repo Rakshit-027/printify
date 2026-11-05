@@ -5,7 +5,7 @@
   "author": "Print2Me Team <support@print2me.in>",
   "main": "dist/main/index.js",
   "scripts": {
-    "dev": "npm run build && env GTK_IM_MODULE=xim electron . --disable-gpu",
+    "dev": "npm run build && electron . --disable-gpu",
     "copy-renderer": "node scripts/copy-assets.js",
     "build": "tsc && npm run copy-renderer && node scripts/generate-installer-art.js",
     "test": "npm run build && node --test dist/test/real-printer-system.test.js",
