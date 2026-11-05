@@ -31,10 +31,10 @@ function renderPrinters() {
   if (bwWarningEl) {
     if (savedBw && !printersList.some((p) => p.systemName.toLowerCase() === savedBw.toLowerCase())) {
       bwWarningEl.style.display = "block";
-      bwWarningEl.innerHTML = `⚠️ <strong>Missing Printer:</strong> Saved B&amp;W printer '<strong>${savedBw}</strong>' is not currently found in Windows. Please select an available printer.`;
+      bwWarningEl.innerHTML = `<strong>Missing Printer:</strong> Saved B&amp;W printer '<strong>${savedBw}</strong>' is not currently found in Windows. Please select an available printer.`;
     } else if (savedColor && !printersList.some((p) => p.systemName.toLowerCase() === savedColor.toLowerCase())) {
       bwWarningEl.style.display = "block";
-      bwWarningEl.innerHTML = `⚠️ <strong>Missing Printer:</strong> Saved Color printer '<strong>${savedColor}</strong>' is not currently found in Windows. Please select an available printer.`;
+      bwWarningEl.innerHTML = `<strong>Missing Printer:</strong> Saved Color printer '<strong>${savedColor}</strong>' is not currently found in Windows. Please select an available printer.`;
     } else {
       bwWarningEl.style.display = "none";
     }
@@ -55,17 +55,19 @@ function renderPrinters() {
   if (printersList.length === 0) {
     hwWrap.innerHTML = `
       <div style="padding:28px 20px;text-align:center;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;display:flex;flex-direction:column;align-items:center;">
-        <div style="font-size:36px;margin-bottom:8px;">⚠️</div>
+        <div style="width:36px;height:36px;border-radius:10px;background:#FEF3C7;color:#D97706;display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
         <div style="font-size:15px;font-weight:800;color:#92400E;margin-bottom:6px;">No printers were found on this computer.</div>
         <div style="font-size:12px;color:#B45309;margin-bottom:18px;max-width:440px;line-height:1.6;">
           Connect or install a printer in Windows, then refresh the printer list. Make sure the printer is turned on and connected via USB or local network.
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
           <button class="btn btn-primary btn-sm" onclick="syncAllPrinters()">
-            🔄 Refresh Printers
+            Refresh Printers
           </button>
           <button class="btn btn-secondary btn-sm" onclick="openWindowsSettings()">
-            ⚙️ Open Windows Printer Settings
+            Open Windows Printer Settings
           </button>
         </div>
       </div>
@@ -112,24 +114,24 @@ function renderPrinters() {
           <span>•</span>
           <span><strong>Port:</strong> ${escapeHtml(p.portName || 'System Port')}</span>
           <span>•</span>
-          <span>${p.supportsColor ? "🎨 Color Supported" : "⬛ Monochrome"}</span>
+          <span>${p.supportsColor ? "Color Supported" : "Monochrome"}</span>
           <span>•</span>
           <span>${p.supportsDuplex ? "Two-Sided (Duplex)" : "Single Sided"}</span>
         </div>
 
         ${p.statusDetails && p.status !== 'READY' ? `
           <div style="font-size:11px;color:#B45309;background:#FEF3C7;padding:3px 8px;border-radius:4px;margin-top:2px;display:inline-block;">
-            ⚠️ ${escapeHtml(p.statusDetails)}
+            ${escapeHtml(p.statusDetails)}
           </div>
         ` : ''}
       </div>
 
       <div style="display:flex;gap:6px;flex-shrink:0;">
         <button class="btn btn-secondary btn-sm" onclick="openPrinterNativeQueue('${escapeJs(p.systemName)}')" title="Open real Windows Spooler Queue">
-          📑 Windows Queue
+          Windows Queue
         </button>
         <button class="btn btn-secondary btn-sm" onclick="testPrintPrinter('${escapeJs(p.systemName)}')">
-          🖨️ Test Print
+          Test Print
         </button>
       </div>
     `;
@@ -179,7 +181,7 @@ async function saveRoutingPrefs() {
   const defaultColorPrinter = colSelect ? colSelect.value : "";
 
   await api.setPrinterPreference({ defaultBwPrinter, defaultColorPrinter });
-  showToast("✓ Smart printer routing preferences saved!");
+  showToast("Printer routing preferences saved");
   if (typeof refreshAll === "function") refreshAll();
 }
 
@@ -189,7 +191,7 @@ async function testPrintPrinter(name) {
   try {
     const res = await api.testPrint(name);
     if (res && res.success) {
-      showToast(`✓ Test page submitted to Windows print spooler for '${name}'!`);
+      showToast(`Test page submitted to Windows print spooler for '${name}'`);
       logActivity("Test Page Spooled", name, "success");
     } else {
       showToast(`Test print alert: ${res?.message || "Failed"}`);

@@ -22,36 +22,40 @@ const autoPrintedOrderIds = new Set();
 // Page Metadata Registry for Headers & Breadcrumbs
 const pageMeta = {
   overview: {
-    title: "Workstation Overview",
-    subtitle: "High-level workstation health, pending orders summary, and printer availability"
+    title: "Overview",
+    subtitle: "Station status, pending queue, and printer readiness"
   },
   orders: {
-    title: "Live Print Queue",
-    subtitle: "Manage incoming online orders and cash orders requiring approval"
+    title: "Print Queue",
+    subtitle: "Orders waiting for print or cash collection"
   },
   printers: {
-    title: "Printers & Hardware",
-    subtitle: "Connected local spoolers, zero-touch page routing, and printer capabilities"
+    title: "Printers",
+    subtitle: "Installed printers, routing defaults, and spool status"
   },
   pricing: {
-    title: "Print Rates & Paper Sizes",
-    subtitle: "Configure per-page rates for B&W and color across all supported paper sizes"
+    title: "Print Rates",
+    subtitle: "Per-page pricing by color mode and paper size"
+  },
+  payments: {
+    title: "Online Payments",
+    subtitle: "Razorpay account connection and direct bank payout settings"
   },
   standee: {
-    title: "QR Kiosk & Store QR",
-    subtitle: "Countertop QR standee generation, customer upload links, and kiosk preview"
+    title: "Store QR Standee",
+    subtitle: "Countertop standee and customer upload link"
   },
   terminal: {
-    title: "Spooler & Diagnostics",
-    subtitle: "Real-time print spooler telemetry stream, driver events, and diagnostic logs"
+    title: "Spooler Diagnostics",
+    subtitle: "Windows print spooler log and error events"
   },
   history: {
-    title: "Activity & History",
-    subtitle: "Audit trail of completed print jobs, payment collection, and reprint history"
+    title: "History",
+    subtitle: "Completed jobs, reprint log, and daily summary"
   },
   settings: {
-    title: "Agent Settings",
-    subtitle: "Workstation counter preferences, cloud polling, and platform connection"
+    title: "Settings",
+    subtitle: "Station preferences and cloud sync"
   }
 };
 

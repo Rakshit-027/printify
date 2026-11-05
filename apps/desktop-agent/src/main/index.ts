@@ -19,6 +19,19 @@ app.commandLine.appendSwitch("disable-software-rasterizer");
 // Remove default application menu completely so Linux window manager does not trap keyboard accelerators
 Menu.setApplicationMenu(null);
 
+// Enforce single-instance lock to prevent duplicate print agent worker processes
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
@@ -51,6 +64,20 @@ function createWindow() {
         ],
       },
     });
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!url.startsWith("file://")) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 
   const rendererHtml = path.join(__dirname, "../renderer/index.html");
@@ -835,9 +862,232 @@ ipcMain.handle("agent:toggle-polling", async (_event: any, active: boolean) => {
 });
 
 ipcMain.handle("agent:open-external-url", async (_event: any, url: string) => {
+  if (!url || typeof url !== "string") {
+    return { success: false, error: "Invalid URL" };
+  }
+  // Security guard: Only allow opening http and https URLs in external browser
+  if (!url.startsWith("https://") && !url.startsWith("http://")) {
+    return { success: false, error: "Only HTTP/HTTPS URLs are permitted" };
+  }
   try {
     await shell.openExternal(url);
     return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Helper for bounded fetch requests
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+// -------------------------------------------------------------
+// VENDOR SUBSCRIPTION IPC HANDLERS
+// -------------------------------------------------------------
+
+ipcMain.handle("agent:get-subscription", async () => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = {};
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(`${config.backendUrl}/api/vendor/subscription`, { headers }, 10000);
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:validate-subscription-coupon", async (_event: any, params: any) => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/subscription/validate-coupon`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(params),
+      },
+      10000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:checkout-subscription", async (_event: any, params: any) => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/subscription/checkout`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(params),
+      },
+      15000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:verify-subscription", async (_event: any, params: any) => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/subscription/verify`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(params),
+      },
+      15000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// -------------------------------------------------------------
+// RAZORPAY PARTNER ONBOARDING & PAYMENT GATEWAY IPC HANDLERS
+// -------------------------------------------------------------
+
+ipcMain.handle("agent:get-razorpay-status", async () => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = {};
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/payments/razorpay/status`,
+      { headers },
+      10000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:connect-razorpay", async () => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/payments/razorpay/connect`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      },
+      15000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:sync-razorpay", async () => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/payments/razorpay/sync`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      },
+      15000
+    );
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle("agent:disconnect-razorpay", async () => {
+  const config = agentWorker.getConfig();
+  if (!config) return { success: false, error: "Not logged in" };
+
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (config.sessionToken) headers["Authorization"] = `Bearer ${config.sessionToken}`;
+    if (config.deviceId) headers["x-device-id"] = config.deviceId;
+    if (config.deviceToken) headers["x-device-token"] = config.deviceToken;
+
+    const res = await fetchWithTimeout(
+      `${config.backendUrl}/api/vendor/payments/razorpay/disconnect`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      },
+      15000
+    );
+    const data = await res.json();
+    return data;
   } catch (err: any) {
     return { success: false, error: err.message };
   }

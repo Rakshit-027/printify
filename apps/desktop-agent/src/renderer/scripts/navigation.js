@@ -59,6 +59,8 @@ function switchNavPane(paneName) {
   // Specific view triggers
   if (paneName === "pricing" && typeof loadPricingData === "function") {
     loadPricingData();
+  } else if (paneName === "payments" && typeof loadPaymentsData === "function") {
+    loadPaymentsData();
   } else if (paneName === "history" && typeof renderHistoryTable === "function") {
     renderHistoryTable();
   } else if (paneName === "overview" && typeof renderOverview === "function") {

@@ -198,7 +198,7 @@ async function savePricingMatrix() {
       minimumOrderMinor: minOrderMinor
     });
     if (res && res.success !== false) {
-      showToast("✓ Rates & Paper Sizes published successfully!");
+      showToast("Rates and paper sizes updated");
     } else {
       showToast("Update error: " + (res?.error || "Failed"));
     }

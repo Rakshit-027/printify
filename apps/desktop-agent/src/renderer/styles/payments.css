@@ -1,0 +1,282 @@
+/* ==============================================================
+   PAGE: RAZORPAY ONBOARDING & VENDOR PAYMENTS
+   ============================================================== */
+
+.payments-workspace-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 1. Status Banner Card */
+.payment-status-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.payment-status-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.payment-status-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+.payment-status-icon-box.connected {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #059669;
+}
+
+.payment-status-icon-box.pending {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+  color: #D97706;
+}
+
+.payment-status-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.payment-status-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
+.payment-status-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 580px;
+  line-height: 1.5;
+}
+
+.payment-status-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+}
+
+.payment-status-badge.active {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #059669;
+}
+
+.payment-status-badge.review {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #D97706;
+}
+
+.payment-status-badge.disconnected {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #64748B;
+}
+
+.payment-status-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 2. Razorpay Onboarding Hero / Steps Grid */
+.payment-details-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .payment-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payment-account-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--brand-navy);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-meta-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.payment-meta-table tr:not(:last-child) td {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payment-meta-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.payment-meta-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  width: 40%;
+  background: #F8FAFC;
+}
+
+.payment-meta-value {
+  color: var(--brand-navy);
+  font-weight: 700;
+}
+
+/* Onboarding Benefits & Steps Card */
+.payment-benefits-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.onboarding-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.step-num-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand-orange);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.step-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Connect Action Prompt Box */
+.razorpay-connect-cta-box {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px 28px;
+  color: var(--brand-navy);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 8px;
+}
+
+.cta-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cta-headline {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
+.cta-subtext {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.btn-razorpay-connect {
+  background: var(--brand-navy);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-razorpay-connect:hover {
+  background: #1e293b;
+}
+
+.btn-razorpay-connect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

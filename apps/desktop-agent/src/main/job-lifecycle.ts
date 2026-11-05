@@ -1,19 +1,20 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { logger } from "./logger";
 
 export type JobLifecycleState =
-  | 'RECEIVED'
-  | 'VALIDATING'
-  | 'DOWNLOADING'
-  | 'READY_TO_PRINT'
-  | 'SUBMITTING'
-  | 'SPOOLING'
-  | 'SUBMITTED_TO_SPOOLER'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'NEEDS_ATTENTION'
-  | 'CANCELLED';
+  | "RECEIVED"
+  | "VALIDATING"
+  | "DOWNLOADING"
+  | "READY_TO_PRINT"
+  | "SUBMITTING"
+  | "SUBMITTED_TO_SPOOLER"
+  | "PRINTING"
+  | "COMPLETED"
+  | "FAILED"
+  | "NEEDS_ATTENTION"
+  | "CANCELLED";
 
 export interface PrintJobRecord {
   jobId: string;
@@ -31,6 +32,8 @@ export interface PrintJobRecord {
   documentName: string;
   fileSizeBytes?: number;
   sha256Hash?: string;
+  totalPages?: number;
+  pagesPrinted?: number;
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;
@@ -44,24 +47,55 @@ export class JobLifecycleManager {
   private historyFile: string;
   private jobs: Map<string, PrintJobRecord> = new Map();
 
-  constructor() {
-    const dataDir = path.join(os.homedir(), '.printflow');
-    try {
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-    } catch (err) {
-      console.warn('[LIFECYCLE] Failed to create data dir:', err);
-    }
-    this.historyFile = path.join(dataDir, 'jobs-history.json');
+  constructor(customHistoryFile?: string) {
+    this.historyFile = customHistoryFile || this.resolveHistoryPath();
     this.loadHistory();
     this.reconcileInterruptedJobsOnStartup();
   }
 
-  private loadHistory() {
-    if (!fs.existsSync(this.historyFile)) return;
+  private resolveHistoryPath(): string {
     try {
-      const raw = fs.readFileSync(this.historyFile, 'utf-8');
+      const { app } = require("electron");
+      if (app && typeof app.getPath === "function") {
+        return path.join(app.getPath("userData"), "jobs-history.json");
+      }
+    } catch {
+      // Not in Electron
+    }
+
+    const appData =
+      process.env.APPDATA ||
+      (process.platform === "darwin"
+        ? path.join(os.homedir(), "Library", "Application Support")
+        : path.join(os.homedir(), ".config"));
+    return path.join(appData, "Print2Me Desktop Agent", "jobs-history.json");
+  }
+
+  private loadHistory() {
+    if (!fs.existsSync(this.historyFile)) {
+      // Check legacy path in homedir for backward compatibility migration
+      const legacyPath = path.join(os.homedir(), ".printflow", "jobs-history.json");
+      if (fs.existsSync(legacyPath)) {
+        try {
+          const raw = fs.readFileSync(legacyPath, "utf-8");
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            for (const j of list) {
+              if (j.idempotencyKey) this.jobs.set(j.idempotencyKey, j);
+            }
+            this.persist();
+            try { fs.unlinkSync(legacyPath); } catch {}
+            return;
+          }
+        } catch {
+          // ignore legacy failure
+        }
+      }
+      return;
+    }
+
+    try {
+      const raw = fs.readFileSync(this.historyFile, "utf-8");
       const list: PrintJobRecord[] = JSON.parse(raw);
       if (Array.isArray(list)) {
         for (const j of list) {
@@ -70,8 +104,9 @@ export class JobLifecycleManager {
           }
         }
       }
-    } catch (err) {
-      console.error('[LIFECYCLE] Error reading job history:', err);
+      logger.info(`Loaded ${this.jobs.size} print job records from durable history.`);
+    } catch (err: any) {
+      logger.error(`Error reading job history: ${err.message}`);
     }
   }
 
@@ -87,34 +122,34 @@ export class JobLifecycleManager {
         .slice(0, 500);
 
       const tmpFile = `${this.historyFile}.tmp.${Date.now()}`;
-      fs.writeFileSync(tmpFile, JSON.stringify(list, null, 2), 'utf-8');
+      fs.writeFileSync(tmpFile, JSON.stringify(list, null, 2), "utf-8");
       fs.renameSync(tmpFile, this.historyFile);
-    } catch (err) {
-      console.error('[LIFECYCLE] Failed to persist job history:', err);
+    } catch (err: any) {
+      logger.error(`Failed to persist job history: ${err.message}`);
     }
   }
 
   /**
-   * On application startup, safely reconcile jobs that were in-flight when app crashed or shutdown
+   * On application startup, safely reconcile jobs that were in-flight when app crashed or was shut down
    */
   private reconcileInterruptedJobsOnStartup() {
     let modified = false;
     for (const job of this.jobs.values()) {
-      if (job.state === 'SUBMITTING' || job.state === 'SPOOLING') {
+      if (job.state === "SUBMITTING" || job.state === "PRINTING") {
         // We cannot guarantee whether Windows Spooler accepted it completely or printed paper
-        job.state = 'NEEDS_ATTENTION';
+        job.state = "NEEDS_ATTENTION";
         job.requiresVendorReview = true;
         job.lastErrorMessage =
-          'Workstation restarted while job was being spooled. Please check printer output tray before retrying.';
+          "Workstation restarted while job was being spooled/printed. Please check physical printer tray before retrying.";
         job.updatedAt = new Date().toISOString();
         modified = true;
-        console.warn(
-          `[LIFECYCLE] Job ${job.orderNumber} flagged as NEEDS_ATTENTION following workstation restart.`
+        logger.warn(
+          `Job ${job.orderNumber} flagged as NEEDS_ATTENTION following workstation restart.`
         );
-      } else if (job.state === 'DOWNLOADING' || job.state === 'VALIDATING') {
+      } else if (job.state === "DOWNLOADING" || job.state === "VALIDATING") {
         // File was not yet sent to printer spooler, safe to set FAILED or allow retry
-        job.state = 'FAILED';
-        job.lastErrorMessage = 'Interrupted during download/validation by workstation restart.';
+        job.state = "FAILED";
+        job.lastErrorMessage = "Interrupted during download/validation by workstation restart.";
         job.updatedAt = new Date().toISOString();
         modified = true;
       }
@@ -124,10 +159,12 @@ export class JobLifecycleManager {
 
   /**
    * Generates a stable, canonical idempotency key
+   * Format: order_{orderId}_doc_{resolvedDocId}
    */
   public generateIdempotencyKey(orderId: string, param2?: string, param3?: string): string {
-    const resolvedDocId = param3 || param2 || 'default';
-    return `order_${orderId}_doc_${resolvedDocId}`;
+    const cleanOrderId = String(orderId || "").trim();
+    const resolvedDocId = String(param3 || param2 || "default").trim();
+    return `order_${cleanOrderId}_doc_${resolvedDocId}`;
   }
 
   /**
@@ -136,7 +173,26 @@ export class JobLifecycleManager {
   public isAlreadyDispatched(idempotencyKey: string): boolean {
     const record = this.jobs.get(idempotencyKey);
     if (!record) return false;
-    return record.state === 'SUBMITTED_TO_SPOOLER' || record.state === 'COMPLETED';
+    return (
+      record.state === "SUBMITTING" ||
+      record.state === "SUBMITTED_TO_SPOOLER" ||
+      record.state === "PRINTING" ||
+      record.state === "COMPLETED"
+    );
+  }
+
+  /**
+   * Checks whether this job is actively in-flight
+   */
+  public isCurrentlyProcessing(idempotencyKey: string): boolean {
+    const record = this.jobs.get(idempotencyKey);
+    if (!record) return false;
+    return (
+      record.state === "VALIDATING" ||
+      record.state === "DOWNLOADING" ||
+      record.state === "READY_TO_PRINT" ||
+      record.state === "SUBMITTING"
+    );
   }
 
   public getRecord(idempotencyKey: string): PrintJobRecord | undefined {
@@ -167,9 +223,9 @@ export class JobLifecycleManager {
   }): PrintJobRecord {
     const existing = this.jobs.get(params.idempotencyKey);
     if (existing) {
-      if (existing.state === 'SUBMITTED_TO_SPOOLER' || existing.state === 'COMPLETED') {
-        console.warn(
-          `[LIFECYCLE] Guarded against duplicate submission for order ${params.orderNumber} (State: ${existing.state})`
+      if (this.isAlreadyDispatched(params.idempotencyKey)) {
+        logger.warn(
+          `Guarded against duplicate submission for order ${params.orderNumber} (State: ${existing.state})`
         );
         return existing;
       }
@@ -181,7 +237,7 @@ export class JobLifecycleManager {
 
     const record: PrintJobRecord = {
       ...params,
-      state: 'RECEIVED',
+      state: "RECEIVED",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       retryCount: 0,
@@ -203,6 +259,8 @@ export class JobLifecycleManager {
       fileSizeBytes?: number;
       sha256Hash?: string;
       errorMessage?: string;
+      totalPages?: number;
+      pagesPrinted?: number;
     }
   ): PrintJobRecord {
     const record = this.jobs.get(idempotencyKey);
@@ -218,16 +276,18 @@ export class JobLifecycleManager {
     if (meta?.fileSizeBytes !== undefined) record.fileSizeBytes = meta.fileSizeBytes;
     if (meta?.sha256Hash !== undefined) record.sha256Hash = meta.sha256Hash;
     if (meta?.errorMessage) record.lastErrorMessage = meta.errorMessage;
+    if (meta?.totalPages !== undefined) record.totalPages = meta.totalPages;
+    if (meta?.pagesPrinted !== undefined) record.pagesPrinted = meta.pagesPrinted;
 
-    if (nextState === 'SUBMITTED_TO_SPOOLER') {
+    if (nextState === "SUBMITTED_TO_SPOOLER") {
       record.submittedAt = new Date().toISOString();
-    } else if (nextState === 'COMPLETED') {
+    } else if (nextState === "COMPLETED") {
       record.completedAt = new Date().toISOString();
     }
 
-    console.log(
-      `[LIFECYCLE] Job ${record.orderNumber} (${record.jobId}): ${prevState} -> ${nextState}${
-        meta?.windowsJobId ? ` [WinSpooler Job #${meta.windowsJobId}]` : ''
+    logger.info(
+      `Job ${record.orderNumber} (${record.jobId}): ${prevState} -> ${nextState}${
+        meta?.windowsJobId ? ` [WinSpooler Job #${meta.windowsJobId}]` : ""
       }`
     );
 
@@ -243,11 +303,12 @@ export class JobLifecycleManager {
     if (!record) {
       throw new Error(`[LIFECYCLE] Cannot retry unknown job with key ${idempotencyKey}`);
     }
-    record.state = 'RECEIVED';
+    record.state = "RECEIVED";
     record.retryCount += 1;
     record.requiresVendorReview = false;
     record.updatedAt = new Date().toISOString();
     this.persist();
+    logger.info(`Vendor allowed manual retry on job ${record.orderNumber} (attempt #${record.retryCount})`);
     return record;
   }
 }

@@ -16,7 +16,7 @@ export interface PrintAgentApi {
   printOrderDirect: (params: { orderId: string; orderNumber?: string; printerName?: string; copies?: number; forceRetry?: boolean }) => Promise<any>;
   togglePolling: (active: boolean) => Promise<boolean>;
   getOrders: (status?: string) => Promise<any>;
-  updateOrderStatus: (params: { orderId: string; action: string }) => Promise<any>;
+  updateOrderStatus: (params: { orderId: string; action: string; message?: string }) => Promise<any>;
   getPricing: () => Promise<any>;
   updatePricing: (params: { pricing: any[]; minimumOrderMinor?: number }) => Promise<any>;
   sendOtp: (params: { backendUrl?: string; email: string }) => Promise<any>;
@@ -34,6 +34,21 @@ export interface PrintAgentApi {
     deviceName?: string;
   }) => Promise<any>;
   openExternalUrl: (url: string) => Promise<any>;
+  getSubscription: () => Promise<any>;
+  validateSubscriptionCoupon: (params: { couponCode: string; planCode: string; billingCycle: string }) => Promise<any>;
+  checkoutSubscription: (params: { planCode: string; billingCycle: string; couponCode?: string }) => Promise<any>;
+  verifySubscription: (params: {
+    planCode: string;
+    billingCycle: string;
+    couponCode?: string;
+    razorpayPaymentId: string;
+    razorpayOrderId: string;
+    razorpaySignature: string;
+  }) => Promise<any>;
+  getRazorpayStatus: () => Promise<any>;
+  connectRazorpay: () => Promise<any>;
+  syncRazorpay: () => Promise<any>;
+  disconnectRazorpay: () => Promise<any>;
   onLog: (callback: (log: any) => void) => () => void;
   onNewJob: (callback: (job: any) => void) => () => void;
 }
@@ -61,6 +76,14 @@ const printAgentApi: PrintAgentApi = {
   getPricing: () => ipcRenderer.invoke("agent:get-pricing"),
   updatePricing: (params) => ipcRenderer.invoke("agent:update-pricing", params),
   openExternalUrl: (url) => ipcRenderer.invoke("agent:open-external-url", url),
+  getSubscription: () => ipcRenderer.invoke("agent:get-subscription"),
+  validateSubscriptionCoupon: (params) => ipcRenderer.invoke("agent:validate-subscription-coupon", params),
+  checkoutSubscription: (params) => ipcRenderer.invoke("agent:checkout-subscription", params),
+  verifySubscription: (params) => ipcRenderer.invoke("agent:verify-subscription", params),
+  getRazorpayStatus: () => ipcRenderer.invoke("agent:get-razorpay-status"),
+  connectRazorpay: () => ipcRenderer.invoke("agent:connect-razorpay"),
+  syncRazorpay: () => ipcRenderer.invoke("agent:sync-razorpay"),
+  disconnectRazorpay: () => ipcRenderer.invoke("agent:disconnect-razorpay"),
   onLog: (callback) => {
     const subscription = (_event: any, value: any) => callback(value);
     ipcRenderer.on("agent:log", subscription);

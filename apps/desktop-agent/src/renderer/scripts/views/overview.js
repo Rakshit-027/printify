@@ -3,14 +3,20 @@
 // ==============================================================
 
 function renderOverview() {
-  // 1. Pending & Active Count Calculation
+  // 1. Pending & Active Count Calculation - exclude cancelled/rejected
   const pendingOrders = ordersList.filter(o => 
-    o.status === "AWAITING_VENDOR_APPROVAL" || 
-    o.paymentStatus === "CASH_PENDING" ||
-    (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    o.status !== "CANCELLED" &&
+    o.status !== "REJECTED" &&
+    (
+      o.status === "AWAITING_VENDOR_APPROVAL" || 
+      o.paymentStatus === "CASH_PENDING" || 
+      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    )
   );
   const printingOrders = ordersList.filter(o => 
-    activePrintingOrders.has(o.id) || o.status === "CONFIRMED" || o.status === "PRINTING" || o.status === "PROCESSING" || printErrorOrders.has(o.id)
+    o.status !== "CANCELLED" &&
+    o.status !== "REJECTED" &&
+    (activePrintingOrders.has(o.id) || o.status === "CONFIRMED" || o.status === "PRINTING" || o.status === "PROCESSING" || printErrorOrders.has(o.id))
   );
   const completedOrders = ordersList.filter(o => o.status === "COMPLETED");
 
@@ -50,9 +56,8 @@ function renderOverviewFastTrack(pendingOrders, printingOrders) {
   if (urgentOrders.length === 0) {
     container.innerHTML = `
       <div class="fasttrack-empty" style="grid-column: 1 / -1;">
-        <span style="font-size:24px;">✨</span>
-        <div style="font-size:13px;font-weight:700;color:var(--brand-navy);">All caught up! Queue is clear.</div>
-        <div style="font-size:11px;color:var(--text-muted);">Incoming kiosk prints and walk-up counter orders will appear here automatically.</div>
+        <div style="font-size:13px;font-weight:700;color:var(--brand-navy);">Queue is empty</div>
+        <div style="font-size:11px;color:var(--text-muted);">Incoming orders will appear here automatically.</div>
       </div>
     `;
     return;
@@ -61,8 +66,10 @@ function renderOverviewFastTrack(pendingOrders, printingOrders) {
   container.innerHTML = "";
   urgentOrders.slice(0, 3).forEach(o => {
     const isPrinting = activePrintingOrders.has(o.id) || o.status === "PRINTING" || o.status === "PROCESSING";
-    const isCashPending = o.paymentStatus === "CASH_PENDING" || 
-      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS");
+    const isCashPending = o.status !== "CANCELLED" && o.status !== "REJECTED" && (
+      o.paymentStatus === "CASH_PENDING" || 
+      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    );
     const firstItem = (o.items && o.items[0]) || {};
     const docName = (firstItem.document && firstItem.document.originalName) || "Document.pdf";
     const pageCount = (firstItem.document && firstItem.document.pageCount) || firstItem.totalSheets || 1;
@@ -74,17 +81,17 @@ function renderOverviewFastTrack(pendingOrders, printingOrders) {
 
     let actionBtnHtml = "";
     if (isPrinting) {
-      actionBtnHtml = `<span style="font-size:11px;font-weight:700;color:var(--info);display:flex;align-items:center;gap:4px;"><span class="spin">🔄</span> Spooling</span>`;
+      actionBtnHtml = `<span style="font-size:11px;font-weight:700;color:var(--info);">Printing</span>`;
     } else if (isCashPending) {
       actionBtnHtml = `
         <button class="btn btn-warning btn-sm" onclick="handleCollectCash('${o.id}', '${o.orderNumber || o.id}', ${o.totalAmountMinor || 0})">
-          Approve Cash (${priceStr})
+          Approve cash (${priceStr})
         </button>
       `;
     } else {
       actionBtnHtml = `
         <button class="btn btn-primary btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', false)">
-          Print Now
+          Print now
         </button>
       `;
     }
@@ -94,7 +101,7 @@ function renderOverviewFastTrack(pendingOrders, printingOrders) {
         <div class="fasttrack-item-row">
           <span class="fasttrack-order-num">${o.orderNumber || o.id}</span>
           <span class="status-badge ${isCashPending ? 'badge-warning' : 'badge-info'}" style="font-size:9px;">
-            ${isCashPending ? 'Cash Due' : 'Ready to Spool'}
+            ${isCashPending ? 'Cash Due' : 'Ready'}
           </span>
         </div>
         <div class="fasttrack-doc" title="${docName}">
@@ -165,11 +172,19 @@ function renderOverviewActivityFeed() {
   activities.slice(0, 5).forEach(act => {
     const item = document.createElement("div");
     item.className = "activity-item";
-    let icon = "✓";
+    let icon = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>`;
     let iconBg = "var(--success-bg)";
     let iconColor = "var(--success-text)";
-    if (act.type === "error") { icon = "⚠️"; iconBg = "var(--danger-bg)"; iconColor = "var(--danger-text)"; }
-    if (act.type === "info") { icon = "ℹ️"; iconBg = "var(--info-bg)"; iconColor = "var(--info-text)"; }
+    if (act.type === "error") {
+      icon = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>`;
+      iconBg = "var(--danger-bg)";
+      iconColor = "var(--danger-text)";
+    }
+    if (act.type === "info") {
+      icon = `<svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/></svg>`;
+      iconBg = "var(--info-bg)";
+      iconColor = "var(--info-text)";
+    }
 
     item.innerHTML = `
       <div class="activity-icon-badge" style="background:${iconBg};color:${iconColor};">${icon}</div>

@@ -1,43 +1,33 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import { printerService } from './printer-service';
-import { tempFileManager } from './temp-file-manager';
-import { jobLifecycleManager } from './job-lifecycle';
+import os from "os";
+import { configStore, AgentConfig } from "./config-store";
+import { printerService } from "./printer-service";
+import { tempFileManager } from "./temp-file-manager";
+import { jobLifecycleManager } from "./job-lifecycle";
+import { logger } from "./logger";
 
-export interface AgentConfig {
-  backendUrl: string;
-  deviceId: string;
-  deviceToken: string;
-  vendorName: string;
-  vendorSlug: string;
-  isPollingActive: boolean;
-  defaultBwPrinter?: string;
-  defaultColorPrinter?: string;
-  userEmail?: string;
-  sessionToken?: string;
-  deviceName?: string;
-}
-
-export type LogListener = (log: { timestamp: string; level: 'info' | 'warn' | 'error'; message: string }) => void;
+export type LogListener = (log: { timestamp: string; level: "info" | "warn" | "error"; message: string }) => void;
 export type JobListener = (job: any) => void;
 
 export class AgentWorker {
-  private config: AgentConfig | null = null;
   private pollingTimer: NodeJS.Timeout | null = null;
   private isBusy = false;
-  private logListeners: LogListener[] = [];
   private jobListeners: JobListener[] = [];
   private currentIntervalMs = 10000;
   private consecutiveErrors = 0;
   private wasOffline = false;
 
   constructor() {
-    this.loadSavedConfig();
+    // Config is loaded through configStore
   }
 
   public onLog(listener: LogListener) {
-    this.logListeners.push(listener);
+    logger.addListener((entry) => {
+      listener({
+        timestamp: new Date(entry.timestamp).toLocaleTimeString(),
+        level: entry.level === "ERROR" || entry.level === "FATAL" ? "error" : entry.level === "WARN" ? "warn" : "info",
+        message: entry.message,
+      });
+    });
   }
 
   public onJob(listener: JobListener) {
@@ -49,64 +39,23 @@ export class AgentWorker {
       try {
         listener(job);
       } catch (e) {
-        console.error('Job listener error:', e);
-      }
-    }
-  }
-
-  public emitLog(level: 'info' | 'warn' | 'error', message: string) {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`[AGENT ${level.toUpperCase()}] ${timestamp} - ${message}`);
-    for (const listener of this.logListeners) {
-      try {
-        listener({ timestamp, level, message });
-      } catch (e) {
-        // Listener error
+        logger.error(`Job listener error: ${e}`);
       }
     }
   }
 
   public getConfig(): AgentConfig | null {
-    return this.config;
+    return configStore.getConfig();
+  }
+
+  public saveConfig(config: AgentConfig) {
+    configStore.saveConfig(config);
   }
 
   public clearConfig() {
     this.stopPolling();
-    this.config = null;
-    const configPath = path.join(os.homedir(), '.printflow-agent-config.json');
-    if (fs.existsSync(configPath)) {
-      try {
-        fs.unlinkSync(configPath);
-      } catch (err) {
-        console.error('Failed to remove config file:', err);
-      }
-    }
-    this.emitLog('info', 'Device logged out and unlinked.');
-  }
-
-  public saveConfig(config: AgentConfig) {
-    this.config = config;
-    const configPath = path.join(os.homedir(), '.printflow-agent-config.json');
-    try {
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
-      this.emitLog('info', `Device credentials saved for ${config.vendorName}`);
-    } catch (err) {
-      console.error('Failed to save config file:', err);
-    }
-  }
-
-  private loadSavedConfig() {
-    const configPath = path.join(os.homedir(), '.printflow-agent-config.json');
-    if (fs.existsSync(configPath)) {
-      try {
-        const raw = fs.readFileSync(configPath, 'utf-8');
-        this.config = JSON.parse(raw);
-      } catch {
-        this.config = null;
-      }
-    } else {
-      this.config = null;
-    }
+    configStore.clearConfig();
+    logger.info("Device logged out and unlinked.");
   }
 
   public startPolling() {
@@ -114,12 +63,14 @@ export class AgentWorker {
       clearTimeout(this.pollingTimer);
       this.pollingTimer = null;
     }
-    if (!this.config) return;
+    const config = configStore.getConfig();
+    if (!config) return;
 
-    this.config.isPollingActive = true;
+    config.isPollingActive = true;
+    configStore.saveConfig(config);
     this.currentIntervalMs = 10000;
     this.consecutiveErrors = 0;
-    this.emitLog('info', 'Print agent polling engine started (10s adaptive interval)');
+    logger.info("Print agent polling engine started (10s adaptive interval)");
 
     this.pollAndExecuteJobs();
   }
@@ -129,41 +80,66 @@ export class AgentWorker {
       clearTimeout(this.pollingTimer);
       this.pollingTimer = null;
     }
-    if (this.config) this.config.isPollingActive = false;
-    this.emitLog('warn', 'Print agent polling paused by operator');
+    const config = configStore.getConfig();
+    if (config) {
+      config.isPollingActive = false;
+      configStore.saveConfig(config);
+    }
+    logger.warn("Print agent polling paused by operator");
   }
 
   private scheduleNextPoll() {
-    if (!this.config || !this.config.isPollingActive) return;
+    const config = configStore.getConfig();
+    if (!config || !config.isPollingActive) return;
     if (this.pollingTimer) clearTimeout(this.pollingTimer);
+
+    // Add jitter: +/- 15% to prevent synchronized retry spikes
+    const jitter = (Math.random() - 0.5) * 0.3 * this.currentIntervalMs;
+    const finalInterval = Math.max(3000, Math.round(this.currentIntervalMs + jitter));
 
     this.pollingTimer = setTimeout(() => {
       this.pollAndExecuteJobs();
-    }, this.currentIntervalMs);
+    }, finalInterval);
   }
 
   /**
-   * Main polling cycle with adaptive backoff
+   * Main polling cycle with adaptive backoff and bounded retries
    */
   public async pollAndExecuteJobs() {
-    if (!this.config || !this.config.isPollingActive || this.isBusy) {
+    const config = configStore.getConfig();
+    if (!config || !config.isPollingActive || this.isBusy) {
       return;
     }
     this.isBusy = true;
 
     try {
-      const { backendUrl, deviceId, deviceToken } = this.config;
+      const { backendUrl, deviceId, deviceToken } = config;
 
-      // 1. Fetch available jobs
-      const res = await fetch(`${backendUrl}/api/agent/jobs`, {
-        headers: {
-          'x-device-id': deviceId,
-          'x-device-token': deviceToken,
-        },
-      });
+      // 1. Fetch available jobs with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      let res: Response;
+      try {
+        res = await fetch(`${backendUrl}/api/agent/jobs`, {
+          headers: {
+            "x-device-id": deviceId,
+            "x-device-token": deviceToken,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!res.ok) {
-        this.emitLog('warn', `Poll response (${res.status}): Server not ready or unauthorized`);
+        if (res.status === 401 || res.status === 403) {
+          logger.error(`Workstation unauthorized (HTTP ${res.status}). Device credentials may be invalid or revoked.`);
+          // Slow down polling significantly for auth errors
+          this.currentIntervalMs = 60000;
+          return;
+        }
+        logger.warn(`Poll response (${res.status}): Server not ready or busy`);
         this.handlePollError();
         return;
       }
@@ -171,16 +147,16 @@ export class AgentWorker {
       const data = await res.json();
       const jobs = data.jobs || [];
 
-      // Connection is healthy - reset error count
+      // Connection healthy
       if (this.wasOffline) {
-        this.emitLog('info', '✅ Connection to Print2Me server restored.');
+        logger.info("Connection to Print2Me server restored.");
         this.wasOffline = false;
       }
       this.consecutiveErrors = 0;
       this.currentIntervalMs = 10000;
 
       if (jobs.length > 0) {
-        this.emitLog('info', `Found ${jobs.length} authorized print job(s) in queue`);
+        logger.info(`Found ${jobs.length} authorized print job(s) in queue`);
 
         // Process queued jobs sequentially
         for (const targetJob of jobs) {
@@ -188,7 +164,7 @@ export class AgentWorker {
         }
       }
     } catch (err: any) {
-      this.handlePollError(err.message || 'Connection failure');
+      this.handlePollError(err.message || "Connection failure");
     } finally {
       this.isBusy = false;
       this.scheduleNextPoll();
@@ -197,52 +173,72 @@ export class AgentWorker {
 
   private handlePollError(details?: string) {
     this.consecutiveErrors++;
-    this.currentIntervalMs = Math.min(60000, Math.round(10000 * Math.pow(1.5, Math.min(this.consecutiveErrors, 5))));
+    // Exponential backoff with max 60s
+    this.currentIntervalMs = Math.min(
+      60000,
+      Math.round(10000 * Math.pow(1.5, Math.min(this.consecutiveErrors, 5)))
+    );
 
     if (!this.wasOffline) {
-      this.emitLog('warn', `Network connection offline (${details || 'server unreachable'}). Retrying with backoff in ${(this.currentIntervalMs / 1000).toFixed(0)}s...`);
+      logger.warn(
+        `Network connection offline (${details || "server unreachable"}). Retrying with backoff in ${(
+          this.currentIntervalMs / 1000
+        ).toFixed(0)}s...`
+      );
       this.wasOffline = true;
     }
   }
 
   public async processSingleJob(job: any) {
-    const { backendUrl, deviceId, deviceToken } = this.config!;
+    const config = configStore.getConfig();
+    if (!config) return;
+
+    const { backendUrl, deviceId, deviceToken } = config;
+    const firstItem = job.items?.[0] || {};
+    const docMeta = firstItem.document || {};
+    const docId = docMeta.id || "default";
+
+    // Standardized idempotency key across all agent components
     const idempotencyKey = jobLifecycleManager.generateIdempotencyKey(
       job.orderId || job.orderNumber,
-      job.jobId,
-      job.items?.[0]?.document?.id
+      firstItem.itemId || "job",
+      docId
     );
 
     // Guard against duplicate prints
     if (jobLifecycleManager.isAlreadyDispatched(idempotencyKey)) {
-      this.emitLog(
-        'warn',
+      logger.warn(
         `Order ${job.orderNumber} (Job: ${job.jobId}) was already spooled. Skipping duplicate dispatch.`
       );
       return;
     }
 
-    const firstItem = job.items?.[0] || {};
-    const docMeta = firstItem.document || {};
-    const targetCopies = firstItem.copies || 1;
-    const isColorJob = job.items.some((i: any) => i.colorMode === 'COLOR');
+    if (jobLifecycleManager.isCurrentlyProcessing(idempotencyKey)) {
+      logger.warn(
+        `Order ${job.orderNumber} (Job: ${job.jobId}) is currently being processed. Skipping.`
+      );
+      return;
+    }
+
+    const targetCopies = Math.max(1, Math.min(100, firstItem.copies || 1));
+    const isColorJob = job.items.some((i: any) => i.colorMode === "COLOR");
 
     // 1. Resolve Target Printer
     const realPrinters = await printerService.getInstalledPrinters();
-    let selectedPrinterName = '';
+    let selectedPrinterName = "";
 
-    if (isColorJob && this.config?.defaultColorPrinter) {
-      selectedPrinterName = this.config.defaultColorPrinter;
-    } else if (!isColorJob && this.config?.defaultBwPrinter) {
-      selectedPrinterName = this.config.defaultBwPrinter;
+    if (isColorJob && config.defaultColorPrinter) {
+      selectedPrinterName = config.defaultColorPrinter;
+    } else if (!isColorJob && config.defaultBwPrinter) {
+      selectedPrinterName = config.defaultBwPrinter;
     } else {
       const defaultPrinter = realPrinters.find((p) => p.isDefault) || realPrinters[0];
-      selectedPrinterName = defaultPrinter ? defaultPrinter.systemName : '';
+      selectedPrinterName = defaultPrinter ? defaultPrinter.systemName : "";
     }
 
     if (!selectedPrinterName) {
-      const msg = 'No physical or virtual Windows printer is available. Please install a printer.';
-      this.emitLog('error', msg);
+      const msg = "No physical or virtual Windows printer is available. Please install a printer.";
+      logger.error(msg);
       return;
     }
 
@@ -254,28 +250,37 @@ export class AgentWorker {
       idempotencyKey,
       printerName: selectedPrinterName,
       totalCopies: targetCopies,
-      colorMode: isColorJob ? 'COLOR' : 'BLACK_AND_WHITE',
-      paperSize: firstItem.paperSize || 'A4',
-      duplexMode: firstItem.duplexMode || 'SINGLE_SIDED',
-      pageRange: firstItem.pageRange || 'ALL',
-      documentName: docMeta.filename || 'customer_document.pdf',
+      colorMode: isColorJob ? "COLOR" : "BLACK_AND_WHITE",
+      paperSize: firstItem.paperSize || "A4",
+      duplexMode: firstItem.duplexMode || "SINGLE_SIDED",
+      pageRange: firstItem.pageRange || "ALL",
+      documentName: docMeta.filename || "customer_document.pdf",
     });
 
-    jobLifecycleManager.transition(idempotencyKey, 'VALIDATING');
-    this.emitLog('info', `Claiming job ${job.orderNumber} (ID: ${job.jobId})...`);
+    jobLifecycleManager.transition(idempotencyKey, "VALIDATING");
+    logger.info(`Claiming job ${job.orderNumber} (ID: ${job.jobId})...`);
 
     // 2. Claim Job
-    let claimToken = '';
+    let claimToken = "";
     try {
-      const claimRes = await fetch(`${backendUrl}/api/agent/jobs/claim`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-device-id': deviceId,
-          'x-device-token': deviceToken,
-        },
-        body: JSON.stringify({ jobId: job.jobId, leaseSeconds: 180 }),
-      });
+      const claimController = new AbortController();
+      const claimTimeout = setTimeout(() => claimController.abort(), 10000);
+
+      let claimRes: Response;
+      try {
+        claimRes = await fetch(`${backendUrl}/api/agent/jobs/claim`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-device-id": deviceId,
+            "x-device-token": deviceToken,
+          },
+          body: JSON.stringify({ jobId: job.jobId, leaseSeconds: 180 }),
+          signal: claimController.signal,
+        });
+      } finally {
+        clearTimeout(claimTimeout);
+      }
 
       if (!claimRes.ok) {
         throw new Error(`Server returned HTTP ${claimRes.status}`);
@@ -286,31 +291,43 @@ export class AgentWorker {
       this.emitJob({ ...job, claimToken });
     } catch (claimErr: any) {
       const errMsg = `Could not claim job ${job.orderNumber}: ${claimErr.message}`;
-      this.emitLog('warn', errMsg);
-      jobLifecycleManager.transition(idempotencyKey, 'FAILED', { errorMessage: errMsg });
+      logger.warn(errMsg);
+      jobLifecycleManager.transition(idempotencyKey, "FAILED", { errorMessage: errMsg });
       return;
     }
 
     let tempFilePath: string | undefined;
 
     try {
-      // 3. Report DOWNLOADING
-      jobLifecycleManager.transition(idempotencyKey, 'DOWNLOADING');
+      // 3. Report DOWNLOADING to backend
+      jobLifecycleManager.transition(idempotencyKey, "DOWNLOADING");
       await this.updateJobStatus(
         job.jobId,
-        claimToken,
-        'DOWNLOADING',
-        'Workstation downloading document securely'
+        "DOWNLOADING",
+        undefined,
+        { details: "Workstation downloading document securely" }
       );
 
-      // 4. Retrieve Document Download URL
-      const docRes = await fetch(`${backendUrl}/api/agent/jobs/${job.jobId}/document?claimToken=${claimToken}`, {
-        headers: {
-          'x-device-id': deviceId,
-          'x-device-token': deviceToken,
-          'x-claim-token': claimToken,
-        },
-      });
+      // 4. Retrieve Document Download SAS URL
+      const docController = new AbortController();
+      const docTimeout = setTimeout(() => docController.abort(), 12000);
+
+      let docRes: Response;
+      try {
+        docRes = await fetch(
+          `${backendUrl}/api/agent/jobs/${job.jobId}/document?claimToken=${claimToken}`,
+          {
+            headers: {
+              "x-device-id": deviceId,
+              "x-device-token": deviceToken,
+              "x-claim-token": claimToken,
+            },
+            signal: docController.signal,
+          }
+        );
+      } finally {
+        clearTimeout(docTimeout);
+      }
 
       if (!docRes.ok) {
         throw new Error(`Failed to acquire download SAS URL from backend (HTTP ${docRes.status})`);
@@ -318,29 +335,40 @@ export class AgentWorker {
 
       const docData = await docRes.json();
       if (!docData.document?.downloadUrl) {
-        throw new Error('Backend response did not provide a valid document download URL');
+        throw new Error("Backend response did not provide a valid document download URL");
       }
 
       const rawDownloadUrl: string = docData.document.downloadUrl;
-      const docFilename: string = docData.document.filename || docMeta.filename || 'document.pdf';
+      const docFilename: string = docData.document.filename || docMeta.filename || "document.pdf";
       const claimedMime: string = docData.document.mimeType || docMeta.mimeType;
 
-      // Construct full URL if relative
-      const fullDownloadUrl = rawDownloadUrl.startsWith('http')
+      const fullDownloadUrl = rawDownloadUrl.startsWith("http")
         ? rawDownloadUrl
-        : `${backendUrl}${rawDownloadUrl.startsWith('/') ? '' : '/'}${rawDownloadUrl}`;
+        : `${backendUrl}${rawDownloadUrl.startsWith("/") ? "" : "/"}${rawDownloadUrl}`;
 
-      this.emitLog('info', `Downloading actual document ${docFilename} securely...`);
+      logger.info(`Downloading actual document ${docFilename} securely...`);
 
-      // 5. Download binary stream
+      // 5. Download binary stream with 60s timeout
       const fileHeaders: Record<string, string> = {};
       if (fullDownloadUrl.startsWith(backendUrl)) {
-        fileHeaders['x-device-id'] = deviceId;
-        fileHeaders['x-device-token'] = deviceToken;
-        fileHeaders['x-claim-token'] = claimToken;
+        fileHeaders["x-device-id"] = deviceId;
+        fileHeaders["x-device-token"] = deviceToken;
+        fileHeaders["x-claim-token"] = claimToken;
       }
 
-      const fileResp = await fetch(fullDownloadUrl, { headers: fileHeaders });
+      const dlController = new AbortController();
+      const dlTimeout = setTimeout(() => dlController.abort(), 60000);
+
+      let fileResp: Response;
+      try {
+        fileResp = await fetch(fullDownloadUrl, {
+          headers: fileHeaders,
+          signal: dlController.signal,
+        });
+      } finally {
+        clearTimeout(dlTimeout);
+      }
+
       if (!fileResp.ok) {
         throw new Error(`Failed to download document content (HTTP ${fileResp.status})`);
       }
@@ -356,23 +384,22 @@ export class AgentWorker {
       );
       tempFilePath = validated.filePath;
 
-      jobLifecycleManager.transition(idempotencyKey, 'READY_TO_PRINT', {
+      jobLifecycleManager.transition(idempotencyKey, "READY_TO_PRINT", {
         fileSizeBytes: validated.fileSizeBytes,
         sha256Hash: validated.sha256Hash,
       });
 
-      this.emitLog(
-        'info',
+      logger.info(
         `Document verified (${(validated.fileSizeBytes / 1024).toFixed(1)} KB, ${validated.mimeType}). Submitting to '${selectedPrinterName}'...`
       );
 
       // 7. Submit to Windows Printer Spooler
-      jobLifecycleManager.transition(idempotencyKey, 'SUBMITTING');
+      jobLifecycleManager.transition(idempotencyKey, "SUBMITTING");
 
       const spoolResult = await printerService.printDocument(tempFilePath, {
         printerName: selectedPrinterName,
         copies: targetCopies,
-        colorMode: isColorJob ? 'COLOR' : 'BLACK_AND_WHITE',
+        colorMode: isColorJob ? "COLOR" : "BLACK_AND_WHITE",
         duplexMode: firstItem.duplexMode,
         paperSize: firstItem.paperSize,
         pageRange: firstItem.pageRange,
@@ -380,28 +407,28 @@ export class AgentWorker {
 
       if (!spoolResult.success) {
         const errorMsg = `Spooler failed: ${spoolResult.message}`;
-        this.emitLog('error', errorMsg);
-        jobLifecycleManager.transition(idempotencyKey, 'NEEDS_ATTENTION', { errorMessage: errorMsg });
+        logger.error(errorMsg);
+        jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", {
+          errorMessage: errorMsg,
+        });
 
         await this.updateJobStatus(
           job.jobId,
-          claimToken,
-          'REQUIRES_MANUAL_REVIEW',
+          "REQUIRES_MANUAL_REVIEW",
           errorMsg
         );
         return;
       }
 
       // 8. Record SUBMITTED_TO_SPOOLER with native Job ID
-      jobLifecycleManager.transition(idempotencyKey, 'SUBMITTED_TO_SPOOLER', {
+      jobLifecycleManager.transition(idempotencyKey, "SUBMITTED_TO_SPOOLER", {
         windowsJobId: spoolResult.windowsJobId,
       });
 
       await this.updateJobStatus(
         job.jobId,
-        claimToken,
-        'SUBMITTED_TO_SPOOLER',
-        `Dispatched to Windows printer '${selectedPrinterName}'`,
+        "SUBMITTED_TO_SPOOLER",
+        undefined,
         {
           windowsJobId: spoolResult.windowsJobId,
           printerName: selectedPrinterName,
@@ -409,68 +436,148 @@ export class AgentWorker {
         }
       );
 
-      // 9. Report Spooler Completion
-      jobLifecycleManager.transition(idempotencyKey, 'COMPLETED', {
-        windowsJobId: spoolResult.windowsJobId,
-      });
-
-      await this.updateJobStatus(
+      // 9. Monitor Windows spooler queue for actual printing progress
+      this.monitorSpoolerProgress(
+        idempotencyKey,
         job.jobId,
-        claimToken,
-        'COMPLETED',
-        `Windows spooler finished processing document for '${selectedPrinterName}'`,
-        {
-          windowsJobId: spoolResult.windowsJobId,
-          printerName: selectedPrinterName,
-        }
+        selectedPrinterName,
+        spoolResult.windowsJobId
       );
 
-      this.emitLog(
-        'info',
-        `🎉 Order ${job.orderNumber} successfully spooled to ${selectedPrinterName}! (Spooler Job #${spoolResult.windowsJobId || 'Active'})`
+      logger.info(
+        `Order ${job.orderNumber} successfully submitted to Windows Spooler on ${selectedPrinterName}! (Spooler Job #${spoolResult.windowsJobId || "Active"})`
       );
     } catch (jobErr: any) {
-      const errMsg = jobErr.message || 'Unknown print error';
-      this.emitLog('error', `Print execution failed for ${job.orderNumber}: ${errMsg}`);
-      jobLifecycleManager.transition(idempotencyKey, 'NEEDS_ATTENTION', { errorMessage: errMsg });
+      const errMsg = jobErr.message || "Unknown print error";
+      logger.error(`Print execution failed for ${job.orderNumber}: ${errMsg}`);
+      jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", { errorMessage: errMsg });
 
       if (claimToken) {
         await this.updateJobStatus(
           job.jobId,
-          claimToken,
-          'REQUIRES_MANUAL_REVIEW',
+          "REQUIRES_MANUAL_REVIEW",
           `Print submission halted: ${errMsg}`
         );
       }
     } finally {
-      // Security: Always delete temporary customer document immediately after spooling handoff
+      // Safely schedule cleanup of temporary document (30-second delay so Windows Spooler finishes reading)
       if (tempFilePath) {
-        tempFileManager.cleanupFile(tempFilePath);
+        tempFileManager.cleanupFile(tempFilePath, 30000);
       }
     }
   }
 
+  /**
+   * Monitors the Windows spooler for completion or errors after submission
+   */
+  private monitorSpoolerProgress(
+    idempotencyKey: string,
+    jobId: string,
+    printerName: string,
+    windowsJobId?: number
+  ) {
+    if (os.platform() !== "win32" || !windowsJobId) {
+      // Mark as completed in lifecycle
+      jobLifecycleManager.transition(idempotencyKey, "COMPLETED", { windowsJobId });
+      this.updateJobStatus(jobId, "COMPLETED", undefined, { windowsJobId, printerName });
+      return;
+    }
+
+    let pollCount = 0;
+    const maxPolls = 30; // Check for up to 60 seconds
+
+    const checkInterval = setInterval(async () => {
+      pollCount++;
+      try {
+        const spoolJobs = await printerService.getSpoolerJobs(printerName);
+        const activeJob = spoolJobs.find((j) => j.jobId === windowsJobId);
+
+        if (activeJob) {
+          // Job is still active in the Windows Spooler
+          jobLifecycleManager.transition(idempotencyKey, "PRINTING", {
+            windowsJobId,
+            totalPages: activeJob.totalPages,
+            pagesPrinted: activeJob.pagesPrinted,
+          });
+
+          // Check for errors in spool status
+          const statusLower = activeJob.jobStatus.toLowerCase();
+          if (statusLower.includes("error") || statusLower.includes("paper")) {
+            clearInterval(checkInterval);
+            jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", {
+              errorMessage: `Spooler reports: ${activeJob.jobStatus}`,
+            });
+            await this.updateJobStatus(
+              jobId,
+              "REQUIRES_MANUAL_REVIEW",
+              `Printer reported alert: ${activeJob.jobStatus}`
+            );
+          }
+        } else {
+          // Job left the spooler queue (spooling finished without error)
+          clearInterval(checkInterval);
+          jobLifecycleManager.transition(idempotencyKey, "COMPLETED", { windowsJobId });
+          await this.updateJobStatus(
+            jobId,
+            "COMPLETED",
+            undefined,
+            { windowsJobId, printerName, completedSpooler: true }
+          );
+          logger.info(`Spooler job #${windowsJobId} completed processing successfully.`);
+        }
+      } catch (err) {
+        // Non-fatal query error
+      }
+
+      if (pollCount >= maxPolls) {
+        clearInterval(checkInterval);
+        // Honest status: Still assume completed if no error reported
+        const currentRecord = jobLifecycleManager.getRecord(idempotencyKey);
+        if (currentRecord && currentRecord.state !== "COMPLETED") {
+          jobLifecycleManager.transition(idempotencyKey, "COMPLETED", { windowsJobId });
+          this.updateJobStatus(jobId, "COMPLETED", undefined, { windowsJobId, printerName });
+        }
+      }
+    }, 2000);
+  }
+
+  /**
+   * Update print job status on backend matching Rust backend UpdateJobStatusPayload contract
+   */
   public async updateJobStatus(
     jobId: string,
-    claimToken: string,
     status: string,
-    message: string,
+    errorMessage?: string,
     metadata?: Record<string, any>
   ) {
-    if (!this.config) return;
-    const { backendUrl, deviceId, deviceToken } = this.config;
+    const config = configStore.getConfig();
+    if (!config) return;
+    const { backendUrl, deviceId, deviceToken } = config;
+
     try {
-      await fetch(`${backendUrl}/api/agent/jobs/${jobId}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-device-id': deviceId,
-          'x-device-token': deviceToken,
-        },
-        body: JSON.stringify({ jobId, status, claimToken, message, metadata }),
-      });
-    } catch (err) {
-      console.warn(`[AGENT] Failed to update status ${status} for job ${jobId}:`, err);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        await fetch(`${backendUrl}/api/agent/jobs/${jobId}/status`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-device-id": deviceId,
+            "x-device-token": deviceToken,
+          },
+          body: JSON.stringify({
+            status,
+            errorMessage: errorMessage || null,
+            metadata: metadata || null,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (err: any) {
+      logger.warn(`Failed to update status ${status} for job ${jobId}: ${err.message}`);
     }
   }
 }

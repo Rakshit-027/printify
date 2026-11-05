@@ -81,21 +81,12 @@ async function refreshAll() {
 }
 
 async function fetchSubscription() {
-  if (!appStatus?.config?.backendUrl) return;
+  if (!api || !appStatus?.isEnrolled) return;
   try {
-    const res = await fetch(`${appStatus.config.backendUrl}/api/vendor/subscription`, {
-      headers: {
-        'x-device-id': appStatus.config.deviceId || '',
-        'x-device-token': appStatus.config.deviceToken || '',
-        ...(appStatus.config.sessionToken ? { Authorization: `Bearer ${appStatus.config.sessionToken}` } : {}),
-      },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.subscription) {
-        appSubscription = data.subscription;
-        updateSubscriptionUI();
-      }
+    const data = await api.getSubscription();
+    if (data && data.success && data.subscription) {
+      appSubscription = data.subscription;
+      updateSubscriptionUI();
     }
   } catch (e) {
     console.warn("Failed to fetch subscription:", e);
@@ -211,7 +202,7 @@ function renderModalSubscriptionUI() {
         title.style.color = "#991B1B";
       }
       if (desc) {
-        desc.innerText = "Customer orders paused. Select a plan below or apply a VIP pass to resume.";
+        desc.innerText = "Customer orders paused. Select a plan below or apply a promo code to resume.";
         desc.style.color = "#B91C1C";
       }
       if (badge) {
@@ -247,9 +238,9 @@ function renderModalPlans() {
   if (!container) return;
 
   const defaultPlans = [
-    { code: 'STARTER', name: 'Starter Plan', description: 'Zero-touch Auto-Printing for single counter stall & walk-up queue', priceMonthlyMinor: 49900, priceYearlyMinor: 499900 },
-    { code: 'PRO', name: 'Professional Plan', description: 'Zero-touch Auto-Printing with multi-printer split routing & priority spooler', priceMonthlyMinor: 99900, priceYearlyMinor: 999900 },
-    { code: 'ENTERPRISE', name: 'Campus Enterprise', description: 'Zero-touch Auto-Printing across unlimited workstation fleet with custom SLA', priceMonthlyMinor: 199900, priceYearlyMinor: 1999900 }
+    { code: 'STARTER', name: 'Starter Plan', description: 'Auto-printing for single counter stall & walk-up queue', priceMonthlyMinor: 49900, priceYearlyMinor: 499900 },
+    { code: 'PRO', name: 'Professional Plan', description: 'Multi-printer split routing & priority spooler', priceMonthlyMinor: 99900, priceYearlyMinor: 999900 },
+    { code: 'ENTERPRISE', name: 'Campus Enterprise', description: 'Multi-workstation fleet support with custom SLA', priceMonthlyMinor: 199900, priceYearlyMinor: 1999900 }
   ];
 
   const plans = (modalPlansList && modalPlansList.length > 0) ? modalPlansList : defaultPlans;
@@ -266,7 +257,7 @@ function renderModalPlans() {
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${p.description || ''}</div>
           <div style="display:inline-flex;align-items:center;gap:4px;background:#F0FDF4;color:#15803D;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;border:1px solid #BBF7D0;margin-top:5px;">
-            <span>⚡ Zero-Touch Auto-Printing Included</span>
+            <span>Auto-printing included</span>
           </div>
         </div>
         <div style="text-align:right;margin-left:10px;">
@@ -320,7 +311,7 @@ function updateModalSummary() {
 
   if (btnPay) {
     if (isZero) {
-      btnPay.innerText = "⚡ Activate 30 Free Days Pass";
+      btnPay.innerText = "Activate Free Pass";
       btnPay.style.background = "#16A34A";
     } else {
       btnPay.innerText = `Proceed to Pay ₹${(finalAmt / 100).toFixed(0)}`;
@@ -332,7 +323,7 @@ function updateModalSummary() {
 async function applyModalCoupon() {
   const inp = document.getElementById("inp-modal-coupon");
   const msg = document.getElementById("modal-coupon-msg");
-  if (!inp || !inp.value.trim() || !appStatus?.config?.backendUrl) return;
+  if (!inp || !inp.value.trim() || !api) return;
 
   const code = inp.value.trim().toUpperCase();
   msg.style.display = "block";
@@ -340,26 +331,16 @@ async function applyModalCoupon() {
   msg.innerText = "Validating coupon...";
 
   try {
-    const res = await fetch(`${appStatus.config.backendUrl}/api/vendor/subscription/validate-coupon`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-device-id": appStatus.config.deviceId || "",
-        "x-device-token": appStatus.config.deviceToken || "",
-        ...(appStatus.config.sessionToken ? { Authorization: `Bearer ${appStatus.config.sessionToken}` } : {}),
-      },
-      body: JSON.stringify({
-        couponCode: code,
-        planCode: modalSelectedPlan,
-        billingCycle: modalBillingCycle,
-      }),
+    const data = await api.validateSubscriptionCoupon({
+      couponCode: code,
+      planCode: modalSelectedPlan,
+      billingCycle: modalBillingCycle,
     });
 
-    const data = await res.json();
     if (data && data.valid) {
       modalAppliedCoupon = data;
       msg.style.color = "#15803D";
-      msg.innerText = `✓ ${data.coupon?.code} applied: ${data.isFreePass ? '100% Free VIP Pass!' : `₹${(data.discountMinor/100).toFixed(0)} discount!`}`;
+      msg.innerText = `${data.coupon?.code} applied: ${data.isFreePass ? '100% discount pass applied' : `₹${(data.discountMinor/100).toFixed(0)} discount applied`}`;
       updateModalSummary();
     } else {
       modalAppliedCoupon = null;
@@ -375,7 +356,7 @@ async function applyModalCoupon() {
 }
 
 async function confirmModalSubscription() {
-  if (!appStatus?.config?.backendUrl) return;
+  if (!api) return;
   const btn = document.getElementById("btn-modal-checkout");
   const inp = document.getElementById("inp-modal-coupon");
   if (btn) btn.disabled = true;
@@ -384,53 +365,31 @@ async function confirmModalSubscription() {
 
   try {
     const couponCode = modalAppliedCoupon ? inp.value.trim().toUpperCase() : undefined;
-    const res = await fetch(`${appStatus.config.backendUrl}/api/vendor/subscription/checkout`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-device-id": appStatus.config.deviceId || "",
-        "x-device-token": appStatus.config.deviceToken || "",
-        ...(appStatus.config.sessionToken ? { Authorization: `Bearer ${appStatus.config.sessionToken}` } : {}),
-      },
-      body: JSON.stringify({
-        planCode: modalSelectedPlan,
-        billingCycle: modalBillingCycle,
-        couponCode: couponCode,
-      }),
+    const data = await api.checkoutSubscription({
+      planCode: modalSelectedPlan,
+      billingCycle: modalBillingCycle,
+      couponCode: couponCode,
     });
 
-    const data = await res.json();
-
     if (data && data.activated) {
-      showToast("🎉 Subscription Activated Successfully!");
+      showToast("Subscription activated successfully");
       await fetchSubscription();
       closeSubscriptionModal();
       return;
     }
 
     if (data && data.razorpayOrderId) {
-      // In-app verification
-      const verifyRes = await fetch(`${appStatus.config.backendUrl}/api/vendor/subscription/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-device-id": appStatus.config.deviceId || "",
-          "x-device-token": appStatus.config.deviceToken || "",
-          ...(appStatus.config.sessionToken ? { Authorization: `Bearer ${appStatus.config.sessionToken}` } : {}),
-        },
-        body: JSON.stringify({
-          planCode: modalSelectedPlan,
-          billingCycle: modalBillingCycle,
-          couponCode: couponCode,
-          razorpayPaymentId: `pay_${Date.now()}`,
-          razorpayOrderId: data.razorpayOrderId,
-          razorpaySignature: `mock_sig_${Date.now()}`,
-        }),
+      const vData = await api.verifySubscription({
+        planCode: modalSelectedPlan,
+        billingCycle: modalBillingCycle,
+        couponCode: couponCode,
+        razorpayPaymentId: `pay_${Date.now()}`,
+        razorpayOrderId: data.razorpayOrderId,
+        razorpaySignature: `mock_sig_${Date.now()}`,
       });
 
-      const vData = await verifyRes.json();
       if (vData && vData.verified) {
-        showToast("🎉 Payment Successful! Plan Renewed.");
+        showToast("Payment verified. Subscription renewed.");
         await fetchSubscription();
         closeSubscriptionModal();
       } else {
@@ -455,7 +414,7 @@ async function triggerManualSync() {
   showToast("Synchronizing queue & printer hardware...");
   try {
     await refreshAll();
-    showToast("✓ Synchronized successfully with Print2Me cloud");
+    showToast("Synchronized with Print2Me cloud");
   } catch (err) {
     showToast("Sync issue: " + err.message);
   } finally {
@@ -571,7 +530,7 @@ function playOrderBellSound() {
 if (typeof api !== 'undefined' && api && typeof api.onNewJob === 'function') {
   api.onNewJob((job) => {
     playOrderBellSound();
-    showToast(`🔔 New Order #${job.orderNumber || ''} claimed & printing...`);
+    showToast(`Order #${job.orderNumber || ''} claimed & printing`);
     if (typeof fetchOrders === 'function') fetchOrders();
   });
 }

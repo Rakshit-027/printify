@@ -12,16 +12,10 @@ async function fetchOrders() {
       renderOrders();
       if (typeof renderOverview === "function") renderOverview();
 
-      // AUTOMATIC ONLINE PAYMENT DISPATCH
+      // Clean up active sets for orders that transitioned to completed
       for (const o of freshOrders) {
-        const isOnlinePaid = o.paymentStatus === "SUCCESS";
-        const isConfirmedOrQueued = o.status === "CONFIRMED" || o.status === "QUEUED";
-        const notYetPrinted = !activePrintingOrders.has(o.id) && !autoPrintedOrderIds.has(o.id) && !printErrorOrders.has(o.id) && o.status !== "COMPLETED";
-
-        if (isOnlinePaid && isConfirmedOrQueued && notYetPrinted) {
-          console.log("Auto-dispatching online paid order to printer:", o.orderNumber || o.id);
-          autoPrintedOrderIds.add(o.id);
-          executeOrderPrint(o.id, o.orderNumber || o.id, false);
+        if (o.status === "COMPLETED" || o.status === "READY_FOR_PICKUP") {
+          activePrintingOrders.delete(o.id);
         }
       }
     }
@@ -39,17 +33,25 @@ function renderOrders() {
   if (currentFilter !== "ALL") {
     if (currentFilter === "PENDING") {
       filtered = filtered.filter(o => 
-        o.status === "AWAITING_VENDOR_APPROVAL" || 
-        o.paymentStatus === "CASH_PENDING" || 
-        (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+        o.status !== "CANCELLED" && 
+        o.status !== "REJECTED" &&
+        (
+          o.status === "AWAITING_VENDOR_APPROVAL" || 
+          o.paymentStatus === "CASH_PENDING" || 
+          (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+        )
       );
     } else if (currentFilter === "CONFIRMED" || currentFilter === "PRINTING") {
       filtered = filtered.filter(o => 
-        activePrintingOrders.has(o.id) || 
-        o.status === "CONFIRMED" || 
-        o.status === "PRINTING" || 
-        o.status === "PROCESSING" ||
-        printErrorOrders.has(o.id)
+        o.status !== "CANCELLED" &&
+        o.status !== "REJECTED" &&
+        (
+          activePrintingOrders.has(o.id) || 
+          o.status === "CONFIRMED" || 
+          o.status === "PRINTING" || 
+          o.status === "PROCESSING" ||
+          printErrorOrders.has(o.id)
+        )
       );
     } else if (currentFilter === "READY") {
       filtered = filtered.filter(o => o.status === "READY_FOR_PICKUP");
@@ -66,14 +68,20 @@ function renderOrders() {
     );
   }
 
-  // Calculate Counters
+  // Calculate Counters - exclude CANCELLED and REJECTED orders from active pending
   const pendingOrders = ordersList.filter(o => 
-    o.status === "AWAITING_VENDOR_APPROVAL" || 
-    o.paymentStatus === "CASH_PENDING" ||
-    (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    o.status !== "CANCELLED" &&
+    o.status !== "REJECTED" &&
+    (
+      o.status === "AWAITING_VENDOR_APPROVAL" || 
+      o.paymentStatus === "CASH_PENDING" ||
+      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    )
   );
   const printingOrders = ordersList.filter(o => 
-    activePrintingOrders.has(o.id) || o.status === "CONFIRMED" || o.status === "PRINTING" || o.status === "PROCESSING" || printErrorOrders.has(o.id)
+    o.status !== "CANCELLED" &&
+    o.status !== "REJECTED" &&
+    (activePrintingOrders.has(o.id) || o.status === "CONFIRMED" || o.status === "PRINTING" || o.status === "PROCESSING" || printErrorOrders.has(o.id))
   );
   const readyOrders = ordersList.filter(o => o.status === "READY_FOR_PICKUP");
   const completedOrders = ordersList.filter(o => o.status === "COMPLETED");
@@ -96,9 +104,8 @@ function renderOrders() {
   if (filtered.length === 0) {
     wrap.innerHTML = `
       <div class="empty-state-box">
-        <div class="empty-state-icon">📭</div>
         <div class="empty-state-title">No orders in this queue</div>
-        <div class="empty-state-desc">Incoming walk-up and online orders will appear here automatically in real time.</div>
+        <div class="empty-state-desc">Incoming walk-up and online orders appear here automatically.</div>
       </div>
     `;
     return;
@@ -111,34 +118,48 @@ function renderOrders() {
     const hasError = printErrorOrders.has(o.id);
     const errInfo = printErrorOrders.get(o.id);
     const isCompleted = o.status === "COMPLETED";
+    const isCancelled = o.status === "CANCELLED" || o.status === "REJECTED";
+    const isOnlineAwaiting = !isCancelled && (o.paymentMethod === "RAZORPAY" || o.paymentMethod === "ONLINE") && 
+                             (o.status === "AWAITING_PAYMENT" || o.paymentStatus === "PENDING");
 
-    card.className = "order-card" + (isPrinting ? " printing-active" : "") + (hasError ? " error-active" : "");
+    card.className = "order-card" + 
+      (isPrinting ? " printing-active" : "") + 
+      (hasError ? " error-active" : "") +
+      (isCancelled ? " cancelled-card" : "");
 
-    const isCashPending = o.paymentStatus === "CASH_PENDING" || 
-      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS");
+    const isCashPending = !isCancelled && (
+      o.paymentStatus === "CASH_PENDING" || 
+      (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+    );
     const isPaid = o.paymentStatus === "SUCCESS" || o.paymentStatus === "CASH_COLLECTED";
 
     let badgeHtml = "";
-    if (isPrinting) {
-      badgeHtml = `<span class="status-badge badge-printing"><span class="spin">🔄</span> Printing...</span>`;
+    if (o.status === "CANCELLED") {
+      badgeHtml = `<span class="status-badge badge-danger">Cancelled</span>`;
+    } else if (o.status === "REJECTED") {
+      badgeHtml = `<span class="status-badge badge-danger">Rejected</span>`;
+    } else if (isPrinting) {
+      badgeHtml = `<span class="status-badge badge-printing">Printing</span>`;
     } else if (hasError) {
-      badgeHtml = `<span class="status-badge badge-danger">⚠️ Spool Error / Paper Out</span>`;
+      badgeHtml = `<span class="status-badge badge-danger">Spooler error / Out of paper</span>`;
     } else if (isCompleted) {
-      badgeHtml = `<span class="status-badge badge-completed">✓ Completed</span>`;
+      badgeHtml = `<span class="status-badge badge-completed">Completed</span>`;
     } else if (o.status === "AWAITING_VENDOR_APPROVAL") {
-      badgeHtml = `<span class="status-badge badge-amber">⚠️ Awaiting Approval</span>`;
+      badgeHtml = `<span class="status-badge badge-amber">Awaiting approval</span>`;
+    } else if (o.status === "AWAITING_PAYMENT") {
+      badgeHtml = `<span class="status-badge badge-amber">Online checkout</span>`;
     } else if (o.status === "CONFIRMED") {
-      badgeHtml = `<span class="status-badge badge-printing">🖨️ Queued for Spooler</span>`;
+      badgeHtml = `<span class="status-badge badge-printing">Queued</span>`;
     } else if (o.status === "READY_FOR_PICKUP") {
-      badgeHtml = `<span class="status-badge badge-completed">Ready for Pickup</span>`;
+      badgeHtml = `<span class="status-badge badge-completed">Ready for pickup</span>`;
     } else {
       badgeHtml = `<span class="status-badge badge-neutral">${o.status}</span>`;
     }
 
     if (isCashPending) {
-      badgeHtml += ` <span class="status-badge badge-amber">💵 Cash Pending</span>`;
+      badgeHtml += ` <span class="status-badge badge-amber">Cash due</span>`;
     } else if (o.paymentStatus === "CASH_COLLECTED") {
-      badgeHtml += ` <span class="status-badge badge-completed">✓ Cash Collected</span>`;
+      badgeHtml += ` <span class="status-badge badge-completed">Cash collected</span>`;
     }
 
     const firstItem = (o.items && o.items[0]) || {};
@@ -147,39 +168,53 @@ function renderOrders() {
     const colorMode = firstItem.colorMode === "COLOR" ? "Color" : "B&W";
     const duplex = (firstItem.duplexMode && firstItem.duplexMode.includes("DOUBLE")) ? "Double-Sided" : "Single-Sided";
     const copies = firstItem.copies || 1;
-
     const timeStr = o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Just now";
     const priceStr = "₹" + ((o.totalAmountMinor || 0) / 100).toFixed(2);
 
     let actionsHtml = "";
 
-    if (isPrinting) {
+    if (isCancelled) {
+      actionsHtml = `
+        <span style="font-size:11px;font-weight:600;color:var(--text-muted);">
+          Order was cancelled by ${o.status === "REJECTED" ? "vendor" : "customer"}
+        </span>
+      `;
+    } else if (isPrinting) {
       actionsHtml = `
         <div class="printing-live-indicator">
           <div class="pulsing-dots"><span></span><span></span><span></span></div>
-          <div style="font-size:11px;font-weight:700;color:var(--info);">SPOOLING TO HARDWARE</div>
+          <div style="font-size:11px;font-weight:700;color:var(--info);">SPOOLING TO PRINTER</div>
         </div>
       `;
     } else if (hasError) {
       actionsHtml = `
         <button class="btn btn-warning btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', true)">
-          🖨️ Print Manually
+          Print manually
         </button>
         <button class="btn btn-secondary btn-sm" onclick="handleStatusAction('${o.id}', 'MARK_READY')">
-          Mark Ready
+          Mark ready
         </button>
       `;
     } else if (isCompleted) {
       actionsHtml = `
         <button class="btn btn-outline btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', true)">
-          🔄 Reprint
+          Reprint
+        </button>
+      `;
+    } else if (isOnlineAwaiting) {
+      actionsHtml = `
+        <button class="btn btn-warning btn-sm" onclick="handleConvertToCash('${o.id}', '${o.orderNumber || o.id}', ${o.totalAmountMinor || 0})">
+          Collect cash (${priceStr})
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="handleStatusAction('${o.id}', 'CANCEL')">
+          Cancel order
         </button>
       `;
     } else {
       if (isCashPending) {
         actionsHtml += `
           <button class="btn btn-warning btn-sm" onclick="handleCollectCash('${o.id}', '${o.orderNumber || o.id}', ${o.totalAmountMinor || 0})">
-            💵 Approve Cash (${priceStr})
+            Approve cash (${priceStr})
           </button>
         `;
       }
@@ -187,7 +222,7 @@ function renderOrders() {
       if (o.status === "AWAITING_VENDOR_APPROVAL") {
         actionsHtml += `
           <button class="btn btn-primary btn-sm" onclick="handleStatusAction('${o.id}', 'APPROVE')">
-            Approve Order
+            Approve order
           </button>
           <button class="btn btn-outline btn-sm" onclick="handleStatusAction('${o.id}', 'REJECT')">
             Reject
@@ -196,19 +231,19 @@ function renderOrders() {
       } else if (o.status === "CONFIRMED") {
         actionsHtml += `
           <button class="btn btn-primary btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', false)">
-            🖨️ Spool Document Now
+            Print now
           </button>
           <button class="btn btn-secondary btn-sm" onclick="handleStatusAction('${o.id}', 'MARK_READY')">
-            Mark Ready
+            Mark ready
           </button>
         `;
       } else if (o.status === "READY_FOR_PICKUP") {
         actionsHtml += `
           <button class="btn btn-primary btn-sm" onclick="handleStatusAction('${o.id}', 'MARK_COMPLETED')">
-            Handed Over / Complete
+            Completed
           </button>
           <button class="btn btn-outline btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', true)">
-            Print Manually
+            Print manually
           </button>
         `;
       }
@@ -219,19 +254,40 @@ function renderOrders() {
       errorBannerHtml = `
         <div class="error-alert-banner">
           <div>
-            <strong>PAPER FINISHED OR SPOOLER HALTED:</strong> ${errInfo?.message || "Please check printer tray and click Print Manually."}
+            <strong>Out of paper or spooler halted:</strong> ${errInfo?.message || "Check printer tray and click Print manually."}
           </div>
           <button class="btn btn-warning btn-sm" onclick="executeOrderPrint('${o.id}', '${o.orderNumber || o.id}', true)">
-            Print Manually
+            Print manually
           </button>
         </div>
       `;
     }
 
-    const paymentLabel = o.paymentStatus === "SUCCESS" 
-      ? "● Razorpay Paid" 
-      : (o.paymentStatus === "CASH_COLLECTED" ? "● Cash Collected (Paid)" : "● Cash Pending (Desk)");
-    const paymentClass = isPaid ? "paid" : "pending";
+    let paymentLabel = "";
+    let paymentClass = "pending";
+
+    if (isCancelled) {
+      paymentLabel = "● Order Cancelled";
+      paymentClass = "cancelled";
+    } else if (o.paymentStatus === "SUCCESS") {
+      paymentLabel = "● Online Paid (Razorpay)";
+      paymentClass = "paid";
+    } else if (o.paymentStatus === "CASH_COLLECTED") {
+      paymentLabel = "● Cash Collected (Paid)";
+      paymentClass = "paid";
+    } else if (o.paymentStatus === "FAILED") {
+      paymentLabel = "● Online Payment Failed";
+      paymentClass = "danger";
+    } else if (o.paymentMethod === "RAZORPAY" || o.paymentMethod === "ONLINE") {
+      paymentLabel = "● Online Checkout Pending";
+      paymentClass = "pending";
+    } else if (o.paymentMethod === "CASH_ON_COLLECTION" || o.paymentMethod === "CASH") {
+      paymentLabel = "● Cash Due at Desk";
+      paymentClass = "pending";
+    } else {
+      paymentLabel = `● ${o.paymentStatus || "Unpaid"}`;
+      paymentClass = isPaid ? "paid" : "pending";
+    }
 
     card.innerHTML = `
       <div class="order-top-bar">
@@ -283,9 +339,16 @@ function renderOrders() {
   });
 }
 
-// Print Dispatch Execution
+// Print Dispatch Execution with Double-Click Guard
 async function executeOrderPrint(orderId, orderNum, isRetry = false) {
   if (!api) return;
+
+  // Prevent double-clicking from submitting duplicate jobs
+  if (activePrintingOrders.has(orderId)) {
+    console.warn("Print already in progress for order:", orderNum);
+    return;
+  }
+
   const ord = ordersList.find(o => o.id === orderId);
   const copies = (ord?.items && ord.items[0]?.copies) || 1;
 
@@ -294,8 +357,8 @@ async function executeOrderPrint(orderId, orderNum, isRetry = false) {
   renderOrders();
   if (typeof renderOverview === "function") renderOverview();
 
-  showToast(`🖨️ ${isRetry ? "Retrying manual print" : "Printing"} Order ${orderNum}...`);
-  logActivity(isRetry ? "Manual Print Started" : "Auto Print Dispatched", orderNum, "info");
+  showToast(`${isRetry ? "Retrying print" : "Printing"} order ${orderNum}...`);
+  logActivity(isRetry ? "Manual Print Started" : "Print Dispatched", orderNum, "info");
 
   try {
     api.updateOrderStatus({ orderId, action: "START_PRINTING" }).catch(() => {});
@@ -311,14 +374,15 @@ async function executeOrderPrint(orderId, orderNum, isRetry = false) {
       activePrintingOrders.delete(orderId);
       autoPrintedOrderIds.add(orderId);
 
-      if (ord) ord.status = "COMPLETED";
+      if (ord) ord.status = "READY_FOR_PICKUP";
       renderOrders();
       if (typeof renderOverview === "function") renderOverview();
 
-      showToast(`✓ Dispatched to Windows Spooler for Order ${orderNum}! (${res.windowsJobId ? 'Win Job #' + res.windowsJobId : 'Active in Queue'})`);
+      showToast(`Submitted to Windows spooler: order ${orderNum} (${res.windowsJobId ? 'Job #' + res.windowsJobId : 'Active'})`);
       logActivity("Order Spooled to Windows", orderNum, "success");
 
-      await api.updateOrderStatus({ orderId, action: "MARK_COMPLETED" });
+      // Mark order as ready for pickup so vendor knows it's printed and waiting for customer handover
+      await api.updateOrderStatus({ orderId, action: "MARK_READY" });
       await fetchOrders();
     } else {
       activePrintingOrders.delete(orderId);
@@ -328,20 +392,20 @@ async function executeOrderPrint(orderId, orderNum, isRetry = false) {
       renderOrders();
       if (typeof renderOverview === "function") renderOverview();
 
-      showToast(`⚠️ Print Alert on ${orderNum}: ${errMsg}`);
-      logActivity("Spooler Rejection / Error", orderNum, "error");
+      showToast(`Print error on ${orderNum}: ${errMsg}`);
+      logActivity("Spooler Rejection", orderNum, "error");
       api.updateOrderStatus({ orderId, action: "REPORT_ERROR", message: errMsg }).catch(() => {});
     }
   } catch (err) {
     console.error("executeOrderPrint error:", err);
     activePrintingOrders.delete(orderId);
     printErrorOrders.set(orderId, {
-      message: err.message || "Hardware connection issue. Please check printer and click Print Manually.",
+      message: err.message || "Hardware connection issue. Check printer and click Print manually.",
       timestamp: Date.now(),
     });
     renderOrders();
     if (typeof renderOverview === "function") renderOverview();
-    showToast(`⚠️ Print Error: Check printer & click Print Manually.`);
+    showToast(`Print error. Check printer and click Print manually.`);
     logActivity("Print Dispatch Failed", orderNum, "error");
   }
 }
@@ -350,7 +414,7 @@ async function executeOrderPrint(orderId, orderNum, isRetry = false) {
 async function handleCollectCash(orderId, orderNum, amountMinor) {
   if (!api) return;
   const priceDisplay = amountMinor ? "₹" + (amountMinor / 100).toFixed(2) : "";
-  showToast("💵 Approving cash payment " + priceDisplay + " for " + orderNum + "...");
+  showToast("Approving cash payment " + priceDisplay + " for order " + orderNum + "...");
 
   const ord = ordersList.find(o => o.id === orderId);
   if (ord) {
@@ -371,12 +435,39 @@ async function handleCollectCash(orderId, orderNum, amountMinor) {
   await executeOrderPrint(orderId, orderNum, false);
 }
 
+// Convert Abandoned/Unpaid Online Order to Desk Cash & Print
+async function handleConvertToCash(orderId, orderNum, amountMinor) {
+  if (!api) return;
+  const priceDisplay = amountMinor ? "₹" + (amountMinor / 100).toFixed(2) : "";
+  showToast("Converting to desk cash " + priceDisplay + " for order " + orderNum + "...");
+
+  const ord = ordersList.find(o => o.id === orderId);
+  if (ord) {
+    ord.paymentMethod = "CASH_ON_COLLECTION";
+    ord.paymentStatus = "CASH_COLLECTED";
+    ord.status = "CONFIRMED";
+    renderOrders();
+    if (typeof renderOverview === "function") renderOverview();
+  }
+
+  logActivity("Online Converted to Desk Cash", `${orderNum} (${priceDisplay})`, "success");
+
+  try {
+    await api.updateOrderStatus({ orderId, action: "CONVERT_TO_CASH" });
+  } catch (err) {
+    console.error("handleConvertToCash API error:", err);
+  }
+
+  await executeOrderPrint(orderId, orderNum, false);
+}
+
 async function handleStatusAction(orderId, action) {
   if (!api) return;
   const ord = ordersList.find(o => o.id === orderId);
   if (ord) {
     if (action === "APPROVE") ord.status = "CONFIRMED";
     else if (action === "REJECT") ord.status = "REJECTED";
+    else if (action === "CANCEL" || action === "CANCEL_ORDER") ord.status = "CANCELLED";
     else if (action === "MARK_READY") ord.status = "READY_FOR_PICKUP";
     else if (action === "MARK_COMPLETED") ord.status = "COMPLETED";
     else if (action === "MARK_CASH_COLLECTED") ord.paymentStatus = "CASH_COLLECTED";

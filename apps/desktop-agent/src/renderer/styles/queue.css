@@ -274,6 +274,9 @@
 }
 .payment-status-tag.paid { color: #059669; }
 .payment-status-tag.pending { color: #D97706; }
+.payment-status-tag.danger { color: #DC2626; }
+.payment-status-tag.cancelled { color: #94A3B8; }
+.order-card.cancelled-card { opacity: 0.65; border-color: rgba(226, 232, 240, 0.6); }
 
 .actions-cell {
   display: flex;

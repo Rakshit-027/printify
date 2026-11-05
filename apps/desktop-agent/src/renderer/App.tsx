@@ -24,7 +24,6 @@ import {
   DollarSign,
   ChevronRight,
   Send,
-  Sparkles,
   ShieldCheck,
   Smartphone,
   HardDrive,
@@ -37,7 +36,7 @@ declare global {
   }
 }
 
-type TabType = "queue" | "printers" | "logs";
+type TabType = "queue" | "printers" | "payments" | "logs";
 
 export function App() {
   const [status, setStatus] = useState<any>(null);
@@ -51,6 +50,8 @@ export function App() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [testPrintLoading, setTestPrintLoading] = useState<string | null>(null);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
+  const [paymentAccount, setPaymentAccount] = useState<any>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // Auth / Login State
   const [authMode, setAuthMode] = useState<"login" | "signup" | "code">("login");
@@ -175,7 +176,7 @@ export function App() {
     if (window.printAgentApi?.onNewJob) {
       unsubJob = window.printAgentApi.onNewJob((job: any) => {
         playOrderChime();
-        setBannerNotice(`🔔 New Print Order: #${job.orderNumber || ''} claimed`);
+        setBannerNotice(`Order #${job.orderNumber || ''} claimed`);
         fetchOrders();
       });
     }
@@ -392,12 +393,78 @@ export function App() {
     }
   };
 
+  const handleLoadPaymentStatus = async () => {
+    setPaymentLoading(true);
+    try {
+      const res = await window.printAgentApi.getRazorpayStatus();
+      if (res?.success) {
+        setPaymentAccount(res.account);
+      }
+    } catch (err: any) {
+      console.error("Payment status load error:", err);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleConnectRazorpay = async () => {
+    try {
+      const res = await window.printAgentApi.connectRazorpay();
+      if (res?.authorizeUrl) {
+        await window.printAgentApi.openExternalUrl(res.authorizeUrl);
+        setBannerNotice("Razorpay partner onboarding opened in your browser.");
+      } else {
+        alert("Could not start onboarding: " + (res?.error || "Unknown"));
+      }
+    } catch (err: any) {
+      setBannerNotice("Failed to launch Razorpay onboarding: " + err.message);
+    }
+  };
+
+  const handleSyncRazorpay = async () => {
+    setPaymentLoading(true);
+    try {
+      const res = await window.printAgentApi.syncRazorpay();
+      if (res?.success !== false) {
+        await handleLoadPaymentStatus();
+        setBannerNotice("Razorpay status refreshed successfully.");
+      } else {
+        alert("Sync result: " + (res?.message || res?.error));
+      }
+    } catch (err: any) {
+      setBannerNotice("Failed to sync Razorpay: " + err.message);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleDisconnectRazorpay = async () => {
+    if (!confirm("Are you sure you want to disconnect your Razorpay account?")) return;
+    setPaymentLoading(true);
+    try {
+      const res = await window.printAgentApi.disconnectRazorpay();
+      if (res?.success !== false) {
+        await handleLoadPaymentStatus();
+        setBannerNotice("Razorpay account disconnected.");
+      }
+    } catch (err: any) {
+      setBannerNotice("Failed to disconnect: " + err.message);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const isEnrolled = Boolean(status?.isEnrolled);
   const vendorName = status?.config?.vendorName || "Print Store";
 
   const filteredOrders = orders.filter((o) => {
     if (orderFilter === "ALL") return true;
-    if (orderFilter === "PENDING") return o.status === "AWAITING_VENDOR_APPROVAL" || o.status === "AWAITING_PAYMENT";
+    if (orderFilter === "PENDING") {
+      return o.status !== "CANCELLED" && o.status !== "REJECTED" && (
+        o.status === "AWAITING_VENDOR_APPROVAL" || 
+        (o.paymentMethod === "CASH_ON_COLLECTION" && o.paymentStatus !== "CASH_COLLECTED" && o.paymentStatus !== "SUCCESS")
+      );
+    }
     if (orderFilter === "CONFIRMED") return o.status === "CONFIRMED" || o.status === "PRINTING";
     if (orderFilter === "READY") return o.status === "READY_FOR_PICKUP";
     if (orderFilter === "COMPLETED") return o.status === "COMPLETED";
@@ -768,7 +835,7 @@ export function App() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {otpVerified ? "✓ Verified" : resendCooldown > 0 ? `Resend (${resendCooldown}s)` : otpSent ? "Resend OTP" : "Send OTP"}
+                      {otpVerified ? "Verified" : resendCooldown > 0 ? `Resend (${resendCooldown}s)` : otpSent ? "Resend OTP" : "Send OTP"}
                     </button>
                   </div>
                 </div>
@@ -820,7 +887,7 @@ export function App() {
                 </div>
 
                 <details style={{ marginTop: 2, marginBottom: 4, fontSize: 11, color: "#64748B" }}>
-                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>Advanced: Custom Server URL</summary>
                   <div style={{ marginTop: 6 }}>
                     <input
                       type="text"
@@ -887,7 +954,7 @@ export function App() {
                 </div>
 
                 <details style={{ marginTop: 4, marginBottom: 8, fontSize: 12, color: "#64748B" }}>
-                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>Advanced: Custom Server URL</summary>
                   <div style={{ marginTop: 8 }}>
                     <input
                       type="text"
@@ -945,7 +1012,7 @@ export function App() {
                 </div>
 
                 <details style={{ marginTop: 4, marginBottom: 8, fontSize: 12, color: "#64748B" }}>
-                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>⚙️ Advanced: Custom Server URL</summary>
+                  <summary style={{ cursor: "pointer", opacity: 0.8, userSelect: "none" }}>Advanced: Custom Server URL</summary>
                   <div style={{ marginTop: 8 }}>
                     <input
                       type="text"
@@ -1083,6 +1150,27 @@ export function App() {
                 </button>
 
                 <button
+                  onClick={() => { setActiveTab("payments"); handleLoadPaymentStatus(); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 20px",
+                    borderRadius: 999,
+                    border: "1px solid",
+                    borderColor: activeTab === "payments" ? "#0E1A3A" : "transparent",
+                    background: activeTab === "payments" ? "#0E1A3A" : "transparent",
+                    color: activeTab === "payments" ? "#FFFFFF" : "#64748B",
+                    fontWeight: "700",
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  <CreditCard size={16} />
+                  <span>Razorpay Payments</span>
+                </button>
+
+                <button
                   onClick={() => setActiveTab("logs")}
                   style={{
                     display: "flex",
@@ -1147,8 +1235,18 @@ export function App() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {filteredOrders.map((order) => {
                       const totalSheets = order.items?.reduce((acc: number, i: any) => acc + (i.totalSheets || 1), 0) || 0;
-                      const isPendingApproval = order.status === "AWAITING_VENDOR_APPROVAL";
-                      const isCashPending = order.paymentMethod === "CASH_ON_COLLECTION" && order.paymentStatus !== "CASH_COLLECTED";
+                      const isCancelled = order.status === "CANCELLED" || order.status === "REJECTED";
+                      const isPendingApproval = !isCancelled && order.status === "AWAITING_VENDOR_APPROVAL";
+                      const isCashPending = !isCancelled && order.paymentMethod === "CASH_ON_COLLECTION" && order.paymentStatus !== "CASH_COLLECTED";
+                      const isOnlineAwaiting = !isCancelled && (order.paymentMethod === "RAZORPAY" || order.paymentMethod === "ONLINE") && (order.status === "AWAITING_PAYMENT" || order.paymentStatus === "PENDING");
+
+                      let paymentDisplay = order.paymentStatus;
+                      if (isCancelled) paymentDisplay = "Cancelled";
+                      else if (order.paymentStatus === "SUCCESS") paymentDisplay = "● Razorpay Paid";
+                      else if (order.paymentStatus === "CASH_COLLECTED") paymentDisplay = "● Cash Paid";
+                      else if (order.paymentStatus === "FAILED") paymentDisplay = "● Payment Failed";
+                      else if (isOnlineAwaiting) paymentDisplay = "● Online Checkout Pending";
+                      else if (isCashPending) paymentDisplay = "● Cash Due at Desk";
 
                       return (
                         <div
@@ -1162,6 +1260,7 @@ export function App() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             gap: 20,
+                            opacity: isCancelled ? 0.65 : 1,
                             boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)",
                           }}
                         >
@@ -1179,9 +1278,9 @@ export function App() {
                                   borderRadius: 999,
                                   textTransform: "uppercase",
                                   border: "1px solid",
-                                  background: order.status === "COMPLETED" ? "#10B98115" : order.status === "CONFIRMED" ? "#0E1A3A" : "#FF8A1F15",
-                                  borderColor: order.status === "COMPLETED" ? "#10B98130" : "#0E1A3A",
-                                  color: order.status === "COMPLETED" ? "#10B981" : order.status === "CONFIRMED" ? "#FFFFFF" : "#FF8A1F",
+                                  background: isCancelled ? "#DC262615" : order.status === "COMPLETED" ? "#10B98115" : order.status === "CONFIRMED" ? "#0E1A3A" : "#FF8A1F15",
+                                  borderColor: isCancelled ? "#DC262630" : order.status === "COMPLETED" ? "#10B98130" : "#0E1A3A",
+                                  color: isCancelled ? "#DC2626" : order.status === "COMPLETED" ? "#10B981" : order.status === "CONFIRMED" ? "#FFFFFF" : "#FF8A1F",
                                 }}>
                                   {order.status}
                                 </span>
@@ -1192,11 +1291,11 @@ export function App() {
                                   borderRadius: 999,
                                   textTransform: "uppercase",
                                   border: "1px solid",
-                                  background: order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F15" : "#10B98115",
-                                  borderColor: order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F30" : "#10B98130",
-                                  color: order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F" : "#10B981",
+                                  background: isCancelled ? "#94A3B815" : order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F15" : "#10B98115",
+                                  borderColor: isCancelled ? "#94A3B830" : order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F30" : "#10B98130",
+                                  color: isCancelled ? "#94A3B8" : order.paymentMethod === "CASH_ON_COLLECTION" ? "#FF8A1F" : "#10B981",
                                 }}>
-                                  {order.paymentMethod === "CASH_ON_COLLECTION" ? "💵 Cash on Desk" : "💳 Online Razorpay"}
+                                  {order.paymentMethod === "CASH_ON_COLLECTION" ? "Cash on Desk" : "Online Razorpay"}
                                 </span>
                               </div>
                               <div style={{ fontSize: 13, color: "#64748B", marginTop: 6, fontWeight: "500" }}>
@@ -1210,8 +1309,8 @@ export function App() {
                               <div style={{ fontSize: 20, fontWeight: "800", color: "#0E1A3A" }}>
                                 ₹{((order.totalAmountMinor || 0) / 100).toFixed(2)}
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748B", fontWeight: "600", marginTop: 2 }}>
-                                {order.paymentStatus}
+                              <div style={{ fontSize: 12, color: isCancelled ? "#94A3B8" : "#64748B", fontWeight: "600", marginTop: 2 }}>
+                                {paymentDisplay}
                               </div>
                             </div>
 
@@ -1234,6 +1333,49 @@ export function App() {
                                 >
                                   {actionLoading === order.id ? "Approving..." : "Approve & Print"}
                                 </button>
+                              )}
+
+                              {isOnlineAwaiting && (
+                                <>
+                                  <button
+                                    onClick={() => handleOrderStatusAction(order.id, "CONVERT_TO_CASH")}
+                                    disabled={actionLoading === order.id}
+                                    style={{
+                                      padding: "10px 16px",
+                                      borderRadius: 12,
+                                      background: "#FF8A1F",
+                                      border: "none",
+                                      color: "#FFFFFF",
+                                      fontWeight: "800",
+                                      fontSize: 13,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Pay Cash
+                                  </button>
+                                  <button
+                                    onClick={() => handleOrderStatusAction(order.id, "CANCEL")}
+                                    disabled={actionLoading === order.id}
+                                    style={{
+                                      padding: "10px 16px",
+                                      borderRadius: 12,
+                                      background: "#FFFFFF",
+                                      border: "1px solid #E2E8F0",
+                                      color: "#DC2626",
+                                      fontWeight: "800",
+                                      fontSize: 13,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
+
+                              {isCancelled && (
+                                <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: "600" }}>
+                                  Order cancelled
+                                </span>
                               )}
 
                               {isCashPending && (
@@ -1352,7 +1494,7 @@ export function App() {
                       <option value="">Auto-Route (Same as B&amp;W)</option>
                       {printers.map((p, idx) => (
                         <option key={idx} value={p.systemName}>
-                          {p.displayName || p.systemName} {p.supportsColor ? "🎨 (Color Ready)" : ""}
+                          {p.displayName || p.systemName} {p.supportsColor ? "(Color)" : ""}
                         </option>
                       ))}
                     </select>
@@ -1444,6 +1586,121 @@ export function App() {
                         </div>
                       ))
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: RAZORPAY ONBOARDING & PAYMENTS */}
+            {activeTab === "payments" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 24, padding: 32, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)", flexWrap: "wrap", gap: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 20, background: paymentAccount?.authStatus === "AUTHORIZED" ? "#10B98115" : "#FF8A1F15", border: "1px solid " + (paymentAccount?.authStatus === "AUTHORIZED" ? "#10B98130" : "#FF8A1F30"), display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <CreditCard size={28} color={paymentAccount?.authStatus === "AUTHORIZED" ? "#10B981" : "#FF8A1F"} />
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: 20, fontWeight: "800", color: "#0E1A3A" }}>Razorpay Partner Gateway</span>
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: "800",
+                          padding: "4px 12px",
+                          borderRadius: 999,
+                          textTransform: "uppercase",
+                          background: paymentAccount?.authStatus === "AUTHORIZED" ? "#10B98115" : "#64748B15",
+                          color: paymentAccount?.authStatus === "AUTHORIZED" ? "#10B981" : "#64748B",
+                          border: "1px solid " + (paymentAccount?.authStatus === "AUTHORIZED" ? "#10B98130" : "#64748B30")
+                        }}>
+                          {paymentAccount?.authStatus === "AUTHORIZED" ? "Connected" : "Not Connected"}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 13, color: "#64748B", marginTop: 4 }}>
+                        {paymentAccount?.authStatus === "AUTHORIZED"
+                          ? "Your Razorpay account is active. Customer payments from store QR scans are deposited directly into your bank account."
+                          : "Connect your store's Razorpay account to accept instant UPI (GPay, PhonePe, Paytm) and cards when customers scan your counter QR."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 12 }}>
+                    {paymentAccount?.authStatus === "AUTHORIZED" ? (
+                      <>
+                        <button
+                          onClick={handleSyncRazorpay}
+                          disabled={paymentLoading}
+                          style={{ padding: "10px 18px", borderRadius: 12, background: "#FAF7F2", border: "1px solid #E2E8F0", color: "#0E1A3A", fontWeight: "700", fontSize: 13, cursor: "pointer" }}
+                        >
+                          {paymentLoading ? "Syncing..." : "Sync Status"}
+                        </button>
+                        <button
+                          onClick={handleDisconnectRazorpay}
+                          disabled={paymentLoading}
+                          style={{ padding: "10px 18px", borderRadius: 12, background: "#EF444415", border: "1px solid #EF444430", color: "#EF4444", fontWeight: "700", fontSize: 13, cursor: "pointer" }}
+                        >
+                          Disconnect
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={handleConnectRazorpay}
+                        style={{ padding: "12px 24px", borderRadius: 14, background: "#0284C7", border: "none", color: "#FFFFFF", fontWeight: "800", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
+                      >
+                        <CreditCard size={16} />
+                        <span>Connect Razorpay</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 24 }}>
+                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 24, padding: 28, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)" }}>
+                    <div style={{ fontSize: 16, fontWeight: "800", color: "#0E1A3A" }}>Merchant Account Specifications</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 13 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#FAF7F2", borderRadius: 10 }}>
+                        <span style={{ color: "#64748B", fontWeight: "600" }}>Razorpay Merchant ID</span>
+                        <strong style={{ color: "#0E1A3A" }}>{paymentAccount?.razorpayAccountId || "Unassigned"}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#FAF7F2", borderRadius: 10 }}>
+                        <span style={{ color: "#64748B", fontWeight: "600" }}>Partner Onboarding</span>
+                        <strong style={{ color: "#0E1A3A" }}>{paymentAccount?.partnerApp || "Print2me"}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#FAF7F2", borderRadius: 10 }}>
+                        <span style={{ color: "#64748B", fontWeight: "600" }}>KYC &amp; Activation State</span>
+                        <strong style={{ color: "#0E1A3A" }}>{paymentAccount?.activationStatus || "NOT_ACTIVATED"}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", background: "#FAF7F2", borderRadius: 10 }}>
+                        <span style={{ color: "#64748B", fontWeight: "600" }}>Settlement Mode</span>
+                        <strong style={{ color: "#0E1A3A" }}>Direct Bank Route (Daily T+1 IMPS)</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 24, padding: 28, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 4px 20px rgba(14, 26, 58, 0.05)" }}>
+                    <div style={{ fontSize: 16, fontWeight: "800", color: "#0E1A3A" }}>Quick Setup Guide</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#FF8A1F", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: "800" }}>1</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Initiate Onboarding</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>Authorize Print2Me through Razorpay's secure OAuth flow.</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#FF8A1F", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: "800" }}>2</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Link Bank Account</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>Provide store IFSC and account number for daily automatic payouts.</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#FF8A1F", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: "800" }}>3</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: "700", color: "#0E1A3A" }}>Start Accepting UPI</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>Customers scan your QR standee and pay instantly on mobile.</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
