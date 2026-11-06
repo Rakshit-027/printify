@@ -134,6 +134,8 @@ function renderOverviewPrinters() {
   printersList.slice(0, 3).forEach(p => {
     const isBw = p.systemName === savedBw || (!savedBw && p.isDefault);
     const isCol = p.systemName === savedColor;
+    const connClass = (p.connectionType || "other").toLowerCase();
+    const connBadge = `<span class="printer-conn-badge conn-${connClass}" style="font-size:9px;padding:1px 5px;">${p.connectionType || "OTHER"}</span>`;
     const card = document.createElement("div");
     card.className = "mini-printer-card";
     card.innerHTML = `
@@ -144,12 +146,13 @@ function renderOverviewPrinters() {
         <div class="printer-text-group">
           <div class="printer-title-row">
             <span class="printer-name-text">${p.displayName || p.systemName}</span>
+            ${connBadge}
             ${p.isDefault ? '<span class="status-badge badge-neutral" style="font-size:9px;">OS DEFAULT</span>' : ''}
             ${isBw ? '<span class="printer-chip chip-cyan">B&W Default</span>' : ''}
             ${isCol ? '<span class="printer-chip chip-purple">Color Default</span>' : ''}
           </div>
           <div class="printer-meta-text">
-            ${p.supportsColor ? "Color + Mono" : "Monochrome"} • ${p.supportsDuplex ? "Duplex" : "Single-sided"} • Ready
+            ${p.supportsColor ? "Color + Mono" : "Monochrome"} • ${p.supportsDuplex ? "Duplex" : "Single-sided"} • ${p.isOnline ? "Online" : "Offline"}
           </div>
         </div>
       </div>

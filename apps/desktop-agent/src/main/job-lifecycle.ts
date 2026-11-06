@@ -162,8 +162,8 @@ export class JobLifecycleManager {
    * Format: order_{orderId}_doc_{resolvedDocId}
    */
   public generateIdempotencyKey(orderId: string, param2?: string, param3?: string): string {
-    const cleanOrderId = String(orderId || "").trim();
-    const resolvedDocId = String(param3 || param2 || "default").trim();
+    const cleanOrderId = String(orderId || "").trim().toLowerCase();
+    const resolvedDocId = String(param3 || param2 || "default").trim().toLowerCase();
     return `order_${cleanOrderId}_doc_${resolvedDocId}`;
   }
 
@@ -172,13 +172,81 @@ export class JobLifecycleManager {
    */
   public isAlreadyDispatched(idempotencyKey: string): boolean {
     const record = this.jobs.get(idempotencyKey);
-    if (!record) return false;
-    return (
-      record.state === "SUBMITTING" ||
-      record.state === "SUBMITTED_TO_SPOOLER" ||
-      record.state === "PRINTING" ||
-      record.state === "COMPLETED"
-    );
+    if (record) {
+      if (
+        record.state === "SUBMITTING" ||
+        record.state === "SUBMITTED_TO_SPOOLER" ||
+        record.state === "PRINTING" ||
+        record.state === "COMPLETED"
+      ) {
+        return true;
+      }
+    }
+
+    // Cross-check: prevent duplicates when one caller used orderId (UUID) and another used orderNumber (e.g. ORD-XXXX)
+    // CRITICAL: Extract document portion so different documents in the same multi-doc order NEVER block each other!
+    const cleanKey = idempotencyKey.toLowerCase();
+    const docMatch = cleanKey.match(/_doc_(.+)$/);
+    const targetDocId = docMatch ? docMatch[1] : "";
+
+    for (const job of this.jobs.values()) {
+      const matchOrder =
+        (job.orderId && cleanKey.includes(job.orderId.toLowerCase())) ||
+        (job.orderNumber && cleanKey.includes(job.orderNumber.toLowerCase()));
+
+      const jobDocMatch = job.idempotencyKey.toLowerCase().match(/_doc_(.+)$/);
+      const jobDocId = jobDocMatch ? jobDocMatch[1] : "";
+      const matchDoc = !targetDocId || !jobDocId || targetDocId === jobDocId;
+
+      if (matchOrder && matchDoc) {
+        if (
+          job.state === "SUBMITTING" ||
+          job.state === "SUBMITTED_TO_SPOOLER" ||
+          job.state === "PRINTING" ||
+          job.state === "COMPLETED"
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Checks whether an order and specific document has already been dispatched/printed
+   */
+  public isOrderAlreadyDispatched(orderIdentifier: string, docId?: string): boolean {
+    const cleanOrder = String(orderIdentifier || "").trim().toLowerCase();
+    const cleanDoc = docId ? String(docId).trim().toLowerCase() : "";
+    if (!cleanOrder) return false;
+
+    for (const job of this.jobs.values()) {
+      const matchOrder =
+        job.orderId.toLowerCase() === cleanOrder ||
+        job.orderNumber.toLowerCase() === cleanOrder ||
+        job.idempotencyKey.toLowerCase().includes(cleanOrder);
+
+      if (matchOrder) {
+        if (cleanDoc) {
+          const jobDocMatch = job.idempotencyKey.toLowerCase().match(/_doc_(.+)$/);
+          const jobDocId = jobDocMatch ? jobDocMatch[1] : "";
+          if (jobDocId && jobDocId !== cleanDoc) {
+            continue; // Different document in the same order — allow it!
+          }
+        }
+
+        if (
+          job.state === "SUBMITTING" ||
+          job.state === "SUBMITTED_TO_SPOOLER" ||
+          job.state === "PRINTING" ||
+          job.state === "COMPLETED"
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -186,13 +254,43 @@ export class JobLifecycleManager {
    */
   public isCurrentlyProcessing(idempotencyKey: string): boolean {
     const record = this.jobs.get(idempotencyKey);
-    if (!record) return false;
-    return (
-      record.state === "VALIDATING" ||
-      record.state === "DOWNLOADING" ||
-      record.state === "READY_TO_PRINT" ||
-      record.state === "SUBMITTING"
-    );
+    if (record) {
+      if (
+        record.state === "VALIDATING" ||
+        record.state === "DOWNLOADING" ||
+        record.state === "READY_TO_PRINT" ||
+        record.state === "SUBMITTING"
+      ) {
+        return true;
+      }
+    }
+
+    const cleanKey = idempotencyKey.toLowerCase();
+    const docMatch = cleanKey.match(/_doc_(.+)$/);
+    const targetDocId = docMatch ? docMatch[1] : "";
+
+    for (const job of this.jobs.values()) {
+      const matchOrder =
+        (job.orderId && cleanKey.includes(job.orderId.toLowerCase())) ||
+        (job.orderNumber && cleanKey.includes(job.orderNumber.toLowerCase()));
+
+      const jobDocMatch = job.idempotencyKey.toLowerCase().match(/_doc_(.+)$/);
+      const jobDocId = jobDocMatch ? jobDocMatch[1] : "";
+      const matchDoc = !targetDocId || !jobDocId || targetDocId === jobDocId;
+
+      if (matchOrder && matchDoc) {
+        if (
+          job.state === "VALIDATING" ||
+          job.state === "DOWNLOADING" ||
+          job.state === "READY_TO_PRINT" ||
+          job.state === "SUBMITTING"
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   public getRecord(idempotencyKey: string): PrintJobRecord | undefined {

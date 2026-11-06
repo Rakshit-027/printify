@@ -205,15 +205,36 @@ export class AgentWorker {
       docId
     );
 
-    // Guard against duplicate prints
-    if (jobLifecycleManager.isAlreadyDispatched(idempotencyKey)) {
-      logger.warn(
-        `Order ${job.orderNumber} (Job: ${job.jobId}) was already spooled. Skipping duplicate dispatch.`
+    // Guard against duplicate prints: check if all documents in this order have already been dispatched
+    const allItemsDispatched =
+      Array.isArray(job.items) &&
+      job.items.length > 0 &&
+      job.items.every((it: any) => {
+        const did = it.document?.id || it.documentId || it.id || "default";
+        const ikey = jobLifecycleManager.generateIdempotencyKey(
+          job.orderId || job.orderNumber,
+          it.itemId || "job",
+          did
+        );
+        return (
+          jobLifecycleManager.isAlreadyDispatched(ikey) ||
+          jobLifecycleManager.isOrderAlreadyDispatched(job.orderId || job.orderNumber, did)
+        );
+      });
+
+    if (allItemsDispatched) {
+      logger.info(
+        `Order ${job.orderNumber} (Job: ${job.jobId}) all document items were already spooled/printed. Acknowledging with backend to clear queue.`
       );
+      this.updateJobStatus(job.jobId, "COMPLETED", undefined, { duplicatePrevented: true }).catch(() => {});
       return;
     }
 
-    if (jobLifecycleManager.isCurrentlyProcessing(idempotencyKey)) {
+    const isProcessing =
+      jobLifecycleManager.isCurrentlyProcessing(idempotencyKey) ||
+      (job.orderNumber && jobLifecycleManager.isCurrentlyProcessing(`order_${job.orderNumber.toLowerCase()}_doc_${docId.toLowerCase()}`));
+
+    if (isProcessing) {
       logger.warn(
         `Order ${job.orderNumber} (Job: ${job.jobId}) is currently being processed. Skipping.`
       );
@@ -242,6 +263,64 @@ export class AgentWorker {
       return;
     }
 
+    const matchedPrinter = realPrinters.find(
+      (p) => p.systemName.toLowerCase() === selectedPrinterName.toLowerCase()
+    );
+
+    const existingRec = jobLifecycleManager.getRecord(idempotencyKey);
+    if (existingRec && existingRec.state === "NEEDS_ATTENTION") {
+      if (!matchedPrinter || !matchedPrinter.isOnline) {
+        // Printer is still not ready, avoid flooding logs repeatedly
+        return;
+      }
+      logger.info(`Target printer '${matchedPrinter.systemName}' is now READY and ONLINE. Resuming print for order ${job.orderNumber}...`);
+      jobLifecycleManager.transition(idempotencyKey, "RECEIVED");
+    }
+
+    if (!matchedPrinter) {
+      const msg = `Preferred printer '${selectedPrinterName}' is not installed in Windows. Please check printer connection or select an available printer in Settings.`;
+      if (!existingRec || existingRec.state !== "NEEDS_ATTENTION") {
+        logger.error(msg);
+        jobLifecycleManager.registerJob({
+          jobId: job.jobId,
+          orderId: job.orderId || job.orderNumber,
+          orderNumber: job.orderNumber,
+          idempotencyKey,
+          printerName: selectedPrinterName,
+          totalCopies: targetCopies,
+          colorMode: firstItem.colorMode === "COLOR" ? "COLOR" : "BLACK_AND_WHITE",
+          paperSize: firstItem.paperSize || "A4",
+          duplexMode: firstItem.duplexMode || "SINGLE_SIDED",
+          pageRange: firstItem.pageRange || "ALL",
+          documentName: docMeta.filename || "customer_document.pdf",
+        });
+        jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", { errorMessage: msg });
+      }
+      return;
+    }
+
+    if (!matchedPrinter.isOnline) {
+      const msg = `Preferred printer '${matchedPrinter.systemName}' (${matchedPrinter.connectionType}) is currently OFFLINE. ${matchedPrinter.statusDetails}. Order held for vendor review.`;
+      if (!existingRec || existingRec.state !== "NEEDS_ATTENTION") {
+        logger.warn(msg);
+        jobLifecycleManager.registerJob({
+          jobId: job.jobId,
+          orderId: job.orderId || job.orderNumber,
+          orderNumber: job.orderNumber,
+          idempotencyKey,
+          printerName: matchedPrinter.systemName,
+          totalCopies: targetCopies,
+          colorMode: firstItem.colorMode === "COLOR" ? "COLOR" : "BLACK_AND_WHITE",
+          paperSize: firstItem.paperSize || "A4",
+          duplexMode: firstItem.duplexMode || "SINGLE_SIDED",
+          pageRange: firstItem.pageRange || "ALL",
+          documentName: docMeta.filename || "customer_document.pdf",
+        });
+        jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", { errorMessage: msg });
+      }
+      return;
+    }
+
     // Register job in lifecycle state machine
     jobLifecycleManager.registerJob({
       jobId: job.jobId,
@@ -250,7 +329,7 @@ export class AgentWorker {
       idempotencyKey,
       printerName: selectedPrinterName,
       totalCopies: targetCopies,
-      colorMode: isColorJob ? "COLOR" : "BLACK_AND_WHITE",
+      colorMode: firstItem.colorMode === "COLOR" ? "COLOR" : "BLACK_AND_WHITE",
       paperSize: firstItem.paperSize || "A4",
       duplexMode: firstItem.duplexMode || "SINGLE_SIDED",
       pageRange: firstItem.pageRange || "ALL",
@@ -296,7 +375,7 @@ export class AgentWorker {
       return;
     }
 
-    let tempFilePath: string | undefined;
+    const tempDownloadedFiles: string[] = [];
 
     try {
       // 3. Report DOWNLOADING to backend
@@ -305,10 +384,10 @@ export class AgentWorker {
         job.jobId,
         "DOWNLOADING",
         undefined,
-        { details: "Workstation downloading document securely" }
+        { details: "Workstation downloading document(s) securely" }
       );
 
-      // 4. Retrieve Document Download SAS URL
+      // 4. Retrieve Document Download SAS URL(s)
       const docController = new AbortController();
       const docTimeout = setTimeout(() => docController.abort(), 12000);
 
@@ -334,118 +413,176 @@ export class AgentWorker {
       }
 
       const docData = await docRes.json();
-      if (!docData.document?.downloadUrl) {
-        throw new Error("Backend response did not provide a valid document download URL");
+      const docList: any[] =
+        Array.isArray(docData.documents) && docData.documents.length > 0
+          ? docData.documents
+          : docData.document
+          ? [docData.document]
+          : [];
+
+      if (docList.length === 0) {
+        throw new Error("Backend response did not provide any valid printable documents");
       }
 
-      const rawDownloadUrl: string = docData.document.downloadUrl;
-      const docFilename: string = docData.document.filename || docMeta.filename || "document.pdf";
-      const claimedMime: string = docData.document.mimeType || docMeta.mimeType;
+      let totalSpooled = 0;
+      let lastSpoolResult: any = null;
 
-      const fullDownloadUrl = rawDownloadUrl.startsWith("http")
-        ? rawDownloadUrl
-        : `${backendUrl}${rawDownloadUrl.startsWith("/") ? "" : "/"}${rawDownloadUrl}`;
+      // 5. Download and spool each document in the order sequentially
+      for (let itemIdx = 0; itemIdx < docList.length; itemIdx++) {
+        const itemDoc = docList[itemIdx];
+        const rawDownloadUrl: string = itemDoc.downloadUrl;
+        if (!rawDownloadUrl) {
+          logger.warn(`Document #${itemIdx + 1} has no download URL, skipping`);
+          continue;
+        }
 
-      logger.info(`Downloading actual document ${docFilename} securely...`);
+        const currentItemMeta = job.items?.[itemIdx] || {};
+        const currentDocId = String(itemDoc.documentId || itemDoc.id || currentItemMeta.document?.id || `doc-${itemIdx}`);
+        const currentItemId = String(itemDoc.itemId || currentItemMeta.itemId || `item-${itemIdx}`);
+        const itemCopies = Math.max(1, Math.min(100, itemDoc.copies || currentItemMeta.copies || targetCopies));
+        const itemColorMode = (itemDoc.colorMode || currentItemMeta.colorMode) === "COLOR" ? "COLOR" : "BLACK_AND_WHITE";
+        const itemDuplexMode = itemDoc.duplexMode || currentItemMeta.duplexMode || firstItem.duplexMode || "SINGLE_SIDED";
+        const itemPaperSize = itemDoc.paperSize || currentItemMeta.paperSize || firstItem.paperSize || "A4";
+        const itemPageRange = itemDoc.pageRange || currentItemMeta.pageRange || firstItem.pageRange;
+        const itemFilename = itemDoc.filename || currentItemMeta.document?.filename || `document_${itemIdx + 1}.pdf`;
+        const itemMime = itemDoc.mimeType || currentItemMeta.document?.mimeType || "application/pdf";
 
-      // 5. Download binary stream with 60s timeout
-      const fileHeaders: Record<string, string> = {};
-      if (fullDownloadUrl.startsWith(backendUrl)) {
-        fileHeaders["x-device-id"] = deviceId;
-        fileHeaders["x-device-token"] = deviceToken;
-        fileHeaders["x-claim-token"] = claimToken;
-      }
-
-      const dlController = new AbortController();
-      const dlTimeout = setTimeout(() => dlController.abort(), 60000);
-
-      let fileResp: Response;
-      try {
-        fileResp = await fetch(fullDownloadUrl, {
-          headers: fileHeaders,
-          signal: dlController.signal,
-        });
-      } finally {
-        clearTimeout(dlTimeout);
-      }
-
-      if (!fileResp.ok) {
-        throw new Error(`Failed to download document content (HTTP ${fileResp.status})`);
-      }
-
-      const arrayBuf = await fileResp.arrayBuffer();
-      const fileBuffer = Buffer.from(arrayBuf);
-
-      // 6. Validate magic bytes, mime type, and integrity
-      const validated = await tempFileManager.writeAndValidateBuffer(
-        fileBuffer,
-        docFilename,
-        claimedMime
-      );
-      tempFilePath = validated.filePath;
-
-      jobLifecycleManager.transition(idempotencyKey, "READY_TO_PRINT", {
-        fileSizeBytes: validated.fileSizeBytes,
-        sha256Hash: validated.sha256Hash,
-      });
-
-      logger.info(
-        `Document verified (${(validated.fileSizeBytes / 1024).toFixed(1)} KB, ${validated.mimeType}). Submitting to '${selectedPrinterName}'...`
-      );
-
-      // 7. Submit to Windows Printer Spooler
-      jobLifecycleManager.transition(idempotencyKey, "SUBMITTING");
-
-      const spoolResult = await printerService.printDocument(tempFilePath, {
-        printerName: selectedPrinterName,
-        copies: targetCopies,
-        colorMode: isColorJob ? "COLOR" : "BLACK_AND_WHITE",
-        duplexMode: firstItem.duplexMode,
-        paperSize: firstItem.paperSize,
-        pageRange: firstItem.pageRange,
-      });
-
-      if (!spoolResult.success) {
-        const errorMsg = `Spooler failed: ${spoolResult.message}`;
-        logger.error(errorMsg);
-        jobLifecycleManager.transition(idempotencyKey, "NEEDS_ATTENTION", {
-          errorMessage: errorMsg,
-        });
-
-        await this.updateJobStatus(
-          job.jobId,
-          "REQUIRES_MANUAL_REVIEW",
-          errorMsg
+        const itemKey = jobLifecycleManager.generateIdempotencyKey(
+          job.orderId || job.orderNumber,
+          currentItemId,
+          currentDocId
         );
-        return;
-      }
 
-      // 8. Record SUBMITTED_TO_SPOOLER with native Job ID
-      jobLifecycleManager.transition(idempotencyKey, "SUBMITTED_TO_SPOOLER", {
-        windowsJobId: spoolResult.windowsJobId,
-      });
+        if (
+          jobLifecycleManager.isAlreadyDispatched(itemKey) ||
+          jobLifecycleManager.isOrderAlreadyDispatched(job.orderId || job.orderNumber, currentDocId)
+        ) {
+          logger.info(`Document #${itemIdx + 1} (${itemFilename}) already spooled. Skipping duplicate.`);
+          continue;
+        }
+
+        jobLifecycleManager.registerJob({
+          jobId: `${job.jobId}-${itemIdx}`,
+          orderId: job.orderId || job.orderNumber,
+          orderNumber: job.orderNumber,
+          idempotencyKey: itemKey,
+          printerName: selectedPrinterName,
+          totalCopies: itemCopies,
+          colorMode: itemColorMode,
+          paperSize: itemPaperSize,
+          duplexMode: itemDuplexMode,
+          pageRange: itemPageRange,
+          documentName: itemFilename,
+        });
+
+        jobLifecycleManager.transition(itemKey, "DOWNLOADING");
+
+        const fullDownloadUrl = rawDownloadUrl.startsWith("http")
+          ? rawDownloadUrl
+          : `${backendUrl}${rawDownloadUrl.startsWith("/") ? "" : "/"}${rawDownloadUrl}`;
+
+        logger.info(`Downloading document #${itemIdx + 1} of ${docList.length} (${itemFilename}) securely...`);
+
+        const fileHeaders: Record<string, string> = {};
+        if (fullDownloadUrl.startsWith(backendUrl)) {
+          fileHeaders["x-device-id"] = deviceId;
+          fileHeaders["x-device-token"] = deviceToken;
+          fileHeaders["x-claim-token"] = claimToken;
+        }
+
+        const dlController = new AbortController();
+        const dlTimeout = setTimeout(() => dlController.abort(), 60000);
+
+        let fileResp: Response;
+        try {
+          fileResp = await fetch(fullDownloadUrl, {
+            headers: fileHeaders,
+            signal: dlController.signal,
+          });
+        } finally {
+          clearTimeout(dlTimeout);
+        }
+
+        if (!fileResp.ok) {
+          throw new Error(`Failed to download document content (HTTP ${fileResp.status})`);
+        }
+
+        const arrayBuf = await fileResp.arrayBuffer();
+        const fileBuffer = Buffer.from(arrayBuf);
+
+        // Validate magic bytes, mime type, and integrity
+        const validated = await tempFileManager.writeAndValidateBuffer(
+          fileBuffer,
+          itemFilename,
+          itemMime
+        );
+        tempDownloadedFiles.push(validated.filePath);
+
+        jobLifecycleManager.transition(itemKey, "READY_TO_PRINT", {
+          fileSizeBytes: validated.fileSizeBytes,
+          sha256Hash: validated.sha256Hash,
+        });
+
+        logger.info(
+          `Document #${itemIdx + 1} verified (${(validated.fileSizeBytes / 1024).toFixed(1)} KB, ${validated.mimeType}). Submitting to '${selectedPrinterName}'...`
+        );
+
+        // Submit to Windows Printer Spooler
+        jobLifecycleManager.transition(itemKey, "SUBMITTING");
+
+        const spoolResult = await printerService.printDocument(validated.filePath, {
+          printerName: selectedPrinterName,
+          copies: itemCopies,
+          colorMode: itemColorMode,
+          duplexMode: itemDuplexMode,
+          paperSize: itemPaperSize,
+          pageRange: itemPageRange,
+        });
+
+        if (!spoolResult.success) {
+          const errorMsg = `Spooler failed for '${itemFilename}': ${spoolResult.message}`;
+          logger.error(errorMsg);
+          jobLifecycleManager.transition(itemKey, "NEEDS_ATTENTION", {
+            errorMessage: errorMsg,
+          });
+
+          await this.updateJobStatus(
+            job.jobId,
+            "REQUIRES_MANUAL_REVIEW",
+            errorMsg
+          );
+          return;
+        }
+
+        // Record SUBMITTED_TO_SPOOLER with native Job ID
+        jobLifecycleManager.transition(itemKey, "SUBMITTED_TO_SPOOLER", {
+          windowsJobId: spoolResult.windowsJobId,
+        });
+        jobLifecycleManager.transition(itemKey, "COMPLETED", {
+          windowsJobId: spoolResult.windowsJobId,
+        });
+
+        totalSpooled += 1;
+        lastSpoolResult = spoolResult;
+
+        logger.info(
+          `Order ${job.orderNumber} (Doc #${itemIdx + 1}/${docList.length}): successfully submitted to Windows Spooler on ${selectedPrinterName}! (Spooler Job #${spoolResult.windowsJobId || "Active"})`
+        );
+      }
 
       await this.updateJobStatus(
         job.jobId,
-        "SUBMITTED_TO_SPOOLER",
+        "COMPLETED",
         undefined,
         {
-          windowsJobId: spoolResult.windowsJobId,
+          windowsJobId: lastSpoolResult?.windowsJobId,
           printerName: selectedPrinterName,
-          spoolStatus: spoolResult.spoolStatus,
+          totalDocumentsPrinted: totalSpooled,
         }
       );
 
-      // 9. Monitor Windows spooler queue for actual printing progress
-      this.monitorSpoolerProgress(
-        idempotencyKey,
-        job.jobId,
-        selectedPrinterName,
-        spoolResult.windowsJobId
-      );
-
       logger.info(
-        `Order ${job.orderNumber} successfully submitted to Windows Spooler on ${selectedPrinterName}! (Spooler Job #${spoolResult.windowsJobId || "Active"})`
+        `Order ${job.orderNumber} successfully completed all ${totalSpooled} document(s) on ${selectedPrinterName}!`
       );
     } catch (jobErr: any) {
       const errMsg = jobErr.message || "Unknown print error";
@@ -460,9 +597,9 @@ export class AgentWorker {
         );
       }
     } finally {
-      // Safely schedule cleanup of temporary document (30-second delay so Windows Spooler finishes reading)
-      if (tempFilePath) {
-        tempFileManager.cleanupFile(tempFilePath, 30000);
+      // Safely schedule cleanup of all temporary documents (30-second delay so Windows Spooler finishes reading)
+      for (const f of tempDownloadedFiles) {
+        tempFileManager.cleanupFile(f, 30000);
       }
     }
   }

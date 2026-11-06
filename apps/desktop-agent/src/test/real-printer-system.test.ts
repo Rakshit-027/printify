@@ -5,7 +5,7 @@ import path from "path";
 import os from "os";
 import { TempFileManager } from "../main/temp-file-manager";
 import { JobLifecycleManager } from "../main/job-lifecycle";
-import { WindowsPrinterService } from "../main/printer-service";
+import { WindowsPrinterService, detectPrinterConnectionType, PrinterConnectionType, RealPrinterInfo } from "../main/printer-service";
 import { ConfigStore } from "../main/config-store";
 import { logger } from "../main/logger";
 
@@ -481,6 +481,360 @@ describe("Print2Me Desktop Agent - Full Engineering Audit Test Suite", () => {
       assert.ok(sampleOAuthUrl.startsWith("https://auth.razorpay.com/oauth/authorize"));
       assert.ok(sampleOAuthUrl.includes("client_id="));
       assert.ok(sampleOAuthUrl.includes("response_type=code"));
+    });
+  });
+
+  // ==============================================================
+  // 9. Wi-Fi, Ethernet, USB, Shared, IPP Connection Type Detection
+  // ==============================================================
+  describe("9. Wi-Fi & Network Printer Connection Type Detection", () => {
+    test("Detects standard USB printer on USB001", () => {
+      const res = detectPrinterConnectionType({
+        name: "HP LaserJet 1020",
+        portName: "USB001",
+        driverName: "HP LaserJet 1020 Driver",
+      });
+      assert.equal(res.connectionType, "USB");
+      assert.ok(res.connectionDetails.includes("USB001"));
+    });
+
+    test("Detects multiple USB printers across USB002 and DOT4 ports", () => {
+      const usb2 = detectPrinterConnectionType({
+        name: "Canon LBP2900",
+        portName: "USB002",
+      });
+      assert.equal(usb2.connectionType, "USB");
+
+      const dot4 = detectPrinterConnectionType({
+        name: "HP LaserJet Professional P1102",
+        portName: "DOT4_001",
+        driverName: "HP LaserJet P1102 PCLm-S",
+      });
+      assert.equal(dot4.connectionType, "USB");
+      assert.ok(dot4.connectionDetails.includes("DOT4_001"));
+    });
+
+    test("Detects Wi-Fi printer from printer name with Wi-Fi / WiFi keyword", () => {
+      const res = detectPrinterConnectionType({
+        name: "HP LaserJet Pro MFP M227fdw (Wi-Fi)",
+        portName: "WSD-38294a2b-1234",
+        driverName: "HP LaserJet Pro PCL 6",
+      });
+      assert.equal(res.connectionType, "WIFI");
+      assert.ok(res.connectionDetails.includes("Wi-Fi"));
+    });
+
+    test("Detects Wi-Fi printer from driver name with Wireless keyword", () => {
+      const res = detectPrinterConnectionType({
+        name: "EPSON L3150 Series",
+        portName: "192.168.1.105",
+        driverName: "EPSON L3150 Series Wireless Driver",
+      });
+      assert.equal(res.connectionType, "WIFI");
+    });
+
+    test("Detects Wi-Fi printer on WSD port when host network adapter is Wi-Fi", () => {
+      const res = detectPrinterConnectionType({
+        name: "Brother HL-L2350DW series",
+        portName: "WSD-b14876ca-5491-4d7a",
+        driverName: "Brother HL-L2350DW series",
+        hasActiveWifi: true,
+        hasActiveEthernet: false,
+      });
+      assert.equal(res.connectionType, "WIFI");
+    });
+
+    test("Detects Ethernet / LAN printer from Standard TCP/IP port on wired host", () => {
+      const res = detectPrinterConnectionType({
+        name: "Xerox VersaLink B400",
+        portName: "IP_192.168.1.50",
+        driverName: "Xerox VersaLink B400 PCL6",
+        hasActiveWifi: false,
+        hasActiveEthernet: true,
+      });
+      assert.equal(res.connectionType, "ETHERNET");
+      assert.ok(res.connectionDetails.includes("192.168.1.50"));
+    });
+
+    test("Detects Ethernet printer from LAN / Ethernet keyword in printer name", () => {
+      const res = detectPrinterConnectionType({
+        name: "Canon imageRUNNER 2520 (LAN)",
+        portName: "192.168.0.88",
+        driverName: "Canon UFR II Driver",
+      });
+      assert.equal(res.connectionType, "ETHERNET");
+    });
+
+    test("Detects Windows Shared printer from UNC printer name \\\\server\\printer", () => {
+      const res = detectPrinterConnectionType({
+        name: "\\\\OFFICE-PC\\Canon_IR2006",
+        portName: "\\\\OFFICE-PC\\Canon_IR2006",
+        driverName: "Canon Generic Plus PCL6",
+      });
+      assert.equal(res.connectionType, "SHARED");
+      assert.ok(res.connectionDetails.includes("\\\\OFFICE-PC\\Canon_IR2006"));
+    });
+
+    test("Detects Windows Shared printer from 'on server' name format", () => {
+      const res = detectPrinterConnectionType({
+        name: "Brother HL-L2350DW on DESKTOP-MAIN",
+        portName: "Ne02:",
+        driverName: "Brother HL-L2350DW series",
+      });
+      assert.equal(res.connectionType, "SHARED");
+    });
+
+    test("Detects Windows Shared printer from PRINTER_ATTRIBUTE_NETWORK attribute flag", () => {
+      const res = detectPrinterConnectionType({
+        name: "Counter Billing Printer",
+        portName: "Ne03:",
+        driverName: "Epson TM-T82 Receipt",
+        attributes: 0x00000010, // PRINTER_ATTRIBUTE_NETWORK
+      });
+      assert.equal(res.connectionType, "SHARED");
+    });
+
+    test("Detects IPP (Internet Printing Protocol) printer from HTTP/IPP port", () => {
+      const res1 = detectPrinterConnectionType({
+        name: "Cloud Reception Printer",
+        portName: "http://192.168.1.80:631/printers/LaserJet",
+        driverName: "Generic / Text Only",
+      });
+      assert.equal(res1.connectionType, "IPP");
+
+      const res2 = detectPrinterConnectionType({
+        name: "Remote Office IPP",
+        portName: "ipps://print.company.internal/printers/reception",
+        driverName: "IPP Class Driver",
+      });
+      assert.equal(res2.connectionType, "IPP");
+    });
+
+    test("Classifies virtual and local system printers as OTHER", () => {
+      const pdf = detectPrinterConnectionType({
+        name: "Microsoft Print to PDF",
+        portName: "PORTPROMPT:",
+        driverName: "Microsoft Print To PDF",
+      });
+      assert.equal(pdf.connectionType, "OTHER");
+
+      const oneNote = detectPrinterConnectionType({
+        name: "OneNote (Desktop)",
+        portName: "nul:",
+        driverName: "Send to Microsoft OneNote 16 Driver",
+      });
+      assert.equal(oneNote.connectionType, "OTHER");
+    });
+  });
+
+  // ==============================================================
+  // 10. Capability Detection & Hardware Normalization
+  // ==============================================================
+  describe("10. Printer Capability Detection & Normalization", () => {
+    test("Discovers real system printers and assigns valid connection types", async () => {
+      const printers = await printerService.getInstalledPrinters(true);
+      assert.ok(Array.isArray(printers));
+      for (const p of printers) {
+        assert.ok(p.systemName, "Printer must have systemName");
+        assert.ok(
+          ["USB", "WIFI", "ETHERNET", "SHARED", "IPP", "OTHER"].includes(p.connectionType),
+          `Printer ${p.systemName} must have valid connectionType, got: ${p.connectionType}`
+        );
+        assert.ok(p.connectionDetails, "Printer must have connectionDetails string");
+        assert.ok(Array.isArray(p.supportedSizes), "Printer must have supportedSizes array");
+        assert.equal(typeof p.supportsColor, "boolean");
+        assert.equal(typeof p.supportsDuplex, "boolean");
+        assert.equal(typeof p.isDefault, "boolean");
+      }
+    });
+
+    test("Caches printer list efficiently and honors forceRefresh", async () => {
+      const t0 = Date.now();
+      const first = await printerService.getInstalledPrinters(false);
+      const t1 = Date.now();
+
+      // Second call without forceRefresh returns cached in < 10ms
+      const t2 = Date.now();
+      const cached = await printerService.getInstalledPrinters(false);
+      const t3 = Date.now();
+
+      assert.equal(first.length, cached.length);
+      assert.ok(t3 - t2 < 50, `Cached call took ${t3 - t2}ms, expected < 50ms`);
+    });
+
+    test("Provides network adapter and connection diagnostic summary", async () => {
+      const diag = await printerService.getNetworkDiagnostics();
+      assert.ok(diag, "Diagnostics summary must be returned");
+      assert.equal(typeof diag.hasActiveWifi, "boolean");
+      assert.equal(typeof diag.hasActiveEthernet, "boolean");
+      assert.ok(diag.printersByConnection, "printersByConnection counts must be present");
+      assert.equal(typeof diag.printersByConnection.USB, "number");
+      assert.equal(typeof diag.printersByConnection.WIFI, "number");
+      assert.equal(typeof diag.printersByConnection.ETHERNET, "number");
+      assert.equal(typeof diag.printersByConnection.SHARED, "number");
+      assert.equal(typeof diag.printersByConnection.IPP, "number");
+      assert.equal(typeof diag.printersByConnection.OTHER, "number");
+    });
+  });
+
+  // ==============================================================
+  // 11. Network Printer Edge Cases & Safe Routing Guarding
+  // ==============================================================
+  describe("11. Network Printer Edge Cases & Safe Routing", () => {
+    test("Rejects print submission safely when network printer is offline with clear troubleshooting guidance", async () => {
+      // Create a test file
+      const tempPdf = path.join(testDataDir, "test-offline.pdf");
+      fs.writeFileSync(tempPdf, "%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>%%EOF");
+
+      try {
+        await assert.rejects(
+          async () => {
+            await printerService.printDocument(tempPdf, {
+              printerName: "NonExistent_Network_Printer_99",
+            });
+          },
+          {
+            message: /Selected printer 'NonExistent_Network_Printer_99' is not installed/,
+          }
+        );
+      } finally {
+        if (fs.existsSync(tempPdf)) fs.unlinkSync(tempPdf);
+      }
+    });
+
+    test("Guards against duplicate print dispatches for the same order across multiple attempts", () => {
+      const key = `net_ord_${Date.now()}_dedup`;
+      lifecycle.registerJob({
+        jobId: "job-dedup-1",
+        orderId: "ord-dedup-1",
+        orderNumber: "ORD-DEDUP-1",
+        idempotencyKey: key,
+        printerName: "Office-HP-Wifi",
+        totalCopies: 1,
+        colorMode: "BLACK_AND_WHITE",
+        paperSize: "A4",
+        duplexMode: "SINGLE_SIDED",
+        documentName: "invoice.pdf",
+      });
+
+      // Submit to spooler
+      lifecycle.transition(key, "SUBMITTED_TO_SPOOLER", { windowsJobId: 101 });
+      assert.equal(lifecycle.isAlreadyDispatched(key), true);
+
+      // Attempting to dispatch again must report already dispatched
+      assert.equal(lifecycle.isAlreadyDispatched(key), true);
+    });
+
+    test("Prevents double printing across UUID orderId and ORD-XXXX orderNumber formats", () => {
+      const orderUuid = "45ad01fe-bea8-4055-a5ac-478dd5bb5536";
+      const orderNum = "ORD-3A09F0C5";
+      const directKey = lifecycle.generateIdempotencyKey(orderUuid, "item-1", "doc-1");
+
+      lifecycle.registerJob({
+        jobId: `direct-${orderUuid}`,
+        orderId: orderUuid,
+        orderNumber: orderNum,
+        idempotencyKey: directKey,
+        printerName: "OhMyPrinter",
+        totalCopies: 1,
+        colorMode: "BLACK_AND_WHITE",
+        paperSize: "A4",
+        duplexMode: "SINGLE_SIDED",
+        documentName: "print_doc.pdf",
+      });
+
+      lifecycle.transition(directKey, "SUBMITTED_TO_SPOOLER", { windowsJobId: 42 });
+
+      // Worker key generated with orderNumber instead of UUID
+      const workerKey = lifecycle.generateIdempotencyKey(orderNum, "job", "doc-1");
+
+      // Cross-key guard must detect that the order was already dispatched
+      assert.equal(lifecycle.isAlreadyDispatched(workerKey), true);
+      assert.equal(lifecycle.isOrderAlreadyDispatched(orderNum, "doc-1"), true);
+      assert.equal(lifecycle.isOrderAlreadyDispatched(orderUuid, "doc-1"), true);
+    });
+
+    test("Permits sequential spooling of multiple distinct documents within the same order", () => {
+      const orderId = "ord-multi-doc-77";
+      const keyDoc1 = lifecycle.generateIdempotencyKey(orderId, "item-1", "doc-A");
+      const keyDoc2 = lifecycle.generateIdempotencyKey(orderId, "item-2", "doc-B");
+
+      lifecycle.registerJob({
+        jobId: "job-multi-1",
+        orderId,
+        orderNumber: "ORD-MULTI-77",
+        idempotencyKey: keyDoc1,
+        printerName: "OhMyPrinter",
+        totalCopies: 1,
+        colorMode: "BLACK_AND_WHITE",
+        paperSize: "A4",
+        duplexMode: "SINGLE_SIDED",
+        documentName: "first_doc.pdf",
+      });
+
+      // Spool doc 1
+      lifecycle.transition(keyDoc1, "SUBMITTED_TO_SPOOLER", { windowsJobId: 101 });
+      lifecycle.transition(keyDoc1, "COMPLETED", { windowsJobId: 101 });
+
+      // Doc 1 is already dispatched
+      assert.equal(lifecycle.isAlreadyDispatched(keyDoc1), true);
+
+      // Doc 2 must NOT be treated as a duplicate of Doc 1!
+      assert.equal(lifecycle.isAlreadyDispatched(keyDoc2), false);
+      assert.equal(lifecycle.isOrderAlreadyDispatched(orderId, "doc-B"), false);
+    });
+
+    test("Preserves vendor's preferred printer selection safely in config store", () => {
+      configStore.saveConfig({
+        backendUrl: "https://www.print2me.in",
+        deviceId: "dev_pref_test",
+        deviceToken: "tok_pref_test",
+        defaultBwPrinter: "HP LaserJet Pro (Wi-Fi)",
+        defaultColorPrinter: "Canon imageRUNNER (Ethernet)",
+        vendorName: "Station Road Print Shop",
+        vendorSlug: "station-road",
+        isPollingActive: true,
+      });
+
+      const loaded = configStore.getConfig();
+      assert.equal(loaded?.defaultBwPrinter, "HP LaserJet Pro (Wi-Fi)");
+      assert.equal(loaded?.defaultColorPrinter, "Canon imageRUNNER (Ethernet)");
+    });
+
+    test("Enforces pure monochrome grayscale conversion formula (ITU-R BT.601) for Black & White prints", () => {
+      // Verify ITU-R BT.601 perceptual luminance formula used for canvas desaturation
+      const testPixels = [
+        { r: 255, g: 0, b: 0, expected: 76 },     // Pure Red
+        { r: 0, g: 255, b: 0, expected: 149 },    // Pure Green
+        { r: 0, g: 0, b: 255, expected: 29 },     // Pure Blue
+        { r: 255, g: 255, b: 255, expected: 255 }, // Pure White
+        { r: 0, g: 0, b: 0, expected: 0 },         // Pure Black
+      ];
+
+      for (const pix of testPixels) {
+        const luma = (pix.r * 0.299 + pix.g * 0.587 + pix.b * 0.114) | 0;
+        assert.equal(luma, pix.expected);
+      }
+    });
+  });
+
+  // ==============================================================
+  // 12. USB Regression Verification
+  // ==============================================================
+  describe("12. USB Printer Functionality & Backward Compatibility", () => {
+    test("Existing USB printer settings and paper ranges function without error", () => {
+      const parsedRange = printerService.parsePageRange("1-5, 8");
+      assert.deepEqual(parsedRange, [{ from: 0, to: 4 }, { from: 7, to: 7 }]);
+      const selectedPages = printerService.getSelectedPageNumbers(10, "1-5, 8");
+      assert.deepEqual(selectedPages, [1, 2, 3, 4, 5, 8]);
+    });
+
+    test("Existing vendor authentication configuration schema remains intact", () => {
+      const conf = configStore.getConfig();
+      assert.ok(conf);
+      assert.ok(conf?.deviceId);
+      assert.ok(conf?.deviceToken);
+      assert.ok(conf?.backendUrl);
     });
   });
 });

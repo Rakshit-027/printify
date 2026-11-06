@@ -163,7 +163,10 @@ function renderOrders() {
     }
 
     const firstItem = (o.items && o.items[0]) || {};
-    const docName = (firstItem.document && firstItem.document.originalName) || "Document.pdf";
+    const itemCount = (o.items && o.items.length) || 1;
+    const docName = itemCount > 1
+      ? `${(firstItem.document && firstItem.document.originalName) || "Document.pdf"} (+${itemCount - 1} more docs)`
+      : (firstItem.document && firstItem.document.originalName) || "Document.pdf";
     const pageCount = (firstItem.document && firstItem.document.pageCount) || firstItem.totalSheets || 1;
     const colorMode = firstItem.colorMode === "COLOR" ? "Color" : "B&W";
     const duplex = (firstItem.duplexMode && firstItem.duplexMode.includes("DOUBLE")) ? "Double-Sided" : "Single-Sided";
@@ -343,9 +346,14 @@ function renderOrders() {
 async function executeOrderPrint(orderId, orderNum, isRetry = false) {
   if (!api) return;
 
-  // Prevent double-clicking from submitting duplicate jobs
+  // Prevent double-clicking or re-dispatching already printed jobs
   if (activePrintingOrders.has(orderId)) {
     console.warn("Print already in progress for order:", orderNum);
+    return;
+  }
+
+  if (autoPrintedOrderIds.has(orderId) && !isRetry) {
+    console.warn("Order already printed:", orderNum);
     return;
   }
 
@@ -428,11 +436,10 @@ async function handleCollectCash(orderId, orderNum, amountMinor) {
 
   try {
     await api.updateOrderStatus({ orderId, action: "MARK_CASH_COLLECTED" });
+    showToast(`Order ${orderNum} cash approved. Auto-print dispatched to spooler.`);
   } catch (err) {
     console.error("handleCollectCash API error:", err);
   }
-
-  await executeOrderPrint(orderId, orderNum, false);
 }
 
 // Convert Abandoned/Unpaid Online Order to Desk Cash & Print
@@ -454,11 +461,10 @@ async function handleConvertToCash(orderId, orderNum, amountMinor) {
 
   try {
     await api.updateOrderStatus({ orderId, action: "CONVERT_TO_CASH" });
+    showToast(`Order ${orderNum} switched to counter cash. Auto-print dispatched.`);
   } catch (err) {
     console.error("handleConvertToCash API error:", err);
   }
-
-  await executeOrderPrint(orderId, orderNum, false);
 }
 
 async function handleStatusAction(orderId, action) {

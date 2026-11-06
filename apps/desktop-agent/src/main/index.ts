@@ -213,11 +213,11 @@ ipcMain.handle("agent:login", async (_event: any, params: any) => {
       }),
     });
 
-    let enrollData = { deviceId: "dev_" + Date.now(), deviceToken: "tok_" + Date.now() };
-    if (enrollRes.ok) {
-      const parsed = await enrollRes.json();
-      enrollData = parsed;
+    if (!enrollRes.ok) {
+      const errBody = await enrollRes.json().catch(() => ({}));
+      throw new Error(errBody.error || errBody.message || `Failed to enroll workstation device with server (HTTP ${enrollRes.status})`);
     }
+    const enrollData = await enrollRes.json();
 
     agentWorker.saveConfig({
       backendUrl,
@@ -351,11 +351,11 @@ ipcMain.handle("agent:register-vendor", async (_event: any, params: any) => {
       }),
     });
 
-    let enrollData = { deviceId: "dev_" + Date.now(), deviceToken: "tok_" + Date.now() };
-    if (enrollRes.ok) {
-      const parsed = await enrollRes.json();
-      enrollData = parsed;
+    if (!enrollRes.ok) {
+      const errBody = await enrollRes.json().catch(() => ({}));
+      throw new Error(errBody.error || errBody.message || `Failed to enroll workstation device with server (HTTP ${enrollRes.status})`);
     }
+    const enrollData = await enrollRes.json();
 
     agentWorker.saveConfig({
       backendUrl,
@@ -420,7 +420,7 @@ ipcMain.handle("agent:sync-printers", async () => {
   if (!config) return { success: false, error: "Agent not enrolled" };
 
   try {
-    const printers = await printerService.getInstalledPrinters();
+    const printers = await printerService.getInstalledPrinters(true);
     const res = await fetch(`${config.backendUrl}/api/agent/printers/sync`, {
       method: "POST",
       headers: {
@@ -434,7 +434,7 @@ ipcMain.handle("agent:sync-printers", async () => {
     const data = await res.json();
     return { success: res.ok, printers, message: data.message };
   } catch (err: any) {
-    const printers = await printerService.getInstalledPrinters();
+    const printers = await printerService.getInstalledPrinters(true);
     return { success: true, printers, message: "Printers enumerated from operating system" };
   }
 });
@@ -484,6 +484,7 @@ ipcMain.handle("agent:get-diagnostics", async () => {
   const printers = await printerService.getInstalledPrinters();
   const spoolerJobs = await printerService.getSpoolerJobs();
   const recentJobs = jobLifecycleManager.getAllRecords().slice(0, 20);
+  const networkDiagnostics = await printerService.getNetworkDiagnostics();
 
   return {
     success: true,
@@ -496,7 +497,22 @@ ipcMain.handle("agent:get-diagnostics", async () => {
     printers,
     spoolerJobs,
     recentJobs,
+    networkDiagnostics,
   };
+});
+
+ipcMain.handle("agent:get-network-troubleshooting", async () => {
+  try {
+    const diag = await printerService.getNetworkDiagnostics();
+    const printers = await printerService.getInstalledPrinters();
+    return {
+      success: true,
+      ...diag,
+      printers,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 });
 
 ipcMain.handle("agent:retry-job", async (_event: any, params: any) => {
@@ -591,8 +607,18 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
     }
 
     if (!matchedPrinter.isOnline) {
+      const connMsg =
+        matchedPrinter.connectionType === "WIFI"
+          ? "Wi-Fi printer is offline. Verify that the printer is turned on, awake from sleep mode, and connected to the same Wi-Fi network."
+          : matchedPrinter.connectionType === "ETHERNET"
+          ? "Ethernet printer is offline. Verify the network cable, router link light, and printer IP address."
+          : matchedPrinter.connectionType === "SHARED"
+          ? "Windows shared printer is unreachable. Ensure the host computer sharing this printer is powered on and accessible."
+          : matchedPrinter.connectionType === "IPP"
+          ? "IPP network printer is unreachable. Verify network connection and IPP port status."
+          : "Please check printer power and cable connection.";
       throw new Error(
-        `Printer '${matchedPrinter.systemName}' is currently OFFLINE or disconnected. Please turn it on and check cable.`
+        `Printer '${matchedPrinter.systemName}' (${matchedPrinter.connectionType}) is currently OFFLINE or disconnected. ${connMsg}`
       );
     }
 
@@ -616,9 +642,14 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
         docId
       );
 
-      // Guard against accidental duplicate prints
-      if (jobLifecycleManager.isAlreadyDispatched(idempotencyKey) && !params.forceRetry) {
-        console.warn(`[DIRECT-PRINT] Document ${docFilename} for order ${orderNumber} already spooled. Skipping.`);
+      // Guard against accidental duplicate prints for this specific document item
+      const isAlreadyDispatched =
+        jobLifecycleManager.isAlreadyDispatched(idempotencyKey) ||
+        jobLifecycleManager.isOrderAlreadyDispatched(orderId, docId) ||
+        (orderNumber && jobLifecycleManager.isOrderAlreadyDispatched(orderNumber, docId));
+
+      if (isAlreadyDispatched && !params.forceRetry) {
+        console.warn(`[DIRECT-PRINT] Document ${docFilename} for order ${orderNumber || orderId} already spooled. Skipping duplicate.`);
         continue;
       }
 
@@ -699,6 +730,28 @@ ipcMain.handle("agent:print-order-direct", async (_event: any, params: any) => {
       jobLifecycleManager.transition(idempotencyKey, "COMPLETED", {
         windowsJobId: printResult.windowsJobId,
       });
+
+      if (orderNumber && orderNumber !== orderId) {
+        const mirrorKey = jobLifecycleManager.generateIdempotencyKey(orderNumber, doc.itemId || "direct", docId);
+        if (!jobLifecycleManager.getRecord(mirrorKey)) {
+          jobLifecycleManager.registerJob({
+            jobId: `mirror-${orderId}-${Date.now()}`,
+            orderId,
+            orderNumber,
+            idempotencyKey: mirrorKey,
+            printerName: matchedPrinter.systemName,
+            totalCopies: docCopies,
+            colorMode: docColorMode,
+            paperSize: docPaperSize,
+            duplexMode: docDuplexMode,
+            pageRange: docPageRange,
+            documentName: docFilename,
+          });
+          jobLifecycleManager.transition(mirrorKey, "COMPLETED", {
+            windowsJobId: printResult.windowsJobId,
+          });
+        }
+      }
 
       totalSpooled += 1;
       lastSpoolResult = printResult;

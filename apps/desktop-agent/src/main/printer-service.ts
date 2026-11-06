@@ -19,11 +19,21 @@ export type PrinterOnlineStatus =
   | "SPOOLER_STOPPED"
   | "UNKNOWN";
 
+export type PrinterConnectionType =
+  | "USB"
+  | "WIFI"
+  | "ETHERNET"
+  | "SHARED"
+  | "IPP"
+  | "OTHER";
+
 export interface RealPrinterInfo {
   systemName: string;
   displayName: string;
   driverName?: string;
   portName?: string;
+  connectionType: PrinterConnectionType;
+  connectionDetails: string;
   isDefault: boolean;
   status: PrinterOnlineStatus;
   statusCode?: number;
@@ -35,6 +45,206 @@ export interface RealPrinterInfo {
   supportsColor: boolean;
   supportsDuplex: boolean;
   supportedSizes: string[];
+  isNetwork?: boolean;
+  isShared?: boolean;
+  serverName?: string;
+  shareName?: string;
+  location?: string;
+  comment?: string;
+  rawAttributes?: number;
+}
+
+export interface DetectConnectionOptions {
+  name: string;
+  portName?: string;
+  driverName?: string;
+  attributes?: number;
+  isNetwork?: boolean;
+  isShared?: boolean;
+  serverName?: string;
+  hasActiveWifi?: boolean;
+  hasActiveEthernet?: boolean;
+}
+
+/**
+ * Robust Windows printer connection type classifier
+ * Detects USB, Wi-Fi, Ethernet/LAN, Windows Shared, IPP, and Virtual/Other connections
+ * using reliable Windows printer port, driver, network interface, and registry attributes.
+ */
+export function detectPrinterConnectionType(opts: DetectConnectionOptions): {
+  connectionType: PrinterConnectionType;
+  connectionDetails: string;
+} {
+  const {
+    name = "",
+    portName = "",
+    driverName = "",
+    attributes = 0,
+    isNetwork = false,
+    isShared = false,
+    serverName = "",
+    hasActiveWifi = false,
+    hasActiveEthernet = false,
+  } = opts;
+
+  const n = name.toLowerCase();
+  const p = (portName || "").trim().toLowerCase();
+  const d = (driverName || "").trim().toLowerCase();
+  const s = (serverName || "").trim().toLowerCase();
+
+  // 1. Windows Shared Printer (SMB UNC path / network printer connection)
+  // Check for UNC path (\\server\printer) in name or port, or " on " notation, or PRINTER_ATTRIBUTE_NETWORK (0x00000010)
+  const isUnc = name.startsWith("\\\\") || (portName && portName.startsWith("\\\\"));
+  const hasOnServer = /\s+on\s+[a-z0-9_.-]+/i.test(name);
+  const hasNetworkAttr = (attributes & 0x00000010) !== 0 || isNetwork || Boolean(serverName);
+
+  if (
+    isUnc ||
+    hasOnServer ||
+    hasNetworkAttr ||
+    (isShared && !p.startsWith("usb") && !p.startsWith("portprompt") && !p.startsWith("nul"))
+  ) {
+    const remoteTarget = name.startsWith("\\\\")
+      ? name
+      : portName && portName.startsWith("\\\\")
+      ? portName
+      : serverName
+      ? `\\\\${serverName}\\${name}`
+      : name;
+    return {
+      connectionType: "SHARED",
+      connectionDetails: `Windows Network Share (${remoteTarget})`,
+    };
+  }
+
+  // 2. IPP (Internet Printing Protocol)
+  // Ports starting with http://, https://, ipp://, ipps://, or IPP port monitors
+  if (
+    p.startsWith("http://") ||
+    p.startsWith("https://") ||
+    p.startsWith("ipp://") ||
+    p.startsWith("ipps://") ||
+    p.includes("/printers/") ||
+    p.includes("internet print") ||
+    d.includes("internet print") ||
+    d.includes("ipp")
+  ) {
+    return {
+      connectionType: "IPP",
+      connectionDetails: `Internet Printing Protocol (${portName || "IPP Port"})`,
+    };
+  }
+
+  // 3. USB-connected printers
+  // Ports starting with USB (USB001, USB002), DOT4 (DOT4_001 IEEE 1284.4 USB printing), or USB keywords
+  if (
+    /^usb[0-9]*/i.test(portName) ||
+    /^dot4/i.test(portName) ||
+    p.includes("usb") ||
+    d.includes("usb")
+  ) {
+    return {
+      connectionType: "USB",
+      connectionDetails: `USB Connection (${portName || "USB Port"})`,
+    };
+  }
+
+  // 4. Wi-Fi (Wireless Network)
+  // Explicit wireless keywords in printer name, driver name, or port
+  const hasWifiMarker =
+    /\b(wi-?fi|wireless|wlan|802\.11|airprint)\b/i.test(name) ||
+    /\b(wi-?fi|wireless|wlan|802\.11|airprint)\b/i.test(driverName) ||
+    /\b(wi-?fi|wireless|wlan|802\.11|airprint)\b/i.test(portName);
+
+  if (hasWifiMarker) {
+    return {
+      connectionType: "WIFI",
+      connectionDetails: `Wi-Fi Wireless (${portName || "Wireless Network"})`,
+    };
+  }
+
+  // 5. Ethernet / LAN (Wired Network)
+  // Explicit ethernet/LAN keywords
+  const hasEthernetMarker =
+    /\b(ethernet|lan|wired)\b/i.test(name) ||
+    /\b(ethernet|lan|wired)\b/i.test(driverName) ||
+    /\b(ethernet|lan|wired)\b/i.test(portName);
+
+  if (hasEthernetMarker) {
+    return {
+      connectionType: "ETHERNET",
+      connectionDetails: `Ethernet / LAN (${portName || "Wired Network"})`,
+    };
+  }
+
+  // Standard TCP/IP Port (e.g. IP_192.168.1.50, 192.168.1.100, port 9100)
+  const isTcpIpPort =
+    /^ip_/i.test(portName) ||
+    /^([0-9]{1,3}\.){3}[0-9]{1,3}/.test(portName) ||
+    /:9100$/i.test(portName) ||
+    p.includes("tcpip") ||
+    p.includes("standard tcp/ip");
+
+  if (isTcpIpPort) {
+    if (hasActiveWifi && !hasActiveEthernet) {
+      return {
+        connectionType: "WIFI",
+        connectionDetails: `Wi-Fi Wireless (TCP/IP ${portName})`,
+      };
+    }
+    return {
+      connectionType: "ETHERNET",
+      connectionDetails: `Ethernet / LAN (TCP/IP ${portName})`,
+    };
+  }
+
+  // WSD (Web Services for Devices) Ports (e.g. WSD-xxxx)
+  if (/^wsd/i.test(portName)) {
+    if (hasActiveWifi && !hasActiveEthernet) {
+      return {
+        connectionType: "WIFI",
+        connectionDetails: `Wi-Fi Wireless (WSD ${portName})`,
+      };
+    }
+    if (hasActiveEthernet && !hasActiveWifi) {
+      return {
+        connectionType: "ETHERNET",
+        connectionDetails: `Ethernet / LAN (WSD ${portName})`,
+      };
+    }
+    return {
+      connectionType: "WIFI",
+      connectionDetails: `Network Device (WSD ${portName})`,
+    };
+  }
+
+  // 6. Virtual / Local / Other
+  // Software / PDF / XPS / File ports
+  if (
+    p.startsWith("portprompt") ||
+    p.startsWith("nul") ||
+    p.startsWith("file:") ||
+    p.startsWith("ne0") ||
+    p.startsWith("lpt") ||
+    p.startsWith("com") ||
+    n.includes("pdf") ||
+    n.includes("onenote") ||
+    n.includes("xps") ||
+    d.includes("pdf") ||
+    d.includes("onenote") ||
+    d.includes("xps")
+  ) {
+    return {
+      connectionType: "OTHER",
+      connectionDetails: `Virtual / System Port (${portName || "Local"})`,
+    };
+  }
+
+  // Unknown fallback
+  return {
+    connectionType: "OTHER",
+    connectionDetails: portName ? `Other (${portName})` : "Other",
+  };
 }
 
 export interface PrintDocumentOptions {
@@ -62,6 +272,7 @@ export interface PrintResult {
   message: string;
   windowsJobId?: number;
   printerName: string;
+  connectionType?: PrinterConnectionType;
   spoolStatus?: string;
   pageCount?: number;
 }
@@ -117,69 +328,190 @@ export class WindowsPrinterService {
     return Array.from(selected).sort((a, b) => a - b);
   }
 
+  private cachedPrinters: RealPrinterInfo[] = [];
+  private lastScanTimestamp: number = 0;
+  private readonly CACHE_TTL_MS = 12000;
+
   /**
-   * Discovers actual printers installed and registered in Windows using CIM and native APIs
+   * Discovers actual printers installed and registered in Windows using native Registry,
+   * System.Drawing driver capabilities, network interface checks, and CIM fallback.
+   * Caches results for 12s unless forceRefresh is true.
    * NO MOCK PRINTERS, NO SIMULATED PRINTERS.
    */
-  async getInstalledPrinters(): Promise<RealPrinterInfo[]> {
-    if (os.platform() !== "win32") {
-      return this.getLinuxPrinters();
+  async getInstalledPrinters(forceRefresh = false): Promise<RealPrinterInfo[]> {
+    if (!forceRefresh && this.cachedPrinters.length > 0 && Date.now() - this.lastScanTimestamp < this.CACHE_TTL_MS) {
+      return this.cachedPrinters;
     }
-    return this.getWindowsPrinters();
+
+    let printers: RealPrinterInfo[];
+    if (os.platform() !== "win32") {
+      printers = await this.getLinuxPrinters();
+    } else {
+      printers = await this.getWindowsPrinters();
+    }
+
+    this.cachedPrinters = printers;
+    this.lastScanTimestamp = Date.now();
+    return printers;
   }
 
   /**
-   * Enumerate real Windows printers via CIM/WMI with deep hardware status analysis
+   * Enumerate real Windows printers via Registry, System.Drawing, and native Spooler APIs
+   * with deep hardware status analysis and connection type classification.
    */
   private async getWindowsPrinters(): Promise<RealPrinterInfo[]> {
     try {
       // Execute safe PowerShell script without raw string interpolation
       const psScript = `
         $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-        $spooler = Get-Service -Name Spooler -ErrorAction SilentlyContinue
-        $isSpoolerRunning = ($spooler -and $spooler.Status -eq 'Running')
+        Add-Type -AssemblyName System.Drawing
 
-        $printers = @()
+        $isSpoolerRunning = $true
+        $spooler = Get-Service -Name Spooler -ErrorAction SilentlyContinue
+        if ($spooler) {
+          $isSpoolerRunning = ($spooler.Status -eq 'Running')
+        }
+
+        $hasActiveWifi = $false
+        $hasActiveEthernet = $false
         try {
-          $printers = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop | Select-Object Name, DeviceID, DriverName, PortName, Default, PrinterStatus, PrinterState, WorkOffline, SpoolEnabled, CapabilityDescriptions, Capabilities, HorizontalResolution, VerticalResolution
-        } catch {
-          try {
-            Add-Type -AssemblyName System.Drawing
-            $default = (Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows').Device
-            $defaultName = if ($default) { $default.Split(',')[0] } else { '' }
-            $printers = [System.Drawing.Printing.PrinterSettings]::InstalledPrinters | ForEach-Object {
-              $ps = New-Object System.Drawing.Printing.PrinterSettings
-              $ps.PrinterName = $_
-              [PSCustomObject]@{
-                Name = $_
-                DeviceID = $_
-                DriverName = 'Standard Windows Driver'
-                PortName = 'Local'
-                Default = ($_ -eq $defaultName)
-                PrinterStatus = 3
-                PrinterState = 0
-                WorkOffline = (-not $ps.IsValid)
-                SpoolEnabled = $true
-                CapabilityDescriptions = @('A4', 'Letter')
-                Capabilities = @()
-                SupportsColor = [bool]$ps.SupportsColor
-                CanDuplex = [bool]$ps.CanDuplex
+          [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | ForEach-Object {
+            if ($_.OperationalStatus -eq 'Up') {
+              if ($_.NetworkInterfaceType -eq 'Wireless80211') { $hasActiveWifi = $true }
+              elseif ($_.NetworkInterfaceType -eq 'Ethernet') { $hasActiveEthernet = $true }
+            }
+          }
+        } catch {}
+
+        $defaultDev = (Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows' -ErrorAction SilentlyContinue).Device
+        $defaultName = if ($defaultDev) { $defaultDev.Split(',')[0].Trim() } else { '' }
+
+        $devProps = Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Devices' -ErrorAction SilentlyContinue
+        $devicesMap = @{}
+        if ($devProps) {
+          $devProps.PSObject.Properties | Where-Object { $_.Name -notin @('PSPath','PSParentPath','PSChildName','PSDrive','PSProvider') } | ForEach-Object {
+            $val = [string]$_.Value
+            $devicesMap[$_.Name] = if ($val.Contains(',')) { $val.Split(',')[1].Trim() } else { $val }
+          }
+        }
+
+        $installedPrinters = @()
+        try {
+          $installedPrinters = @([System.Drawing.Printing.PrinterSettings]::InstalledPrinters)
+        } catch {}
+
+        $hklmPath = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers'
+        if (Test-Path $hklmPath) {
+          Get-ChildItem $hklmPath -ErrorAction SilentlyContinue | ForEach-Object {
+            $pName = $_.PSChildName
+            if ($installedPrinters -notcontains $pName) {
+              $installedPrinters += $pName
+            }
+          }
+        }
+
+        # Check HKCU Printers Connections (Windows Shared printers connected by user)
+        $hkcuConnPath = 'HKCU:\\Printers\\Connections'
+        if (Test-Path $hkcuConnPath) {
+          Get-ChildItem $hkcuConnPath -ErrorAction SilentlyContinue | ForEach-Object {
+            $keyName = $_.PSChildName
+            $parts = $keyName.TrimStart(',').Split(',')
+            if ($parts.Length -ge 2) {
+              $unc = "\\\\" + $parts[0] + "\\" + $parts[1]
+              if ($installedPrinters -notcontains $unc) {
+                $installedPrinters += $unc
               }
             }
-          } catch {}
+          }
         }
 
-        $result = @{
-          spoolerRunning = $isSpoolerRunning
-          printers = $printers
+        $cimMap = @{}
+        try {
+          $cimList = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop
+          foreach ($cp in $cimList) {
+            if ($cp.Name) { $cimMap[$cp.Name] = $cp }
+          }
+        } catch {}
+
+        $results = @()
+        foreach ($name in $installedPrinters) {
+          if (-not $name) { continue }
+
+          $regKey = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Print\\Printers\\' + $name
+          $reg = if (Test-Path $regKey) { Get-ItemProperty $regKey -ErrorAction SilentlyContinue } else { $null }
+
+          $port = if ($reg -and $reg.Port) { [string]$reg.Port } elseif ($devicesMap.ContainsKey($name)) { [string]$devicesMap[$name] } else { '' }
+          $driver = if ($reg -and $reg.'Printer Driver') { [string]$reg.'Printer Driver' } else { '' }
+          $attr = if ($reg -and $reg.Attributes) { [int]$reg.Attributes } else { 0 }
+          $status = if ($reg -and $reg.Status) { [int]$reg.Status } else { 0 }
+          $shareName = if ($reg -and $reg.'Share Name') { [string]$reg.'Share Name' } else { '' }
+          $location = if ($reg -and $reg.Location) { [string]$reg.Location } else { '' }
+          $comment = if ($reg -and $reg.Description) { [string]$reg.Description } else { '' }
+          $serverName = if ($reg -and $reg.ServerName) { [string]$reg.ServerName } else { '' }
+
+          $isValid = $true
+          $supportsColor = $false
+          $canDuplex = $false
+          $sizes = @()
+
+          try {
+            $ps = New-Object System.Drawing.Printing.PrinterSettings
+            $ps.PrinterName = $name
+            $isValid = [bool]$ps.IsValid
+            $supportsColor = [bool]$ps.SupportsColor
+            $canDuplex = [bool]$ps.CanDuplex
+            $sizes = @($ps.PaperSizes | ForEach-Object { $_.PaperName })
+          } catch {
+            $isValid = $false
+          }
+
+          $printerStatus = 3
+          $printerState = 0
+          $workOffline = $false
+          if ($cimMap.ContainsKey($name)) {
+            $c = $cimMap[$name]
+            if ($c.PortName -and -not $port) { $port = [string]$c.PortName }
+            if ($c.DriverName -and -not $driver) { $driver = [string]$c.DriverName }
+            if ($c.PrinterStatus) { $printerStatus = [int]$c.PrinterStatus }
+            if ($c.PrinterState) { $printerState = [int]$c.PrinterState }
+            if ($c.WorkOffline) { $workOffline = [bool]$c.WorkOffline }
+            if ($c.ServerName -and -not $serverName) { $serverName = [string]$c.ServerName }
+          }
+
+          $results += [PSCustomObject]@{
+            Name = $name
+            Port = $port
+            Driver = $driver
+            Attributes = $attr
+            Status = $status
+            PrinterStatus = $printerStatus
+            PrinterState = $printerState
+            WorkOffline = $workOffline
+            ShareName = $shareName
+            Location = $location
+            Comment = $comment
+            ServerName = $serverName
+            Default = ($name -eq $defaultName)
+            IsValid = $isValid
+            SupportsColor = $supportsColor
+            CanDuplex = $canDuplex
+            PaperSizes = $sizes
+          }
         }
-        $result | ConvertTo-Json -Depth 3 -Compress
+
+        $payload = @{
+          spoolerRunning = $isSpoolerRunning
+          hasActiveWifi = $hasActiveWifi
+          hasActiveEthernet = $hasActiveEthernet
+          printers = $results
+        }
+        $payload | ConvertTo-Json -Depth 4 -Compress
       `;
 
       const { stdout } = await execFileAsync(
         "powershell.exe",
         ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psScript],
-        { timeout: 10000 }
+        { timeout: 12000 }
       );
 
       const raw = stdout.trim();
@@ -187,6 +519,8 @@ export class WindowsPrinterService {
 
       const parsed = JSON.parse(raw);
       const isSpoolerRunning = Boolean(parsed.spoolerRunning);
+      const hasActiveWifi = Boolean(parsed.hasActiveWifi);
+      const hasActiveEthernet = Boolean(parsed.hasActiveEthernet);
       const rawPrinters = parsed.printers;
       const list = Array.isArray(rawPrinters) ? rawPrinters : rawPrinters ? [rawPrinters] : [];
 
@@ -198,10 +532,28 @@ export class WindowsPrinterService {
         .filter((p: any) => p && p.Name)
         .map((p: any) => {
           const name = String(p.Name).trim();
+          const port = String(p.Port || "").trim();
+          const driver = String(p.Driver || "").trim();
+          const attr = typeof p.Attributes === "number" ? p.Attributes : 0;
           const isDefault = Boolean(p.Default);
-          const isWorkOffline = Boolean(p.WorkOffline);
+          const isWorkOffline = Boolean(p.WorkOffline) || (attr & 0x00000400) !== 0;
           const printerState = typeof p.PrinterState === "number" ? p.PrinterState : 0;
+          const regStatus = typeof p.Status === "number" ? p.Status : 0;
           const statusCode = typeof p.PrinterStatus === "number" ? p.PrinterStatus : 3;
+          const isValid = p.IsValid !== undefined ? Boolean(p.IsValid) : true;
+
+          // Detect connection type
+          const conn = detectPrinterConnectionType({
+            name,
+            portName: port,
+            driverName: driver,
+            attributes: attr,
+            isNetwork: (attr & 0x00000010) !== 0,
+            isShared: (attr & 0x00000008) !== 0,
+            serverName: p.ServerName ? String(p.ServerName) : undefined,
+            hasActiveWifi,
+            hasActiveEthernet,
+          });
 
           let status: PrinterOnlineStatus = "READY";
           let statusDetails = "Ready to print";
@@ -210,72 +562,70 @@ export class WindowsPrinterService {
 
           if (!isSpoolerRunning) {
             status = "SPOOLER_STOPPED";
-            statusDetails = "Windows Print Spooler service is stopped";
+            statusDetails = "Windows Print Spooler service is stopped. Start the Spooler service in Windows Services.";
             hasError = true;
           } else if ((printerState & 0x00000001) !== 0) {
             status = "PAUSED";
-            statusDetails = "Printer is paused in Windows spooler";
+            statusDetails = "Printer is paused in Windows Spooler. Resume printing in Windows queue.";
             isPaused = true;
           } else if ((printerState & 0x00000008) !== 0) {
             status = "PAPER_JAM";
-            statusDetails = "Paper jam reported by printer hardware";
+            statusDetails = "Paper jam reported by printer hardware. Please clear the paper path.";
             hasError = true;
           } else if ((printerState & 0x00000010) !== 0) {
             status = "OUT_OF_PAPER";
-            statusDetails = "Printer is out of paper. Please refill tray.";
+            statusDetails = "Printer is out of paper. Please refill the paper tray.";
             hasError = true;
-          } else if (isWorkOffline || (printerState & 0x00000080) !== 0 || statusCode === 7) {
+          } else if (isWorkOffline || (printerState & 0x00000080) !== 0 || statusCode === 7 || !isValid) {
             status = "OFFLINE";
-            statusDetails = "Printer is offline or disconnected";
+            if (conn.connectionType === "WIFI") {
+              statusDetails = "Wi-Fi printer is offline. Verify printer is powered on, awake from sleep, and connected to the same Wi-Fi network.";
+            } else if (conn.connectionType === "ETHERNET") {
+              statusDetails = "Ethernet printer is offline. Verify network cable, router switch port, and printer IP address.";
+            } else if (conn.connectionType === "SHARED") {
+              statusDetails = "Shared network printer is offline. Check if the host computer sharing this printer is powered on and accessible.";
+            } else if (conn.connectionType === "IPP") {
+              statusDetails = "IPP printer is offline or unreachable. Check internet/network connectivity.";
+            } else {
+              statusDetails = "Printer is offline or disconnected. Check physical cable and power.";
+            }
           } else if ((printerState & 0x00000002) !== 0) {
             status = "ERROR";
-            statusDetails = "Printer hardware error reported";
+            statusDetails = "Printer hardware or driver error reported.";
             hasError = true;
           } else if (statusCode === 4 || (printerState & 0x00000400) !== 0) {
             status = "PRINTING";
-            statusDetails = "Printer is actively printing jobs";
+            statusDetails = "Printer is actively printing documents.";
           }
 
-          const isOnline = status !== "OFFLINE" && !isWorkOffline && isSpoolerRunning;
+          const isOnline = status !== "OFFLINE" && !isWorkOffline && isSpoolerRunning && isValid;
           const isReachable = isOnline && status !== "ERROR";
 
-          const capDesc = Array.isArray(p.CapabilityDescriptions)
-            ? p.CapabilityDescriptions.map((c: any) => String(c).toLowerCase())
-            : typeof p.CapabilityDescriptions === "string"
-            ? [p.CapabilityDescriptions.toLowerCase()]
-            : [];
-          const caps = Array.isArray(p.Capabilities) ? p.Capabilities : [];
+          // Extract and normalize driver paper sizes
+          const rawSizes: string[] = Array.isArray(p.PaperSizes) ? p.PaperSizes : [];
+          const normalizedSizes: string[] = [];
 
-          // Color and Duplex capabilities from .NET or Win32 Capabilities (3 = Color, 4 = Duplex)
-          const supportsColor =
-            p.SupportsColor !== undefined
-              ? Boolean(p.SupportsColor)
-              : capDesc.some((c: string) => c.includes("color")) ||
-                caps.includes(3) ||
-                name.toLowerCase().includes("color");
+          for (const s of rawSizes) {
+            const clean = String(s).trim();
+            if (!clean) continue;
+            normalizedSizes.push(clean);
+          }
 
-          const supportsDuplex =
-            p.CanDuplex !== undefined
-              ? Boolean(p.CanDuplex)
-              : capDesc.some((c: string) => c.includes("duplex") || c.includes("two-sided")) ||
-                caps.includes(4);
+          // Ensure standard A4 is present if none reported
+          if (normalizedSizes.length === 0) {
+            normalizedSizes.push("A4", "Letter");
+          }
 
-          const supportedSizes: string[] = ["A4"];
-          if (capDesc.some((c: string) => c.includes("a3")) || name.toLowerCase().includes("a3")) {
-            supportedSizes.push("A3");
-          }
-          if (capDesc.some((c: string) => c.includes("letter"))) {
-            supportedSizes.push("LETTER");
-          }
-          if (capDesc.some((c: string) => c.includes("legal"))) {
-            supportedSizes.push("LEGAL");
-          }
+          const supportsColor = Boolean(p.SupportsColor);
+          const supportsDuplex = Boolean(p.CanDuplex);
 
           return {
             systemName: name,
             displayName: name,
-            driverName: p.DriverName ? String(p.DriverName) : undefined,
-            portName: p.PortName ? String(p.PortName) : undefined,
+            driverName: driver || undefined,
+            portName: port || undefined,
+            connectionType: conn.connectionType,
+            connectionDetails: conn.connectionDetails,
             isDefault,
             status,
             statusCode,
@@ -286,7 +636,14 @@ export class WindowsPrinterService {
             hasError,
             supportsColor,
             supportsDuplex,
-            supportedSizes: Array.from(new Set(supportedSizes)),
+            supportedSizes: Array.from(new Set(normalizedSizes)),
+            isShared: Boolean(p.ShareName) || (attr & 0x00000008) !== 0,
+            isNetwork: (attr & 0x00000010) !== 0 || conn.connectionType === "WIFI" || conn.connectionType === "ETHERNET" || conn.connectionType === "SHARED" || conn.connectionType === "IPP",
+            serverName: p.ServerName ? String(p.ServerName) : undefined,
+            shareName: p.ShareName ? String(p.ShareName) : undefined,
+            location: p.Location ? String(p.Location) : undefined,
+            comment: p.Comment ? String(p.Comment) : undefined,
+            rawAttributes: attr,
           };
         });
     } catch (err: any) {
@@ -300,12 +657,19 @@ export class WindowsPrinterService {
    */
   private async getLinuxPrinters(): Promise<RealPrinterInfo[]> {
     try {
-      const { stdout } = await execFileAsync("lpstat", ["-p", "-d"], { timeout: 4000 });
+      const { stdout } = await execFileAsync("lpstat", ["-p", "-d", "-v"], { timeout: 4000 });
       if (!stdout || !stdout.includes("printer")) return [];
 
       let defaultPrinter = "";
       const defMatch = stdout.match(/system default destination:\s*([^\s]+)/i);
       if (defMatch) defaultPrinter = defMatch[1].trim();
+
+      // Parse device URIs if available (e.g. device for HP: usb://... or socket://...)
+      const deviceMap: Record<string, string> = {};
+      const uriMatches = stdout.matchAll(/device for ([^:]+):\s*([^\n\r]+)/gi);
+      for (const m of uriMatches) {
+        deviceMap[m[1].trim()] = m[2].trim();
+      }
 
       const lines = stdout.split("\n");
       const printers: RealPrinterInfo[] = [];
@@ -316,6 +680,24 @@ export class WindowsPrinterService {
           const name = match[1];
           const stateStr = (match[3] || "").toLowerCase();
           const isDefault = name === defaultPrinter;
+          const uri = deviceMap[name] || "CUPS";
+
+          let connType: PrinterConnectionType = "OTHER";
+          let connDetails = `CUPS (${uri})`;
+
+          if (/^usb:/i.test(uri)) {
+            connType = "USB";
+            connDetails = `USB Connection (${uri})`;
+          } else if (/^ipp:|^ipps:|^http:|^https:/i.test(uri)) {
+            connType = "IPP";
+            connDetails = `IPP Network (${uri})`;
+          } else if (/^socket:|^lpd:/i.test(uri)) {
+            connType = "ETHERNET";
+            connDetails = `Network Printer (${uri})`;
+          } else if (/^smb:/i.test(uri)) {
+            connType = "SHARED";
+            connDetails = `Windows SMB Share (${uri})`;
+          }
 
           let status: PrinterOnlineStatus = "READY";
           if (stateStr === "printing") status = "PRINTING";
@@ -325,7 +707,9 @@ export class WindowsPrinterService {
             systemName: name,
             displayName: name.replace(/_/g, " "),
             driverName: "CUPS Linux Driver",
-            portName: "CUPS",
+            portName: uri,
+            connectionType: connType,
+            connectionDetails: connDetails,
             isDefault,
             status,
             isOnline: true,
@@ -335,6 +719,7 @@ export class WindowsPrinterService {
             supportsColor: true,
             supportsDuplex: true,
             supportedSizes: ["A4", "A3", "LETTER", "LEGAL"],
+            isNetwork: connType !== "USB",
           });
         }
       }
@@ -382,9 +767,17 @@ export class WindowsPrinterService {
     }
 
     if (!targetPrinter.isOnline) {
-      throw new Error(
-        `Printer '${printerName}' is currently OFFLINE or disconnected. Please check physical cable and power.`
-      );
+      let connAdvice = "Please check physical cable and power.";
+      if (targetPrinter.connectionType === "WIFI") {
+        connAdvice = "Wi-Fi printer is offline. Verify that the printer is turned on, awake from sleep mode, and connected to the same Wi-Fi network.";
+      } else if (targetPrinter.connectionType === "ETHERNET") {
+        connAdvice = "Ethernet printer is offline. Verify the network Ethernet cable, router port link light, and printer IP address.";
+      } else if (targetPrinter.connectionType === "SHARED") {
+        connAdvice = "Windows shared printer is unreachable. Check if the remote computer sharing this printer is powered on and accessible.";
+      } else if (targetPrinter.connectionType === "IPP") {
+        connAdvice = "IPP network printer is unreachable. Verify network connection and IPP port status.";
+      }
+      throw new Error(`Printer '${printerName}' (${targetPrinter.connectionType}) is currently OFFLINE or disconnected. ${connAdvice}`);
     }
 
     if (targetPrinter.isPaused) {
@@ -555,9 +948,10 @@ export class WindowsPrinterService {
 
           resolve({
             success: true,
-            message: `Document successfully submitted to Windows Print Spooler on '${targetPrinter.systemName}'`,
+            message: `Document successfully submitted to Windows Print Spooler on '${targetPrinter.systemName}' (${targetPrinter.connectionType})`,
             windowsJobId,
             printerName: targetPrinter.systemName,
+            connectionType: targetPrinter.connectionType,
             spoolStatus,
             pageCount: detectedPageCount,
           });
@@ -597,6 +991,7 @@ export class WindowsPrinterService {
 
         const orientationCss = options.landscape ? "landscape" : "portrait";
         const pageCssSize = options.paperSize || "A4";
+        const isMonochrome = options.colorMode !== "COLOR";
 
         // Read file as Uint8Array base64 or pass safely to pdfjs
         const pdfBuffer = fs.readFileSync(filePath);
@@ -623,6 +1018,24 @@ export class WindowsPrinterService {
               }
               .pdf-page-wrapper:last-child { page-break-after: auto; }
               canvas { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+              ${
+                isMonochrome
+                  ? `
+              html, body, #pdf-container, .pdf-page-wrapper, canvas {
+                filter: grayscale(100%) contrast(105%) !important;
+                -webkit-filter: grayscale(100%) contrast(105%) !important;
+              }
+              @media print {
+                * {
+                  filter: grayscale(100%) contrast(105%) !important;
+                  -webkit-filter: grayscale(100%) contrast(105%) !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              }
+              `
+                  : ""
+              }
             </style>
           </head>
           <body>
@@ -641,6 +1054,7 @@ export class WindowsPrinterService {
                   const pdf = await loadingTask.promise;
                   window.__PDF_NUM_PAGES__ = pdf.numPages;
                   const container = document.getElementById('pdf-container');
+                  const isMono = ${isMonochrome ? "true" : "false"};
 
                   // Render pages efficiently
                   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -656,6 +1070,25 @@ export class WindowsPrinterService {
                     const ctx = canvas.getContext('2d');
 
                     await page.render({ canvasContext: ctx, viewport }).promise;
+
+                    if (isMono) {
+                      try {
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const d = imgData.data;
+                        const len = d.length;
+                        for (let i = 0; i < len; i += 4) {
+                          // ITU-R BT.601 perceptual luminance conversion (pure achromatic grayscale)
+                          const gray = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+                          d[i] = gray;
+                          d[i + 1] = gray;
+                          d[i + 2] = gray;
+                        }
+                        ctx.putImageData(imgData, 0, 0);
+                      } catch (canvasErr) {
+                        console.warn('Canvas pixel desaturation fallback:', canvasErr);
+                      }
+                    }
+
                     pageWrapper.appendChild(canvas);
                     container.appendChild(pageWrapper);
                   }
@@ -723,6 +1156,13 @@ export class WindowsPrinterService {
         const fileUrl = `file://${path.resolve(filePath).replace(/\\/g, "/")}`;
         const orientationCss = options.landscape ? "landscape" : "portrait";
         const pageCssSize = options.paperSize || "A4";
+        const isMonochrome = options.colorMode !== "COLOR";
+
+        const imageBuffer = fs.readFileSync(filePath);
+        const base64Img = imageBuffer.toString("base64");
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+        const dataUri = `data:${mimeType};base64,${base64Img}`;
 
         const wrapperHtml = `
           <!DOCTYPE html>
@@ -737,23 +1177,87 @@ export class WindowsPrinterService {
                 overflow: hidden; background: #ffffff;
                 display: flex; justify-content: center; align-items: center;
               }
-              img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+              canvas, img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+              ${
+                isMonochrome
+                  ? `
+              html, body, img, canvas {
+                filter: grayscale(100%) contrast(105%) !important;
+                -webkit-filter: grayscale(100%) contrast(105%) !important;
+              }
+              @media print {
+                * {
+                  filter: grayscale(100%) contrast(105%) !important;
+                  -webkit-filter: grayscale(100%) contrast(105%) !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              }
+              `
+                  : ""
+              }
             </style>
           </head>
           <body>
-            <img src="${fileUrl}" />
+            ${
+              isMonochrome
+                ? `
+            <canvas id="mono-canvas"></canvas>
+            <script>
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.getElementById('mono-canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                try {
+                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const d = imgData.data;
+                  for (let i = 0; i < d.length; i += 4) {
+                    const gray = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) | 0;
+                    d[i] = gray;
+                    d[i + 1] = gray;
+                    d[i + 2] = gray;
+                  }
+                  ctx.putImageData(imgData, 0, 0);
+                } catch (e) {
+                  console.warn('Image canvas mono fallback:', e);
+                }
+                window.__IMAGE_PRINT_READY__ = true;
+              };
+              img.onerror = () => {
+                window.__IMAGE_PRINT_READY__ = true;
+              };
+              img.src = "${dataUri}";
+            </script>
+            `
+                : `
+            <img src="${dataUri}" onload="window.__IMAGE_PRINT_READY__ = true" />
+            <script>
+              window.__IMAGE_PRINT_READY__ = true;
+            </script>
+            `
+            }
           </body>
           </html>
         `;
 
-        printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(wrapperHtml)}`).catch((err) => {
+        const tempImgHtmlPath = path.join(os.tmpdir(), `p2m-img-render-${Date.now()}.html`);
+        fs.writeFileSync(tempImgHtmlPath, wrapperHtml, "utf-8");
+
+        printWindow.loadFile(tempImgHtmlPath).catch((err) => {
           clearTimeout(timeoutTimer);
           cleanupWindow();
+          try { fs.unlinkSync(tempImgHtmlPath); } catch {}
           reject(new Error(`Failed to load image wrapper: ${err.message}`));
         });
 
         printWindow.webContents.on("did-finish-load", () => {
-          setTimeout(() => doPrint(1), 400);
+          setTimeout(() => {
+            try { if (fs.existsSync(tempImgHtmlPath)) fs.unlinkSync(tempImgHtmlPath); } catch {}
+            doPrint(1);
+          }, 350);
         });
       }
     });
@@ -766,9 +1270,10 @@ export class WindowsPrinterService {
     if (os.platform() !== "win32") return [];
 
     try {
+      const safeTarget = printerName ? printerName.replace(/'/g, "''") : "";
       const psScript = `
         $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-        $target = $args[0]
+        $target = '${safeTarget}'
         try {
           $jobs = if ($target) {
             Get-CimInstance -ClassName Win32_PrintJob -Filter "Name LIKE '%$($target -replace "'", "''")%'" -ErrorAction Stop
@@ -786,10 +1291,6 @@ export class WindowsPrinterService {
       `;
 
       const args = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psScript];
-      if (printerName) {
-        args.push(printerName);
-      }
-
       const { stdout } = await execFileAsync("powershell.exe", args, { timeout: 6000 });
       const rawText = stdout.trim();
       if (!rawText || rawText === "[]" || rawText === "null") return [];
@@ -933,11 +1434,13 @@ export class WindowsPrinterService {
         </div>
         <div class="box">
           <div class="row"><span class="label">Target Windows Printer:</span><span class="value">${printer.systemName}</span></div>
+          <div class="row"><span class="label">Connection Type:</span><span class="value" style="color:#0284C7;font-weight:800;">${printer.connectionType} — ${printer.connectionDetails}</span></div>
           <div class="row"><span class="label">Windows Driver:</span><span class="value">${printer.driverName || "Standard Driver"}</span></div>
           <div class="row"><span class="label">Assigned Port:</span><span class="value">${printer.portName || "Unknown"}</span></div>
           <div class="row"><span class="label">OS Default Printer:</span><span class="value">${printer.isDefault ? "Yes" : "No"}</span></div>
           <div class="row"><span class="label">Color Support:</span><span class="value">${printer.supportsColor ? "Full Color" : "Monochrome"}</span></div>
           <div class="row"><span class="label">Duplex (Two-Sided) Support:</span><span class="value">${printer.supportsDuplex ? "Supported" : "Single-Sided Only"}</span></div>
+          <div class="row"><span class="label">Supported Paper Sizes:</span><span class="value">${printer.supportedSizes.slice(0, 8).join(", ")}</span></div>
           <div class="row"><span class="label">Test Execution Timestamp:</span><span class="value">${new Date().toLocaleString()}</span></div>
         </div>
         <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Color &amp; Alignment Calibration Bars:</div>
@@ -969,6 +1472,83 @@ export class WindowsPrinterService {
         if (fs.existsSync(tempTestFile)) fs.unlinkSync(tempTestFile);
       } catch {}
     }
+  }
+
+  /**
+   * Diagnostic summary of network adapters, spooler, and connected printer types
+   */
+  async getNetworkDiagnostics(): Promise<{
+    hasActiveWifi: boolean;
+    hasActiveEthernet: boolean;
+    networkAdapters: Array<{ name: string; description: string; type: string; status: string }>;
+    spoolerRunning: boolean;
+    printersByConnection: Record<PrinterConnectionType, number>;
+  }> {
+    const printers = await this.getInstalledPrinters(false);
+    const printersByConnection: Record<PrinterConnectionType, number> = {
+      USB: 0,
+      WIFI: 0,
+      ETHERNET: 0,
+      SHARED: 0,
+      IPP: 0,
+      OTHER: 0,
+    };
+
+    for (const p of printers) {
+      if (printersByConnection[p.connectionType] !== undefined) {
+        printersByConnection[p.connectionType]++;
+      } else {
+        printersByConnection.OTHER++;
+      }
+    }
+
+    let hasActiveWifi = false;
+    let hasActiveEthernet = false;
+    const networkAdapters: Array<{ name: string; description: string; type: string; status: string }> = [];
+
+    if (os.platform() === "win32") {
+      try {
+        const psScript = `
+          [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | ForEach-Object {
+            [PSCustomObject]@{
+              Name = $_.Name
+              Description = $_.Description
+              Type = $_.NetworkInterfaceType.ToString()
+              Status = $_.OperationalStatus.ToString()
+            }
+          } | ConvertTo-Json -Depth 2 -Compress
+        `;
+        const { stdout } = await execFileAsync(
+          "powershell.exe",
+          ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", psScript],
+          { timeout: 6000 }
+        );
+        const parsed = JSON.parse(stdout.trim() || "[]");
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+          if (!item || !item.Name) continue;
+          const isUp = item.Status === "Up";
+          if (isUp && item.Type === "Wireless80211") hasActiveWifi = true;
+          if (isUp && item.Type === "Ethernet") hasActiveEthernet = true;
+          networkAdapters.push({
+            name: String(item.Name),
+            description: String(item.Description || ""),
+            type: String(item.Type || "Unknown"),
+            status: String(item.Status || "Unknown"),
+          });
+        }
+      } catch {}
+    }
+
+    const spoolerRunning = printers.length > 0 ? printers[0].status !== "SPOOLER_STOPPED" : true;
+
+    return {
+      hasActiveWifi,
+      hasActiveEthernet,
+      networkAdapters,
+      spoolerRunning,
+      printersByConnection,
+    };
   }
 }
 

@@ -11,6 +11,7 @@ export interface PrintAgentApi {
   openPrinterQueue: (printerName: string) => Promise<any>;
   openWindowsPrinterSettings: () => Promise<any>;
   getDiagnostics: () => Promise<any>;
+  getNetworkTroubleshooting: () => Promise<any>;
   retryJob: (params: { idempotencyKey: string }) => Promise<any>;
   getJobHistory: () => Promise<any>;
   printOrderDirect: (params: { orderId: string; orderNumber?: string; printerName?: string; copies?: number; forceRetry?: boolean }) => Promise<any>;
@@ -67,6 +68,7 @@ const printAgentApi: PrintAgentApi = {
   openPrinterQueue: (printerName) => ipcRenderer.invoke("agent:open-printer-queue", printerName),
   openWindowsPrinterSettings: () => ipcRenderer.invoke("agent:open-windows-printer-settings"),
   getDiagnostics: () => ipcRenderer.invoke("agent:get-diagnostics"),
+  getNetworkTroubleshooting: () => ipcRenderer.invoke("agent:get-network-troubleshooting"),
   retryJob: (params) => ipcRenderer.invoke("agent:retry-job", params),
   getJobHistory: () => ipcRenderer.invoke("agent:get-job-history"),
   printOrderDirect: (params) => ipcRenderer.invoke("agent:print-order-direct", params),
